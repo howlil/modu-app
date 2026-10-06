@@ -14,12 +14,7 @@
     "dev": "vite dev",
     "build": "vite build",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "test": "vitest run",
-    "cf:build": "bun install && bun run build",
-    "pages:dev": "bun run build && bunx wrangler pages dev .svelte-kit/cloudflare",
-    "pages:deploy": "bun run build && bun run cf:deploy",
-    "deploy": "bun run pages:deploy",
-    "cf:deploy": "bunx wrangler pages deploy .svelte-kit/cloudflare --project-name=modu-app"
+    "test": "vitest run"
   },
   "dependencies": {
     "bits-ui": "^2.19.5"
@@ -34,7 +29,6 @@
     "tailwindcss": "^4.0.0",
     "typescript": "^6.0.0",
     "vite": "^8.0.12",
-    "vitest": "^4.0.0",
-    "wrangler": "^4.148.0"
+    "vitest": "^4.0.0"
   }
 }
