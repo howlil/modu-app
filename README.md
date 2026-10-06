@@ -1,100 +1,94 @@
 # Module
 
-Local-first browser utilities built with SvelteKit.
+Local-first browser utilities built with SvelteKit, Tailwind CSS, Bits UI, and Bun.
 
-## Start
+## Current scope
+
+Only three modules are kept while the architecture is still being proven:
+
+- Merge PDF
+- Pomodoro
+- Typing Practice
+
+Do not add more tools until one of these is implemented end-to-end and the shared pattern is clear.
+
+## Local development
 
 ```bash
-pnpm install
-pnpm dev
+bun install
+bun run dev
 ```
 
-## Verify
+Verify:
 
 ```bash
-pnpm check
-pnpm test:unit
-pnpm test:e2e
-pnpm build
+bun run check
+bun run test
+bun run build
 ```
 
-## Architecture
+The first `bun install` will create `bun.lock`. Commit that lockfile once generated.
 
-Read these before material changes:
+## Cloudflare Pages
+
+This repository is a **Cloudflare Pages** project, not a Worker project.
+
+### Recommended: Pages Git integration
+
+In Cloudflare, create/import it from **Workers & Pages → Pages → Import an existing Git repository**.
+
+Use:
+
+```text
+Production branch: master
+Build command: bun run cf:build
+Build output directory: .svelte-kit/cloudflare
+Root directory: /
+```
+
+Build environment variables:
+
+```text
+BUN_VERSION=1.2.15
+NODE_VERSION=22.17.0
+SKIP_DEPENDENCY_INSTALL=1
+```
+
+`SKIP_DEPENDENCY_INSTALL=1` is intentional because `bun run cf:build` performs `bun install` itself.
+
+For a normal Pages Git-integrated project, Cloudflare deploys the build output automatically after a successful build.
+
+### If your Cloudflare project has a Deploy command field
+
+Do **not** use:
+
+```bash
+wrangler deploy
+```
+
+That command targets Workers and causes the "Missing entry-point to Worker script" error.
+
+Use:
+
+```bash
+bunx wrangler pages deploy .svelte-kit/cloudflare --project-name=modu-app
+```
+
+Or recreate/import the repository as a proper **Pages** project and let Pages deploy automatically.
+
+### Manual deploy
+
+```bash
+bun install
+bun run deploy
+```
+
+The manual deploy script builds first, then runs `wrangler pages deploy`.
+
+## Source of truth
 
 1. `AGENTS.md`
 2. `DESIGN.md`
-3. `.agents/product-design.md` when product behavior is unresolved
-4. `.agents/engineering-design.md` when system boundaries are unresolved
+3. existing code/tests
 
-Core dependency direction:
-
-```text
-routes/UI
-   ↓
-module
-   ↓
-platform
-   ↓
-browser APIs / libraries
-```
-
-Cloudflare distributes the app. The browser is the primary application runtime.
-
-## UI stack
-
-- Tailwind CSS v4 for styling and Module tokens
-- shadcn-svelte as the preferred styled component registry
-- Bits UI for accessible headless primitives
-- Arc/UIArc as a visual/interaction reference only while its official components remain React-only
-
-Do not hand-roll generic UI primitives when a suitable Svelte library component exists.
-
-## Deploy to Cloudflare Pages
-
-This repository targets **Cloudflare Pages** with the SvelteKit Cloudflare adapter.
-
-### Git integration
-
-Create a Pages project from this GitHub repository and use:
-
-```text
-Framework preset: SvelteKit
-Production branch: master
-Build command: pnpm build
-Build output directory: .svelte-kit/cloudflare
-Root directory: /
-Node version: 22.17.0
-```
-
-Node is pinned in `.node-version` because SvelteKit 3 requires Node 22.17 or newer.
-
-Cloudflare will build and deploy every push to the production branch and create preview deployments for eligible branches / pull requests.
-
-### Wrangler deploy
-
-Authenticate once:
-
-```bash
-pnpm wrangler login
-```
-
-Then deploy the current repository to the Pages project declared in `wrangler.jsonc`:
-
-```bash
-pnpm pages:deploy
-```
-
-Local Pages runtime preview:
-
-```bash
-pnpm pages:dev
-```
-
-The Pages output directory is:
-
-```text
-.svelte-kit/cloudflare
-```
-
-Do not replace the Pages deploy command with plain `wrangler deploy`; that targets Cloudflare Workers rather than the Pages deployment flow.
+Cloudflare distributes the app. The browser is the application runtime.
