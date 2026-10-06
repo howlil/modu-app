@@ -48,6 +48,11 @@ Prefer deleting dead scaffold over preserving hypothetical architecture.
 - Add new generic components with `bun x shadcn-svelte@latest add [component]`.
 - UIArc is a visual/interaction reference only while its official implementation is React-only.
 - Do not manually port UIArc React components to Svelte.
+- Do not use badges for static product claims, architecture labels, or decorative metadata.
+- Do not add explanatory copy when the title/control/context already makes the behavior clear.
+- Never expose scaffold state, implementation notes, vertical-slice notes, or engineering rationale in user-facing copy.
+- Privacy copy belongs near sensitive input boundaries; do not repeat the same privacy claim across the app.
+- A Card is not the default container. Use it only when the content is a real independent object or functional group.
 
 ## Architecture
 
