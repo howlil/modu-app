@@ -89,7 +89,7 @@ Do not introduce pnpm/npm/yarn scripts or lockfiles. Commit `bun.lock` after the
 
 ## Cloudflare
 
-Deployment target is **Cloudflare Pages Git Integration**.
+Deployment target is **Cloudflare Workers Builds**.
 
 Cloudflare configuration:
 
@@ -100,11 +100,11 @@ Build output directory: .svelte-kit/cloudflare
 Root directory: /
 ```
 
-There is no repository deploy command. Pages uploads the build output automatically.
+Deploy command: `npx wrangler deploy`. Wrangler deploys the generated SvelteKit Worker and its static assets.
 
-If the Cloudflare project UI asks for a Deploy command or defaults to `wrangler deploy`, the repository was connected as a Workers Builds project. Recreate/import it through the Pages flow instead of adding a Worker entrypoint.
+This repository intentionally uses Workers Builds. The deploy command is `npx wrangler deploy`, backed by the committed `wrangler.jsonc`.
 
-Do not add `wrangler deploy`, a Worker `main`, or an assets-only Worker config to make a misconfigured Workers project pass.
+Do not remove `wrangler.jsonc`; it prevents Wrangler auto-configuration during deploy.
 
 ## Completion
 
