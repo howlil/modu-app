@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Button } from 'bits-ui';
   import ToolHeader from '#lib/components/ToolHeader.svelte';
   import { getRemainingMs, type TimerState } from '#lib/modules/pomodoro/timer.ts';
 
@@ -14,7 +15,7 @@
 
 <svelte:head><title>Pomodoro — Module</title></svelte:head>
 
-<section class="page">
+<section class="py-12 max-[760px]:py-7">
   <ToolHeader
     eyebrow="Module / Productivity"
     title="Pomodoro"
@@ -22,56 +23,21 @@
     privacy="Timer state stays local"
   />
 
-  <div class="focus">
-    <div class="timer">
-      <strong>{minutes}:00</strong>
-      <span>Ready to focus</span>
+  <div class="mx-auto max-w-[720px] text-center">
+    <div class="mx-auto my-6 grid size-[250px] place-items-center content-center gap-1 rounded-full border-[12px] border-[#eeeeea] border-r-brand border-t-brand">
+      <strong class="text-[52px] tracking-[-0.05em]">{minutes}:00</strong>
+      <span class="text-[13px] text-muted">Ready to focus</span>
     </div>
 
-    <div class="controls">
-      <button class="button primary" type="button">Start</button>
-      <button class="button" type="button">Reset</button>
+    <div class="flex justify-center gap-2">
+      <Button.Root class="inline-flex min-h-9 min-w-[120px] items-center justify-center rounded-lg border border-brand bg-brand px-3 text-[13px] font-[650] text-white hover:bg-brand-deep" type="button">
+        Start
+      </Button.Root>
+      <Button.Root class="inline-flex min-h-9 items-center justify-center rounded-lg border border-line bg-surface px-3 text-[13px] font-[650] hover:bg-surface-soft" type="button">
+        Reset
+      </Button.Root>
     </div>
 
-    <p>Interaction and persistence are intentionally left for the Pomodoro vertical slice.</p>
+    <p class="text-[13px] text-muted">Interaction and persistence are intentionally left for the Pomodoro vertical slice.</p>
   </div>
 </section>
-
-<style>
-  .focus {
-    max-width: 720px;
-    margin: 0 auto;
-    text-align: center;
-  }
-
-  .timer {
-    display: grid;
-    width: 250px;
-    height: 250px;
-    place-items: center;
-    align-content: center;
-    gap: 4px;
-    margin: 24px auto;
-    border: 12px solid #eeeeea;
-    border-top-color: var(--brand);
-    border-right-color: var(--brand);
-    border-radius: 50%;
-  }
-
-  .timer strong {
-    font-size: 52px;
-    letter-spacing: -0.05em;
-  }
-
-  .timer span,
-  .focus p {
-    color: var(--muted);
-    font-size: 13px;
-  }
-
-  .controls {
-    display: flex;
-    justify-content: center;
-    gap: 8px;
-  }
-</style>
