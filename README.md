@@ -40,3 +40,12 @@ browser APIs / libraries
 ```
 
 Cloudflare distributes the app. The browser is the primary application runtime.
+
+## UI stack
+
+- Tailwind CSS v4 for styling and Module tokens
+- shadcn-svelte as the preferred styled component registry
+- Bits UI for accessible headless primitives
+- Arc/UIArc as a visual/interaction reference only while its official components remain React-only
+
+Do not hand-roll generic UI primitives when a suitable Svelte library component exists.
