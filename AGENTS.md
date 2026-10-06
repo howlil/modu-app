@@ -87,27 +87,22 @@ Do not introduce pnpm/npm/yarn scripts or lockfiles. Commit `bun.lock` after the
 
 ## Cloudflare
 
-Deployment target is Cloudflare Pages.
+Deployment target is **Cloudflare Pages Git Integration**.
 
-Build output:
+Cloudflare configuration:
 
 ```text
-.svelte-kit/cloudflare
+Production branch: master
+Build command: bun run build
+Build output directory: .svelte-kit/cloudflare
+Root directory: /
 ```
 
-Allowed:
+There is no repository deploy command. Pages uploads the build output automatically.
 
-```bash
-bunx wrangler pages deploy .svelte-kit/cloudflare --project-name=modu-app
-```
+If the Cloudflare project UI asks for a Deploy command or defaults to `wrangler deploy`, the repository was connected as a Workers Builds project. Recreate/import it through the Pages flow instead of adding a Worker entrypoint.
 
-Forbidden:
-
-```bash
-wrangler deploy
-```
-
-Plain `wrangler deploy` targets Workers and fails because this repo intentionally has no Worker entrypoint.
+Do not add `wrangler deploy`, a Worker `main`, or an assets-only Worker config to make a misconfigured Workers project pass.
 
 ## Completion
 
