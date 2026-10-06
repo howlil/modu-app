@@ -43,7 +43,9 @@ Prefer deleting dead scaffold over preserving hypothetical architecture.
 
 - Tailwind CSS v4 is the default styling system.
 - Reuse components when repetition is real.
-- For generic interactive primitives, check Bits UI first.
+- For generic interactive primitives, use shadcn-svelte first.
+- Import generic UI from `$lib/components/ui/*`; do not import `bits-ui` directly from routes when shadcn-svelte provides the component.
+- Add new generic components with `bun x shadcn-svelte@latest add [component]`.
 - UIArc is a visual/interaction reference only while its official implementation is React-only.
 - Do not manually port UIArc React components to Svelte.
 
