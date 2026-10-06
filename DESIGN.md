@@ -110,9 +110,11 @@ Cloudflare Pages
 
 Package manager: Bun.
 
-Deployment target: Cloudflare Pages.
+Deployment target: Cloudflare Pages Git Integration.
 
-Never use plain `wrangler deploy`. Direct upload must use `wrangler pages deploy`.
+Cloudflare builds with `bun run build` and publishes `.svelte-kit/cloudflare` automatically. The normal deployment path has no Wrangler deploy command.
+
+If a Cloudflare project asks for `wrangler deploy`, it is a Workers Builds project and should be recreated/imported through the Pages flow rather than adapted into a Worker.
 
 ## 9. Definition of done
 
