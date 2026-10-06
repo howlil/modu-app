@@ -17,7 +17,9 @@
     "test": "pnpm test:unit && pnpm test:e2e",
     "test:unit": "vitest run",
     "test:e2e": "playwright test",
-    "deploy": "pnpm build && wrangler deploy"
+    "deploy": "pnpm build && wrangler pages deploy",
+    "pages:dev": "pnpm build && wrangler pages dev",
+    "pages:deploy": "pnpm build && wrangler pages deploy"
   },
   "dependencies": {
     "bits-ui": "^2.19.5",
@@ -36,5 +38,6 @@
     "vite": "^8.0.12",
     "vitest": "^4.0.0",
     "wrangler": "^4.67.0"
-  }
+  },
+  "packageManager": "pnpm@10.11.1"
 }
