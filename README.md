@@ -4,13 +4,11 @@ Local-first browser utilities built with SvelteKit, Tailwind CSS, Bits UI, and B
 
 ## Current scope
 
-Only three modules are kept while the architecture is still being proven:
-
 - Merge PDF
 - Pomodoro
 - Typing Practice
 
-Do not add more tools until one of these is implemented end-to-end and the shared pattern is clear.
+Do not expand the tool catalog until one current module is implemented end-to-end.
 
 ## Local development
 
@@ -27,74 +25,58 @@ bun run test
 bun run build
 ```
 
-The first `bun install` will create `bun.lock`. Commit that lockfile once generated.
+Commit `bun.lock` after the first successful `bun install`.
 
 ## Cloudflare Pages
 
-This repository is a **Cloudflare Pages** project, not a Worker project.
+This repository targets **Cloudflare Pages Git Integration**.
 
-### Recommended: Pages Git integration
+Create the project from:
 
-In Cloudflare, create/import it from **Workers & Pages → Pages → Import an existing Git repository**.
+```text
+Workers & Pages
+→ Create application
+→ Pages
+→ Import an existing Git repository
+→ howlil/modu-app
+```
 
 Use:
 
 ```text
 Production branch: master
-Build command: bun run cf:build
+Build command: bun run build
 Build output directory: .svelte-kit/cloudflare
 Root directory: /
 ```
 
-Build environment variables:
+Build environment:
 
 ```text
 BUN_VERSION=1.2.15
 NODE_VERSION=22.17.0
-SKIP_DEPENDENCY_INSTALL=1
 ```
 
-`SKIP_DEPENDENCY_INSTALL=1` is intentional because `bun run cf:build` performs `bun install` itself.
+A proper Pages Git project deploys automatically after the build succeeds.
 
-For a normal Pages Git-integrated project, Cloudflare deploys the build output automatically after a successful build.
+There should be **no Deploy command field** for this repository.
 
-### If your Cloudflare project has a Deploy command field
-
-Do **not** use:
+If the Cloudflare screen shows a Deploy command such as:
 
 ```bash
-wrangler deploy
+npx wrangler deploy
 ```
 
-That command targets Workers and causes the "Missing entry-point to Worker script" error.
+you created or connected the repository as a **Workers Builds** project. Do not add a Worker entrypoint to make that command pass. Recreate/import the repository under the **Pages** flow instead.
 
-Use:
+The SvelteKit Pages build output is:
 
-```bash
-bun run cf:deploy
+```text
+.svelte-kit/cloudflare
 ```
-
-This expands to:
-
-```bash
-bunx wrangler pages deploy .svelte-kit/cloudflare --project-name=modu-app
-```
-
-Or recreate/import the repository as a proper **Pages** project and let Pages deploy automatically.
-
-### Manual deploy
-
-```bash
-bun install
-bun run deploy
-```
-
-The manual deploy script builds first, then runs `wrangler pages deploy`.
 
 ## Source of truth
 
 1. `AGENTS.md`
 2. `DESIGN.md`
 3. existing code/tests
-
-Cloudflare distributes the app. The browser is the application runtime.
