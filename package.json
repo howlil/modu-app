@@ -17,8 +17,9 @@
     "test": "vitest run",
     "cf:build": "bun install && bun run build",
     "pages:dev": "bun run build && bunx wrangler pages dev .svelte-kit/cloudflare",
-    "pages:deploy": "bun run build && bunx wrangler pages deploy .svelte-kit/cloudflare --project-name=modu-app",
-    "deploy": "bun run pages:deploy"
+    "pages:deploy": "bun run build && bun run cf:deploy",
+    "deploy": "bun run pages:deploy",
+    "cf:deploy": "bunx wrangler pages deploy .svelte-kit/cloudflare --project-name=modu-app"
   },
   "dependencies": {
     "bits-ui": "^2.19.5"
