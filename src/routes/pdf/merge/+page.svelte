@@ -1,10 +1,11 @@
 <script lang="ts">
+  import { Button } from 'bits-ui';
   import ToolHeader from '#lib/components/ToolHeader.svelte';
 </script>
 
 <svelte:head><title>Merge PDF — Module</title></svelte:head>
 
-<section class="page">
+<section class="py-12 max-[760px]:py-7">
   <ToolHeader
     eyebrow="Module / Files / PDF"
     title="Merge PDF"
@@ -12,31 +13,47 @@
     privacy="Files stay on this device"
   />
 
-  <div class="workspace">
+  <div class="grid grid-cols-[minmax(0,1fr)_290px] items-start gap-[22px] max-[860px]:grid-cols-1">
     <div>
-      <div class="dropzone">
+      <div class="grid min-h-60 place-items-center rounded-xl border border-dashed border-[#cdcdc7] bg-surface p-6 text-center">
         <div>
-          <div class="drop-icon">↑</div>
+          <div class="mx-auto mb-3 grid size-11 place-items-center rounded-[10px] bg-brand-soft text-brand">↑</div>
           <strong>Drop PDF files here</strong>
-          <p>or choose files from your device</p>
-          <button class="button" type="button">Choose files</button>
+          <p class="mt-1.5 text-xs leading-6 text-muted">or choose files from your device</p>
+          <Button.Root
+            class="mt-3.5 inline-flex min-h-9 items-center justify-center rounded-lg border border-line bg-surface px-3 text-[13px] font-[650] hover:bg-surface-soft"
+            type="button"
+          >
+            Choose files
+          </Button.Root>
         </div>
       </div>
 
-      <div class="placeholder-list">Selected files will appear here.</div>
+      <div class="mt-3.5 rounded-[10px] border border-line bg-surface p-[18px] text-[13px] text-muted">
+        Selected files will appear here.
+      </div>
     </div>
 
-    <aside class="panel">
-      <div class="panel-head">Output</div>
-      <div class="panel-body options">
-        <label class="field">
-          <span>File name</span>
-          <input class="input" value="merged.pdf" />
+    <aside class="rounded-xl border border-line bg-surface">
+      <div class="flex min-h-12 items-center border-b border-line px-3.5 text-[13px] font-bold">Output</div>
+      <div class="grid gap-3.5 p-3.5">
+        <label class="grid gap-[7px]">
+          <span class="text-xs font-[650] text-[#5d5d5d]">File name</span>
+          <input
+            class="h-[38px] w-full rounded-lg border border-line bg-surface px-2.5 text-[13px] outline-none focus:border-brand/50 focus:ring-3 focus:ring-brand/10"
+            value="merged.pdf"
+          />
         </label>
 
-        <button class="button primary block" type="button" disabled>Merge PDF</button>
+        <Button.Root
+          class="inline-flex min-h-9 w-full items-center justify-center rounded-lg border border-brand bg-brand px-3 text-[13px] font-[650] text-white hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-50"
+          type="button"
+          disabled
+        >
+          Merge PDF
+        </Button.Root>
 
-        <p class="local-note">
+        <p class="m-0 text-xs leading-6 text-muted">
           The PDF engine is intentionally not wired in this scaffold. Add it as a lazy-loaded,
           worker-backed vertical slice.
         </p>
@@ -44,62 +61,3 @@
     </aside>
   </div>
 </section>
-
-<style>
-  .workspace {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 290px;
-    gap: 22px;
-    align-items: start;
-  }
-
-  .dropzone {
-    display: grid;
-    min-height: 240px;
-    place-items: center;
-    border: 1px dashed #cdcdc7;
-    border-radius: 12px;
-    background: var(--surface);
-    padding: 24px;
-    text-align: center;
-  }
-
-  .dropzone p,
-  .local-note {
-    color: var(--muted);
-    font-size: 12px;
-    line-height: 1.5;
-  }
-
-  .drop-icon {
-    display: grid;
-    width: 44px;
-    height: 44px;
-    place-items: center;
-    margin: 0 auto 12px;
-    border-radius: 10px;
-    background: var(--brand-soft);
-    color: var(--brand);
-  }
-
-  .placeholder-list {
-    margin-top: 14px;
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    background: var(--surface);
-    padding: 18px;
-    color: var(--muted);
-    font-size: 13px;
-  }
-
-  .options {
-    display: grid;
-    gap: 14px;
-  }
-
-  @media (max-width: 860px) {
-    .workspace {
-      grid-template-columns: 1fr;
-    }
-  }
-</style>
