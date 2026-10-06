@@ -15,102 +15,37 @@
   const items = getModulesByCategory(category);
 </script>
 
-<section class="page">
-  <div class="page-head">
-    <div>
-      <div class="breadcrumb">Module / {title}</div>
-      <h1 class="page-title">{title}</h1>
-      <p class="page-copy">{description}</p>
-    </div>
+<section class="py-12 max-[760px]:py-7">
+  <div class="mb-7">
+    <div class="mb-3 text-xs text-muted-2">Module / {title}</div>
+    <h1 class="m-0 text-[clamp(30px,4vw,36px)] font-[750] leading-[1.05] tracking-[-0.045em]">{title}</h1>
+    <p class="mt-2 max-w-[680px] text-sm leading-[1.55] text-muted">{description}</p>
   </div>
 
-  <div class="search-wrap">
-    <span>⌕</span>
-    <input aria-label={"Search in " + title} placeholder={"Search in " + title} />
-  </div>
+  <label class="relative mb-5 block">
+    <span class="pointer-events-none absolute left-[13px] top-1/2 -translate-y-1/2 text-muted">⌕</span>
+    <input
+      class="h-[42px] w-full rounded-[9px] border border-line bg-surface pl-[38px] pr-3 text-[13px] outline-none focus:border-brand/50 focus:ring-3 focus:ring-brand/10"
+      aria-label={"Search in " + title}
+      placeholder={"Search in " + title}
+    />
+  </label>
 
-  <div class="tool-list">
+  <div class="overflow-hidden rounded-[10px] border border-line bg-surface">
     {#each items as item}
-      <a class="tool-row" href={item.route}>
-        <div class="tool-icon">{item.name.slice(0, 2)}</div>
-        <div>
-          <div class="name">{item.name}</div>
-          <div class="description">{item.description}</div>
+      <a
+        class="grid min-h-[68px] grid-cols-[38px_1fr_auto] items-center gap-3 border-b border-line px-3 py-2.5 last:border-b-0 hover:bg-brand-pale"
+        href={item.route}
+      >
+        <div class="grid size-[38px] place-items-center rounded-[10px] border border-line bg-surface-soft text-[15px] font-bold">
+          {item.name.slice(0, 2)}
         </div>
-        <span class="arrow">→</span>
+        <div>
+          <div class="text-[13px] font-bold">{item.name}</div>
+          <div class="mt-[3px] text-xs text-muted">{item.description}</div>
+        </div>
+        <span class="text-muted-2">→</span>
       </a>
     {/each}
   </div>
 </section>
-
-<style>
-  .breadcrumb {
-    margin-bottom: 12px;
-    color: var(--muted-2);
-    font-size: 12px;
-  }
-
-  .search-wrap {
-    position: relative;
-    margin-bottom: 20px;
-  }
-
-  .search-wrap span {
-    position: absolute;
-    top: 50%;
-    left: 13px;
-    transform: translateY(-50%);
-    color: var(--muted);
-  }
-
-  .search-wrap input {
-    width: 100%;
-    height: 42px;
-    border: 1px solid var(--line);
-    border-radius: 9px;
-    background: var(--surface);
-    padding: 0 12px 0 38px;
-    outline: none;
-    font-size: 13px;
-  }
-
-  .tool-list {
-    overflow: hidden;
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    background: var(--surface);
-  }
-
-  .tool-row {
-    display: grid;
-    min-height: 68px;
-    grid-template-columns: 38px 1fr auto;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 12px;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .tool-row:last-child {
-    border-bottom: 0;
-  }
-
-  .tool-row:hover {
-    background: var(--brand-pale);
-  }
-
-  .name {
-    font-size: 13px;
-    font-weight: 700;
-  }
-
-  .description {
-    margin-top: 3px;
-    color: var(--muted);
-    font-size: 12px;
-  }
-
-  .arrow {
-    color: var(--muted-2);
-  }
-</style>
