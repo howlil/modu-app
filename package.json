@@ -20,6 +20,7 @@
     "deploy": "pnpm build && wrangler deploy"
   },
   "dependencies": {
+    "bits-ui": "^2.19.5",
     "dexie": "^4.0.0"
   },
   "devDependencies": {
