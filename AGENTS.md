@@ -223,6 +223,18 @@ Visual rules:
 - motion only when it explains state/continuity
 - functional hierarchy beats decoration
 
+Component rules:
+
+- Tailwind CSS v4 is the default styling system
+- prefer Tailwind utilities over component-scoped CSS
+- do not create a parallel bespoke CSS component system
+- before building a generic UI primitive, search shadcn-svelte / Bits UI first
+- use library primitives for accessibility/state/focus behavior
+- compose reusable Module-specific components only when Module adds stable product semantics or repeated layout
+- do not manually port React components from UIArc into Svelte
+- UIArc is currently a React-only reference; use the Svelte-native equivalent until official Svelte support exists
+- if a library component exists and fits the requirement, use it rather than rebuilding it
+
 ---
 
 ## 8. Local-First / Privacy Rules
