@@ -46,7 +46,7 @@
     max-width: 760px;
   }
 
-  section {
+  .settings > section {
     padding: 0 0 26px;
     margin-bottom: 26px;
     border-bottom: 1px solid var(--line);
