@@ -560,7 +560,92 @@ Prefer compact, readable working interfaces over oversized type.
 
 ---
 
-## 12. Interaction Principles
+## 12. UI Component Strategy
+
+### Styling
+
+Tailwind CSS v4 is the only default styling system for application UI.
+
+Use:
+
+- Tailwind utility classes in Svelte markup
+- `@theme` in `src/app.css` for Module design tokens
+- minimal global/base CSS only when it cannot be expressed meaningfully as component utilities
+
+Do not add component-specific `<style>` blocks or recreate a parallel CSS component system unless a concrete limitation requires it.
+
+### Component sourcing
+
+**Library-first. Do not hand-roll generic UI primitives.**
+
+Before building a reusable primitive, search the component sources in this order:
+
+1. shadcn-svelte
+2. Bits UI
+3. an existing reusable component already in this repository
+4. native HTML when it is already the correct accessible primitive
+
+Examples that should come from a library when needed:
+
+- button behavior
+- dialog
+- drawer / sheet
+- command palette
+- dropdown / context menu
+- tooltip
+- popover
+- switch
+- checkbox / radio
+- tabs
+- select / combobox
+- slider
+- file dropzone behavior
+- toast
+- progress
+- accessible overlay/focus-management primitives
+
+App-specific composition is still owned by Module.
+
+Good reusable app components include:
+
+- `AppHeader`
+- `ToolHeader`
+- `CategoryPage`
+- future `ToolCard`, `ToolWorkspace`, or archetype-specific compositions when repetition is real
+
+Do not create wrappers merely to rename a library component. Wrap only when Module adds stable product behavior, semantics, or design-system defaults.
+
+### Arc / UIArc compatibility
+
+Arc UI (`uiarc.dev`) is a design/component reference we want to follow where useful, but its official registry currently requires **React 19** and installs TSX/CSS-module components through the shadcn CLI.
+
+Module remains a SvelteKit application.
+
+Therefore:
+
+- do not copy React Arc components into Svelte files
+- do not manually port Arc components to Svelte just to match the library
+- use Arc as visual/interaction reference where useful
+- use shadcn-svelte / Bits UI for the Svelte implementation
+- if Arc adds official Svelte support later, reevaluate and prefer the official implementation rather than a local port
+
+Configured Svelte component registry:
+
+```text
+components.json
+→ shadcn-svelte
+→ Bits UI primitives underneath where applicable
+```
+
+References:
+
+- https://uiarc.dev/docs/installation
+- https://www.shadcn-svelte.com/docs/installation/sveltekit
+- https://bits-ui.com/docs/getting-started
+
+---
+
+## 13. Interaction Principles
 
 ### Primary action
 
@@ -602,7 +687,7 @@ Honor reduced-motion preferences.
 
 ---
 
-## 13. Privacy UX
+## 14. Privacy UX
 
 Local-first is a product contract, not marketing copy.
 
@@ -640,7 +725,7 @@ Storage settings should communicate:
 
 ---
 
-## 14. Storage Model
+## 15. Storage Model
 
 Use storage according to state type.
 
@@ -668,7 +753,7 @@ Persist only state that has user value after reload/reopen.
 
 ---
 
-## 15. Engineering Architecture
+## 16. Engineering Architecture
 
 Primary boundary:
 
@@ -700,7 +785,7 @@ Do not add D1, R2, KV, auth, queues, or APIs without a concrete product requirem
 
 ---
 
-## 16. Rendering and Performance
+## 17. Rendering and Performance
 
 Prefer static-first, client-interactive pages.
 
@@ -731,7 +816,7 @@ A user opening Pomodoro must not download the PDF engine.
 
 ---
 
-## 17. Dependency Direction
+## 18. Dependency Direction
 
 Required direction:
 
@@ -762,7 +847,7 @@ Route components should remain thin.
 
 ---
 
-## 18. Initial Validation Modules
+## 19. Initial Validation Modules
 
 The first architecture should be proven against three different state shapes.
 
@@ -811,7 +896,7 @@ Do not expand to dozens of modules before these platform patterns are clean.
 
 ---
 
-## 19. Responsive Model
+## 20. Responsive Model
 
 Desktop prioritizes workspace efficiency.
 
@@ -829,7 +914,7 @@ Contextual desktop side navigation may disappear on mobile when breadcrumb + rel
 
 ---
 
-## 20. Accessibility Baseline
+## 21. Accessibility Baseline
 
 Every module should support:
 
@@ -846,7 +931,7 @@ Do not encode important meaning with color alone.
 
 ---
 
-## 21. Definition of Done — Product/UI
+## 22. Definition of Done — Product/UI
 
 A module is product-complete when:
 
@@ -864,7 +949,7 @@ A module is product-complete when:
 
 ---
 
-## 22. Decision Rules
+## 23. Decision Rules
 
 ### Product
 
@@ -907,7 +992,7 @@ If there is no concrete answer, do not add the infrastructure.
 
 ---
 
-## 23. Current Non-Goals
+## 24. Current Non-Goals
 
 Do not add without an explicit product requirement:
 
