@@ -1,10 +1,11 @@
 <script lang="ts">
+  import { Button } from 'bits-ui';
   import ToolHeader from '#lib/components/ToolHeader.svelte';
 </script>
 
 <svelte:head><title>Typing Practice — Module</title></svelte:head>
 
-<section class="page">
+<section class="py-12 max-[760px]:py-7">
   <ToolHeader
     eyebrow="Module / Productivity"
     title="Typing Practice"
@@ -12,80 +13,23 @@
     privacy="Session data stays local"
   />
 
-  <div class="modes">
-    <button class="active" type="button">Time</button>
-    <button type="button">Words</button>
-    <button type="button">Paragraph</button>
-    <button type="button">Custom</button>
+  <div class="mb-3 flex max-w-[420px] gap-[3px] rounded-[9px] border border-line bg-surface-soft p-[3px]">
+    <button class="flex-1 rounded-md bg-surface px-2.5 py-[7px] text-xs font-[650] text-ink" type="button">Time</button>
+    <button class="flex-1 rounded-md px-2.5 py-[7px] text-xs text-muted hover:text-ink" type="button">Words</button>
+    <button class="flex-1 rounded-md px-2.5 py-[7px] text-xs text-muted hover:text-ink" type="button">Paragraph</button>
+    <button class="flex-1 rounded-md px-2.5 py-[7px] text-xs text-muted hover:text-ink" type="button">Custom</button>
   </div>
 
-  <div class="typing-surface">
-    <span class="done">The quick brown fox jumps over the lazy dog. </span>
-    <span class="current">A</span>
+  <div class="min-h-[210px] rounded-xl border border-line bg-surface p-6 font-mono text-lg leading-[1.8] text-[#b4b4b4]">
+    <span class="text-ink">The quick brown fox jumps over the lazy dog. </span>
+    <span class="rounded-[3px] bg-brand-soft text-brand">A</span>
     <span> focused typing session belongs here.</span>
   </div>
 
-  <div class="footer">
+  <div class="mt-3 flex items-center justify-between gap-3 text-[13px] text-muted">
     <span>60 seconds · English</span>
-    <button class="button primary" type="button">Start session</button>
+    <Button.Root class="inline-flex min-h-9 items-center justify-center rounded-lg border border-brand bg-brand px-3 text-[13px] font-[650] text-white hover:bg-brand-deep" type="button">
+      Start session
+    </Button.Root>
   </div>
 </section>
-
-<style>
-  .modes {
-    display: flex;
-    max-width: 420px;
-    gap: 3px;
-    margin-bottom: 12px;
-    border: 1px solid var(--line);
-    border-radius: 9px;
-    background: var(--surface-soft);
-    padding: 3px;
-  }
-
-  .modes button {
-    flex: 1;
-    border: 0;
-    border-radius: 6px;
-    background: transparent;
-    padding: 7px 10px;
-    color: var(--muted);
-    font-size: 12px;
-  }
-
-  .modes button.active {
-    background: var(--surface);
-    color: var(--ink);
-    font-weight: 650;
-  }
-
-  .typing-surface {
-    min-height: 210px;
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    background: var(--surface);
-    padding: 24px;
-    color: #b4b4b4;
-    font: 18px/1.8 "SFMono-Regular", Consolas, monospace;
-  }
-
-  .done {
-    color: var(--ink);
-  }
-
-  .current {
-    border-radius: 3px;
-    background: var(--brand-soft);
-    color: var(--brand);
-  }
-
-  .footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-top: 12px;
-    color: var(--muted);
-    font-size: 13px;
-  }
-</style>
