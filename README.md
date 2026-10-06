@@ -49,53 +49,39 @@ bun run build
 
 Commit `bun.lock` after the first successful `bun install`.
 
-## Cloudflare Pages
+## Cloudflare Workers
 
-This repository targets **Cloudflare Pages Git Integration**.
+This repository intentionally uses **Cloudflare Workers Builds**, matching the deployment model used by `howlil-app`.
 
-Create the project from:
-
-```text
-Workers & Pages
-→ Create application
-→ Pages
-→ Import an existing Git repository
-→ howlil/modu-app
-```
-
-Use:
+Dashboard configuration:
 
 ```text
-Production branch: master
 Build command: bun run build
-Build output directory: .svelte-kit/cloudflare
+Deploy command: npx wrangler deploy
 Root directory: /
+Production branch: master
 ```
 
-Build environment:
+Deployment contract:
 
 ```text
-BUN_VERSION=1.2.15
-NODE_VERSION=22.17.0
-```
-
-A proper Pages Git project deploys automatically after the build succeeds.
-
-There should be **no Deploy command field** for this repository.
-
-If the Cloudflare screen shows a Deploy command such as:
-
-```bash
+bun run build
+  ↓
+@sveltejs/adapter-cloudflare
+  ↓
+.svelte-kit/cloudflare/_worker.js
+.svelte-kit/cloudflare/*
+  ↓
 npx wrangler deploy
+  ↓
+wrangler.jsonc
+  ↓
+Cloudflare Worker + Static Assets
 ```
 
-you created or connected the repository as a **Workers Builds** project. Do not add a Worker entrypoint to make that command pass. Recreate/import the repository under the **Pages** flow instead.
+The committed `wrangler.jsonc` is required. It prevents Wrangler from trying to auto-configure SvelteKit during deploy.
 
-The SvelteKit Pages build output is:
-
-```text
-.svelte-kit/cloudflare
-```
+Do not run `sv add cloudflare` in CI and do not change the build script to `wrangler types --check && vite build`.
 
 ## Source of truth
 
