@@ -16,7 +16,6 @@ Generic UI primitives come from **shadcn-svelte** and live under:
 
 ```text
 src/lib/components/ui/
-├── badge/
 ├── button/
 ├── card/
 └── input/
