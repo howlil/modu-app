@@ -155,22 +155,22 @@ The small Module Registry remains because Home already consumes shared metadata.
 ```text
 GitHub
   ↓
-Cloudflare Pages build
+Cloudflare Workers build
   ↓
 Bun install + SvelteKit build
   ↓
 .svelte-kit/cloudflare
   ↓
-Cloudflare Pages
+Cloudflare Workers
 ```
 
 Package manager: Bun.
 
-Deployment target: Cloudflare Pages Git Integration.
+Deployment target: Cloudflare Workers Builds.
 
-Cloudflare builds with `bun run build` and publishes `.svelte-kit/cloudflare` automatically. The normal deployment path has no Wrangler deploy command.
+Cloudflare runs `bun run build`, then `npx wrangler deploy`. `wrangler.jsonc` points to `.svelte-kit/cloudflare/_worker.js` and serves `.svelte-kit/cloudflare` as assets.
 
-If a Cloudflare project asks for `wrangler deploy`, it is a Workers Builds project and should be recreated/imported through the Pages flow rather than adapted into a Worker.
+Workers Builds is the intended deployment model for this repository.
 
 ## 9. Definition of done
 
