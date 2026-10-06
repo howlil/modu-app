@@ -118,6 +118,8 @@ Avoid:
 - bespoke button/input/card implementations
 - parallel styling systems outside shadcn + Tailwind
 
+SvelteKit 3 compatibility: Module restores `$lib -> src/lib` in `vite.config.ts` because shadcn-svelte registry output uses `$lib`. Application/domain code may continue using `#lib`; shadcn-generated code may use `$lib`.
+
 UIArc remains a visual/interaction reference while its official implementation is React-only. Do not manually port its React components into Svelte.
 
 ## 6. Local-first contract
