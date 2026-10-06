@@ -758,8 +758,8 @@ Persist only state that has user value after reload/reopen.
 Primary boundary:
 
 ```text
-Cloudflare = distribution
-Browser    = application runtime
+Cloudflare Pages = distribution
+Browser          = application runtime
 ```
 
 Target stack:
@@ -777,7 +777,7 @@ Target stack:
 - Zod at runtime data boundaries
 - Vitest
 - Playwright
-- Cloudflare Workers Static Assets
+- Cloudflare Pages with @sveltejs/adapter-cloudflare
 
 No required backend initially.
 
@@ -794,9 +794,9 @@ Known tool routes should be prerenderable where practical.
 ```text
 build
   ↓
-static route
+SvelteKit Cloudflare output
   ↓
-Cloudflare
+Cloudflare Pages
   ↓
 browser hydration
   ↓
@@ -1006,5 +1006,6 @@ Do not add without an explicit product requirement:
 - cross-device state
 - monorepo structure
 - speculative platform abstractions
+- migration from Pages to Workers without a concrete product/runtime requirement
 
 Module should grow by adding coherent modules, not by accumulating infrastructure.
