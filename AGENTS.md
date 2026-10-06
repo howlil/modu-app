@@ -150,6 +150,7 @@ Do not:
 - add unrelated documentation
 - create a monorepo without a real second consumer
 - add backend infrastructure without a product requirement
+- replace Cloudflare Pages with Workers unless a concrete requirement justifies the migration
 
 One rule should have one canonical owner.
 
@@ -442,6 +443,14 @@ Before adding a package, ask:
 Heavy dependencies must remain behind module/route boundaries.
 
 Do not update unrelated dependencies as part of feature work.
+
+Deployment target:
+
+- Cloudflare Pages
+- SvelteKit Cloudflare adapter
+- output directory: `.svelte-kit/cloudflare`
+- `wrangler pages deploy` for direct Pages deployment
+- never substitute plain `wrangler deploy` unless the project is intentionally migrated to Workers
 
 ---
 
