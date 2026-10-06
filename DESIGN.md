@@ -43,28 +43,82 @@ type ModuleDefinition = {
 };
 ```
 
-## 5. UI
+## 5. UI system
+
+### Component source
+
+**shadcn-svelte is the default UI component system.**
+
+Application code composes generic UI from:
+
+```text
+$lib/components/ui/*
+```
+
+Current installed primitives:
+
+- Button
+- Badge
+- Card
+- Input
+
+When another generic UI component is needed, install it from the official shadcn-svelte registry:
+
+```bash
+bun x shadcn-svelte@latest add <component>
+```
+
+Do not rebuild an equivalent generic component when shadcn-svelte already provides it.
+
+Bits UI is an implementation dependency underneath shadcn-svelte. Routes and app-specific components should not import `bits-ui` directly when a shadcn-svelte component exists.
+
+Allowed custom components are product compositions such as:
+
+- `AppHeader`
+- `ToolHeader`
+- `ToolCard`
+
+Those components should compose shadcn primitives rather than recreate buttons, cards, badges, inputs, dialogs, tabs, selects, tooltips, popovers, switches, and other generic controls.
+
+Native semantic HTML remains valid for structural elements such as `section`, `header`, `label`, headings, and text.
+
+### Styling
 
 Tailwind CSS v4 is the styling system.
 
-Direction:
+The semantic shadcn token layer is the design-system API:
 
-- warm white + ink
-- restrained cobalt
-- quiet and utilitarian
-- borders before shadows
-- no decorative gradients
-- no inner shadows
-- no card spam
+```text
+background / foreground
+card / card-foreground
+primary / primary-foreground
+secondary / secondary-foreground
+muted / muted-foreground
+accent / accent-foreground
+border / input / ring
+destructive
+```
 
-Generic interactive primitives are library-first:
+Module maps those tokens to its identity:
 
-1. Bits UI
-2. existing reusable Module component
-3. native HTML when sufficient
-4. custom primitive only when necessary
+- warm white background
+- ink foreground
+- restrained cobalt primary
+- soft cobalt secondary/accent
+- neutral borders
+- quiet, utilitarian surfaces
 
-UIArc is a visual/interaction reference while its official implementation is React-only. Do not manually port its React components into Svelte.
+Prefer semantic classes such as `bg-card`, `text-muted-foreground`, `border-border`, and `bg-primary` over one-off raw colors.
+
+Avoid:
+
+- decorative gradients
+- inner shadows
+- card spam
+- bespoke button/input/card implementations
+- parallel styling systems outside shadcn + Tailwind
+
+UIArc remains a visual/interaction reference while its official implementation is React-only. Do not manually port its React components into Svelte.
 
 ## 6. Local-first contract
 
@@ -119,6 +173,8 @@ If a Cloudflare project asks for `wrangler deploy`, it is a Workers Builds proje
 ## 9. Definition of done
 
 A module is done when its core job works, privacy copy matches reality, errors are recoverable, mobile/keyboard basics work, relevant deterministic logic is tested, and build/check passes.
+
+UI work is complete only when generic controls use shadcn-svelte instead of unnecessary bespoke primitives.
 
 ## 10. Decision rule
 
