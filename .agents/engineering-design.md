@@ -30,8 +30,18 @@ Core:
 - Svelte
 - SvelteKit
 - TypeScript
-- Tailwind CSS
+- Tailwind CSS v4
+- shadcn-svelte for styled reusable Svelte components
+- Bits UI for accessible headless Svelte primitives
 - pnpm
+
+UI component policy:
+
+- use Tailwind utilities for application styling
+- keep global CSS to tokens/base styles
+- reuse library primitives instead of rebuilding generic controls
+- keep Module-specific composition reusable when the product semantics repeat
+- Arc/UIArc is currently React-only; treat it as a design reference, not a source to manually port into Svelte
 
 Local platform:
 
