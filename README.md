@@ -1,6 +1,6 @@
 # Module
 
-Local-first browser utilities built with SvelteKit, Tailwind CSS, Bits UI, and Bun.
+Local-first browser utilities built with SvelteKit, Tailwind CSS, shadcn-svelte, and Bun.
 
 ## Current scope
 
@@ -9,6 +9,28 @@ Local-first browser utilities built with SvelteKit, Tailwind CSS, Bits UI, and B
 - Typing Practice
 
 Do not expand the tool catalog until one current module is implemented end-to-end.
+
+## UI system
+
+Generic UI primitives come from **shadcn-svelte** and live under:
+
+```text
+src/lib/components/ui/
+├── badge/
+├── button/
+├── card/
+└── input/
+```
+
+Add another official component with:
+
+```bash
+bun x shadcn-svelte@latest add [component]
+```
+
+Application pages should import from `$lib/components/ui/*`, not from `bits-ui` directly when shadcn-svelte provides the component.
+
+The Module palette is mapped to shadcn semantic tokens in `src/app.css`.
 
 ## Local development
 
