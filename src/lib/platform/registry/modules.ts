@@ -4,21 +4,21 @@ export const modules: ModuleDefinition[] = [
   {
     id: 'pdf-merge',
     name: 'Merge PDF',
-    description: 'Combine PDF files locally in your browser.',
+    description: 'Combine PDFs locally.',
     route: '/pdf/merge',
     layout: 'file-transform'
   },
   {
     id: 'pomodoro',
     name: 'Pomodoro',
-    description: 'A focus timer built around reliable temporal state.',
+    description: 'Focus timer.',
     route: '/pomodoro',
     layout: 'focus'
   },
   {
     id: 'typing',
     name: 'Typing Practice',
-    description: 'Practice typing speed and accuracy without setup.',
+    description: 'Practice speed and accuracy.',
     route: '/typing',
     layout: 'focus'
   }
