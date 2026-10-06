@@ -12,20 +12,15 @@
   } = $props();
 </script>
 
-<div class="page-head">
+<div class="mb-7 flex items-start justify-between gap-6 max-[760px]:flex-col">
   <div>
-    <div class="eyebrow">{eyebrow}</div>
-    <h1 class="page-title">{title}</h1>
-    <p class="page-copy">{description}</p>
+    <div class="mb-3 text-xs text-muted-2">{eyebrow}</div>
+    <h1 class="m-0 text-[clamp(30px,4vw,36px)] font-[750] leading-[1.05] tracking-[-0.045em]">{title}</h1>
+    <p class="mt-2 max-w-[680px] text-sm leading-[1.55] text-muted">{description}</p>
   </div>
 
-  <div class="privacy-badge">{privacy}</div>
+  <div class="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg border border-[#dcece4] bg-success-bg px-[9px] py-[7px] text-xs font-[650] text-success">
+    <span class="size-1.5 rounded-full bg-current"></span>
+    {privacy}
+  </div>
 </div>
-
-<style>
-  .eyebrow {
-    margin-bottom: 12px;
-    color: var(--muted-2);
-    font-size: 12px;
-  }
-</style>
