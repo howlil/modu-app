@@ -7,8 +7,8 @@ Build Module as a **local-first browser platform** whose utilities are independe
 Primary architecture:
 
 ```text
-Cloudflare = distribution
-Browser    = application runtime
+Cloudflare Pages = distribution
+Browser          = application runtime
 ```
 
 The browser owns:
@@ -63,7 +63,10 @@ Quality:
 
 Deployment:
 
-- Cloudflare Workers Static Assets
+- Cloudflare Pages
+- @sveltejs/adapter-cloudflare
+- build output: .svelte-kit/cloudflare
+- Wrangler Pages config: wrangler.jsonc
 - no required application backend initially
 
 ---
@@ -97,7 +100,7 @@ Deployment:
 └──────────────────────────────────────────────┘
 ```
 
-Do not introduce D1, R2, KV, authentication, queues, or server APIs until a product requirement needs them.
+Do not introduce D1, R2, KV, authentication, queues, server APIs, or migrate from Pages to Workers until a product requirement needs them.
 
 ---
 
