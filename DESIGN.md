@@ -58,7 +58,6 @@ $lib/components/ui/*
 Current installed primitives:
 
 - Button
-- Badge
 - Card
 - Input
 
@@ -117,6 +116,19 @@ Avoid:
 - card spam
 - bespoke button/input/card implementations
 - parallel styling systems outside shadcn + Tailwind
+- badges for static product claims, architecture labels, or decorative metadata
+- explanatory copy for behavior already obvious from the title, control, or surrounding context
+- developer/implementation notes in user-facing UI
+
+Copy rule:
+
+> UI should not explain what is already obvious from the control, title, or context.
+
+Privacy rule:
+
+- show privacy copy only near a meaningful sensitive-input boundary
+- do not repeat "local", "browser-first", or "no upload" across header, hero, and every tool
+- prefer one short sentence over multiple badges
 
 SvelteKit 3 compatibility: Module restores `$lib -> src/lib` in `vite.config.ts` because shadcn-svelte registry output uses `$lib`. Application/domain code may continue using `#lib`; shadcn-generated code may use `$lib`.
 
