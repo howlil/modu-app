@@ -71,6 +71,12 @@ That command targets Workers and causes the "Missing entry-point to Worker scrip
 Use:
 
 ```bash
+bun run cf:deploy
+```
+
+This expands to:
+
+```bash
 bunx wrangler pages deploy .svelte-kit/cloudflare --project-name=modu-app
 ```
 
