@@ -664,10 +664,10 @@
             spacing={1}
             class="max-w-full flex-wrap"
           >
-            <ToggleGroup.Item value="time" class="text-[11px] font-medium">Time</ToggleGroup.Item>
-            <ToggleGroup.Item value="words" class="text-[11px]" disabled>Words</ToggleGroup.Item>
-            <ToggleGroup.Item value="paragraph" class="text-[11px]" disabled>Paragraph</ToggleGroup.Item>
-            <ToggleGroup.Item value="custom" class="text-[11px]" disabled>Custom</ToggleGroup.Item>
+            <ToggleGroup.Item value="time" class="rounded-full text-[11px] font-medium">Time</ToggleGroup.Item>
+            <ToggleGroup.Item value="words" class="rounded-full text-[11px]" disabled>Words</ToggleGroup.Item>
+            <ToggleGroup.Item value="paragraph" class="rounded-full text-[11px]" disabled>Paragraph</ToggleGroup.Item>
+            <ToggleGroup.Item value="custom" class="rounded-full text-[11px]" disabled>Custom</ToggleGroup.Item>
           </ToggleGroup.Root>
 
           <div class="flex shrink-0 items-baseline gap-4 tabular-nums">
