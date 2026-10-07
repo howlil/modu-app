@@ -95,6 +95,7 @@ Current installed primitives:
 - Card
 - Dialog
 - Input
+- Textarea
 - Tabs
 - Switch
 - Toggle
