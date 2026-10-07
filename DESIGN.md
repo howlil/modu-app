@@ -193,8 +193,13 @@ Pomodoro module contract:
 - Reset and Skip remain secondary controls
 - sound and browser notifications are opt-in controls; notification permission is requested only after explicit user action
 - custom durations stay behind settings so the primary timer remains visually quiet
+- optional auto-start breaks and auto-start focus live in settings
+- overtime is available for focus sessions; it counts upward after the scheduled focus target and remains mutually exclusive with auto-start breaks
+- optional Screen Wake Lock keeps the display awake only while an active session is running and only on supported browsers
+- completed focus sessions are stored locally as lightweight history; the primary UI exposes only a compact Today summary
+- history stays local, bounded, and intentionally lightweight rather than becoming an analytics dashboard
 - keyboard shortcuts: Space start/pause, R reset, S skip, 1/2/3 switch mode
-- keep the interface single-column, light-weight, and free of task-management or analytics scope
+- keep the interface single-column, light-weight, and free of task-management or heavy analytics scope
 
 ## 7. Local-first contract
 
