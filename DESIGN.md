@@ -43,7 +43,7 @@ Home tool presentation:
 - each tile should have a distinct illustration/composition tied to the tool; do not reuse the same icon-box layout with only a different glyph
 - use restrained light-to-dark color shifts, inset highlights, and soft shadows to create depth without glossy effects
 - do not add descriptions inside the launcher grid
-- desktop uses a small 3-column grid; narrow screens use 2 columns
+- tool grid should stay visually balanced for the current count: with four launcher cards, use 4 columns on wide screens and 2 columns below tablet width; avoid a single orphan card on a new row
 - the tile itself is the interaction target; avoid extra arrows, badges, or metadata
 
 Scrolled navigation:
