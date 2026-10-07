@@ -81,7 +81,7 @@
 
     <Button
       variant="ghost"
-      class="flex h-10 w-full items-center justify-between rounded-lg px-1 text-[12px] font-normal"
+      class="flex h-10 w-full items-center justify-between rounded-full px-1 text-[12px] font-normal"
       role="switch"
       aria-checked={enabled}
       disabled={toggleDisabled}
@@ -108,7 +108,7 @@
 
     <Button
       variant="ghost"
-      class="flex h-10 w-full items-center justify-between rounded-lg px-1 text-[12px] font-normal"
+      class="flex h-10 w-full items-center justify-between rounded-full px-1 text-[12px] font-normal"
       onclick={onManage}
     >
       <span>Blocked websites</span>
@@ -162,7 +162,7 @@
       />
       <Button
         size="sm"
-        class="h-9 shrink-0 rounded-lg px-3 text-[12px] font-medium shadow-none"
+        class="h-9 shrink-0 rounded-full px-3 text-[12px] font-medium shadow-none"
         onclick={() => addDomain()}
       >
         Add
@@ -186,7 +186,7 @@
               <Button
                 variant="ghost"
                 size="icon-sm"
-                class="shrink-0 rounded-lg text-muted-foreground"
+                class="shrink-0 rounded-full text-muted-foreground"
                 aria-label={`Remove ${domain}`}
                 onclick={() => removeDomain(domain)}
               >
