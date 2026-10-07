@@ -204,7 +204,7 @@
         {#each suggestions.filter((domain) => !blockedDomains.includes(domain)) as domain}
           <button
             type="button"
-            class="flex h-9 items-center justify-between rounded-lg px-2 text-[12px] transition hover:bg-muted"
+            class="flex h-9 items-center justify-between rounded-full px-2 text-[12px] transition hover:bg-muted"
             onclick={() => addDomain(domain)}
           >
             <span>{domain}</span>
