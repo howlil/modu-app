@@ -3,11 +3,12 @@
   import { Github, Heart } from 'lucide-svelte';
   import { Button } from "$lib/components/ui/button/index.js";
 
+  const FLOATING_THRESHOLD = 72;
   let scrolled = $state(false);
 
   onMount(() => {
     const update = () => {
-      scrolled = window.scrollY > 18;
+      scrolled = window.scrollY > FLOATING_THRESHOLD;
     };
 
     update();
@@ -17,7 +18,7 @@
   });
 </script>
 
-<div class="sticky top-0 z-50 h-[68px] pointer-events-none">
+<div class="fixed inset-x-0 top-0 z-50 h-[68px] pointer-events-none">
   <header
     class={scrolled
       ? "pointer-events-auto mx-auto mt-3 flex h-12 w-[calc(100%-20px)] max-w-[1080px] items-center rounded-full border border-white/[0.65] bg-background/[0.82] shadow-[0_10px_35px_rgba(28,28,24,0.08)] backdrop-blur-xl transition-all duration-200"
