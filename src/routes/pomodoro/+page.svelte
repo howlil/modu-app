@@ -361,6 +361,11 @@
         target instanceof HTMLTextAreaElement ||
         target?.isContentEditable;
 
+      if (event.key === 'Escape' && settingsOpen) {
+        settingsOpen = false;
+        return;
+      }
+
       if (isTyping || settingsOpen) return;
 
       if (event.code === 'Space') {
@@ -599,61 +604,79 @@
   </p>
 
   {#if settingsOpen}
-    <div class="mt-7 w-full max-w-[390px] rounded-2xl border bg-card p-4 text-left shadow-[0_14px_34px_rgba(28,28,24,0.08)]">
-      <div class="mb-4 flex items-center justify-between">
-        <h2 class="m-0 text-[14px] font-medium tracking-[-0.02em]">Timer durations</h2>
+    <div
+      class="fixed inset-0 z-[100] grid place-items-center bg-foreground/[0.12] p-4 backdrop-blur-[3px]"
+      role="presentation"
+      onclick={(event) => {
+        if (event.target === event.currentTarget) settingsOpen = false;
+      }}
+    >
+      <div
+        class="w-full max-w-[390px] rounded-[18px] border border-white/[0.65] bg-background/[0.96] p-4 text-left shadow-[0_24px_70px_rgba(28,28,24,0.16)] backdrop-blur-xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pomodoro-settings-title"
+      >
+        <div class="mb-4 flex items-center justify-between">
+          <h2 id="pomodoro-settings-title" class="m-0 text-[14px] font-medium tracking-[-0.02em]">
+            Timer durations
+          </h2>
+          <Button
+            variant="ghost"
+            size="sm"
+            class="h-7 rounded-lg px-2 text-[11px] font-normal text-muted-foreground"
+            onclick={() => (settingsOpen = false)}
+          >
+            Close
+          </Button>
+        </div>
+
+        <div class="grid gap-3">
+          <label class="grid grid-cols-[1fr_90px] items-center gap-3 text-[12px]">
+            Focus
+            <Input
+              type="number"
+              min="1"
+              max="180"
+              class="h-8 text-right text-[12px]"
+              bind:value={draftDurations.focus}
+            />
+          </label>
+
+          <label class="grid grid-cols-[1fr_90px] items-center gap-3 text-[12px]">
+            Short break
+            <Input
+              type="number"
+              min="1"
+              max="60"
+              class="h-8 text-right text-[12px]"
+              bind:value={draftDurations.short}
+            />
+          </label>
+
+          <label class="grid grid-cols-[1fr_90px] items-center gap-3 text-[12px]">
+            Long break
+            <Input
+              type="number"
+              min="1"
+              max="120"
+              class="h-8 text-right text-[12px]"
+              bind:value={draftDurations.long}
+            />
+          </label>
+        </div>
+
+        <p class="mt-3 text-[11px] leading-5 text-muted-foreground">
+          Running and paused sessions keep their current duration.
+        </p>
+
         <Button
-          variant="ghost"
-          size="sm"
-          class="h-7 rounded-lg px-2 text-[11px] font-normal text-muted-foreground"
-          onclick={() => (settingsOpen = false)}
+          class="mt-4 h-9 w-full rounded-lg text-[12px] font-medium shadow-none"
+          onclick={saveSettings}
         >
-          Close
+          Save
         </Button>
       </div>
-
-      <div class="grid gap-3">
-        <label class="grid grid-cols-[1fr_90px] items-center gap-3 text-[12px]">
-          Focus
-          <Input
-            type="number"
-            min="1"
-            max="180"
-            class="h-8 text-right text-[12px]"
-            bind:value={draftDurations.focus}
-          />
-        </label>
-
-        <label class="grid grid-cols-[1fr_90px] items-center gap-3 text-[12px]">
-          Short break
-          <Input
-            type="number"
-            min="1"
-            max="60"
-            class="h-8 text-right text-[12px]"
-            bind:value={draftDurations.short}
-          />
-        </label>
-
-        <label class="grid grid-cols-[1fr_90px] items-center gap-3 text-[12px]">
-          Long break
-          <Input
-            type="number"
-            min="1"
-            max="120"
-            class="h-8 text-right text-[12px]"
-            bind:value={draftDurations.long}
-          />
-        </label>
-      </div>
-
-      <p class="mt-3 text-[11px] leading-5 text-muted-foreground">
-        Running and paused sessions keep their current duration.
-      </p>
-
-      <Button class="mt-4 h-9 w-full rounded-lg text-[12px] font-medium shadow-none" onclick={saveSettings}>
-        Save
-      </Button>
     </div>
   {/if}
 </section>
