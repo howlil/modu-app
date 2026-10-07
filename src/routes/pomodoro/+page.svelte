@@ -1101,6 +1101,7 @@
     </Tabs.Root>
   </div>
 
+  <div class="mx-auto w-full max-w-[860px] min-w-0">
   {#if activeView === 'timer'}
     <div class="mx-auto flex max-w-[680px] flex-col items-center text-center">
       <div
@@ -1269,7 +1270,7 @@
       onGoalChange={updateGoal}
     />
   {:else}
-    <div class="mx-auto w-full max-w-[680px] text-left">
+    <div class="w-full min-w-0 text-left">
       <div class="mb-6 flex min-h-8 items-center gap-1">
         {#if settingsPanel !== 'main'}
           <Button
@@ -1512,4 +1513,5 @@
         {/if}
     </div>
   {/if}
+  </div>
 </section>
