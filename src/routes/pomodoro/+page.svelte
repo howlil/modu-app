@@ -3,6 +3,8 @@
   import { ArrowLeft, Check, ChevronRight, Download, Pencil, RotateCcw, Settings2, SkipForward, Trash2, X } from 'lucide-svelte';
   import { Button } from "$lib/components/ui/button/index.js";
   import { Input } from "$lib/components/ui/input/index.js";
+  import * as Tabs from '$lib/components/ui/tabs/index.js';
+  import ToolHeader from '#lib/components/ToolHeader.svelte';
   import ActivityView from '#lib/components/pomodoro/ActivityView.svelte';
   import FocusProtectionSettings from '#lib/components/pomodoro/FocusProtectionSettings.svelte';
   import {
@@ -1056,45 +1058,42 @@
 </svelte:head>
 
 <section
-  class="mx-auto min-h-[calc(100vh-68px)] w-full max-w-[920px] px-2 pb-14 pt-5 max-[700px]:pt-2.5"
+  class="mx-auto min-h-[calc(100vh-76px)] w-full max-w-[1180px] px-4 pb-14 pt-10 max-[760px]:px-2.5 max-[760px]:pt-7"
   style={`--pomodoro-accent: ${modeMeta.accent}; --pomodoro-soft: ${modeMeta.soft};`}
 >
-  <div class="relative mx-auto mb-4 w-full max-w-[460px] text-center">
-    <h1 class="m-0 text-[28px] font-[500] leading-none tracking-[-0.045em]">Pomodoro</h1>
-    <p class="mt-2 text-[12px] font-normal text-muted-foreground">
-      {activeView === 'timer' ? modeMeta.copy : 'Focus time, goals, and session history.'}
-    </p>
+  <div class="mx-auto mb-7 w-full max-w-[860px] min-w-0">
+    <ToolHeader title="Pomodoro" />
 
-    <div class="mt-3 flex justify-center gap-[18px]">
-      {#each ['timer', 'activity'] as view}
-        {@const typedView = view as PomodoroView}
-        <button
-          type="button"
-          class={[
-            'relative h-7 rounded-full px-2.5 text-[12px] font-normal transition',
-            activeView === typedView
-              ? 'bg-muted text-foreground'
-              : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
-          ]}
-          onclick={() => (activeView = typedView)}
-        >
-          {typedView === 'timer' ? 'Timer' : 'Activity'}
-        </button>
-      {/each}
-    </div>
-
-    {#if activeView === 'timer'}
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        class="absolute right-0 -top-1 rounded-full text-muted-foreground max-[520px]:right-1"
-        aria-label="Pomodoro settings"
-        title="Settings"
-        onclick={openSettings}
+    <Tabs.Root bind:value={activeView} class="gap-0">
+      <Tabs.List
+        variant="default"
+        class="-mt-2 h-9 w-full min-w-0 justify-start rounded-full bg-muted/65 p-1"
       >
-        <Settings2 class="size-4" strokeWidth={1.7} />
-      </Button>
-    {/if}
+        <Tabs.Trigger
+          value="timer"
+          class="h-7 flex-none rounded-full px-3 py-0 text-[12px] font-normal data-[state=active]:font-medium data-[state=active]:shadow-none"
+        >
+          Timer
+        </Tabs.Trigger>
+        <Tabs.Trigger
+          value="activity"
+          class="h-7 flex-none rounded-full px-3 py-0 text-[12px] font-normal data-[state=active]:font-medium data-[state=active]:shadow-none"
+        >
+          Activity
+        </Tabs.Trigger>
+
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          class="ml-auto size-7 rounded-full text-muted-foreground shadow-none"
+          aria-label="Pomodoro settings"
+          title="Settings"
+          onclick={openSettings}
+        >
+          <Settings2 class="size-4" strokeWidth={1.7} />
+        </Button>
+      </Tabs.List>
+    </Tabs.Root>
   </div>
 
   {#if activeView === 'timer'}
