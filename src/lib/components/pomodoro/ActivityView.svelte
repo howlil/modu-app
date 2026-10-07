@@ -170,7 +170,7 @@
     <Button
       variant="ghost"
       size="sm"
-      class="h-8 rounded-lg px-2.5 text-[11px] font-normal text-muted-foreground"
+      class="h-8 rounded-full px-2.5 text-[11px] font-normal text-muted-foreground"
       onclick={openGoal}
     >
       <Target class="size-3.5" strokeWidth={1.7} />
@@ -354,7 +354,7 @@
       >
         <div class="mb-4 flex items-center justify-between">
           <h3 id="daily-goal-title" class="m-0 text-[14px] font-medium">Daily focus target</h3>
-          <Button variant="ghost" size="icon-sm" class="rounded-lg text-muted-foreground" aria-label="Close goal settings" onclick={() => (goalOpen = false)}>
+          <Button variant="ghost" size="icon-sm" class="rounded-full text-muted-foreground" aria-label="Close goal settings" onclick={() => (goalOpen = false)}>
             <X class="size-4" strokeWidth={1.7} />
           </Button>
         </div>
@@ -373,7 +373,7 @@
             <Button
               variant={goalDraftSchedule === 'weekdays' ? 'secondary' : 'outline'}
               size="sm"
-              class="h-8 rounded-lg text-[11px] font-normal shadow-none"
+              class="h-8 rounded-full text-[11px] font-normal shadow-none"
               onclick={() => (goalDraftSchedule = 'weekdays')}
             >
               Weekdays
@@ -381,7 +381,7 @@
             <Button
               variant={goalDraftSchedule === 'every-day' ? 'secondary' : 'outline'}
               size="sm"
-              class="h-8 rounded-lg text-[11px] font-normal shadow-none"
+              class="h-8 rounded-full text-[11px] font-normal shadow-none"
               onclick={() => (goalDraftSchedule = 'every-day')}
             >
               Every day
@@ -389,7 +389,7 @@
           </div>
         </div>
 
-        <Button class="mt-5 h-9 w-full rounded-lg text-[12px] font-medium shadow-none" onclick={saveGoal}>
+        <Button class="mt-5 h-9 w-full rounded-full text-[12px] font-medium shadow-none" onclick={saveGoal}>
           Update target
         </Button>
       </div>
@@ -412,7 +412,7 @@
       >
         <div class="mb-4 flex items-center justify-between">
           <h3 id="day-inspector-title" class="m-0 text-[14px] font-medium">{formatLongDay(selectedDayKey)}</h3>
-          <Button variant="ghost" size="icon-sm" class="rounded-lg text-muted-foreground" aria-label="Close day details" onclick={() => (dayOpen = false)}>
+          <Button variant="ghost" size="icon-sm" class="rounded-full text-muted-foreground" aria-label="Close day details" onclick={() => (dayOpen = false)}>
             <X class="size-4" strokeWidth={1.7} />
           </Button>
         </div>
