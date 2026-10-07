@@ -4,6 +4,7 @@
   import { Button } from "$lib/components/ui/button/index.js";
   import { Input } from "$lib/components/ui/input/index.js";
   import { Switch } from "$lib/components/ui/switch/index.js";
+  import { Dialog } from "$lib/components/ui/dialog/index.js";
   import * as Tabs from '$lib/components/ui/tabs/index.js';
   import ToolHeader from '#lib/components/ToolHeader.svelte';
   import ActivityView from '#lib/components/pomodoro/ActivityView.svelte';
@@ -132,6 +133,14 @@
   let hydrated = $state(false);
   let clockNow = $state(Date.now());
   let wakeLock: { release: () => Promise<void> } | null = null;
+
+  $effect(() => {
+    if (!settingsOpen) {
+      settingsPanel = 'main';
+      deleteConfirm = false;
+      dataMessage = '';
+    }
+  });
 
   const modeMeta = $derived(MODE_META[timer.mode]);
   const overtimeMs = $derived(getOvertimeMs(timer, clockNow));
@@ -1266,18 +1275,11 @@
     />
   {/if}
 
-  {#if settingsOpen}
-    <div
-      class="fixed inset-0 z-[100] grid place-items-center bg-foreground/[0.12] p-4 backdrop-blur-[3px]"
-      role="presentation"
-      onclick={(event) => {
-        if (event.target === event.currentTarget) closeSettings();
-      }}
-    >
-      <div
-        class="max-h-[min(720px,calc(100vh-32px))] w-full max-w-[410px] overflow-y-auto rounded-[18px] border border-white/[0.65] bg-background/[0.96] p-4 text-left shadow-[0_24px_70px_rgba(28,28,24,0.16)] backdrop-blur-xl"
-        role="dialog"
-        aria-modal="true"
+  <Dialog.Root bind:open={settingsOpen}>
+    <Dialog.Portal>
+      <Dialog.Overlay class="fixed inset-0 z-[100] bg-foreground/[0.12] backdrop-blur-[3px]" />
+      <Dialog.Content
+        class="fixed left-1/2 top-1/2 z-[101] max-h-[min(720px,calc(100vh-32px))] w-[calc(100%-2rem)] max-w-[410px] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-[18px] border border-white/[0.65] bg-background/[0.96] p-4 text-left shadow-[0_24px_70px_rgba(28,28,24,0.16)] backdrop-blur-xl outline-none"
         aria-labelledby="pomodoro-settings-title"
       >
         <div class="mb-4 flex items-center justify-between gap-2">
@@ -1532,7 +1534,7 @@
             </div>
           </div>
         {/if}
-      </div>
-    </div>
-  {/if}
+      </Dialog.Content>
+    </Dialog.Portal>
+  </Dialog.Root>
 </section>
