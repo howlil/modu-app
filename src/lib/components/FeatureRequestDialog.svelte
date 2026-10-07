@@ -77,7 +77,7 @@
 </script>
 
 <Button
-  class="h-10 rounded-xl px-4 text-[13px] font-medium shadow-none"
+  class="h-10 rounded-full px-4 text-[13px] font-medium shadow-none"
   onclick={openDialog}
 >
   Request feature
@@ -103,7 +103,7 @@
         </div>
 
         <Dialog.Close
-          class="grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+          class="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
           aria-label="Close"
         >
           <X class="size-4" strokeWidth={1.8} />
@@ -128,7 +128,7 @@
             target="_blank"
             rel="noreferrer"
             variant="outline"
-            class="mt-4 h-9 rounded-xl px-3 text-[12px] font-medium shadow-none"
+            class="mt-4 h-9 rounded-full px-3 text-[12px] font-medium shadow-none"
           >
             View issue
             <ExternalLink class="size-3.5" strokeWidth={1.8} />
@@ -192,7 +192,7 @@
 
           <div class="flex justify-end gap-2 pt-1">
             <Dialog.Close
-              class="inline-flex h-9 items-center justify-center rounded-xl border border-border bg-background px-3 text-[12px] font-medium transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+              class="inline-flex h-9 items-center justify-center rounded-full border border-border bg-background px-3 text-[12px] font-medium transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
             >
               Cancel
             </Dialog.Close>
@@ -200,7 +200,7 @@
             <Button
               type="submit"
               disabled={submitting}
-              class="h-9 rounded-xl px-3 text-[12px] font-medium shadow-none"
+              class="h-9 rounded-full px-3 text-[12px] font-medium shadow-none"
             >
               {submitting ? 'Sending…' : 'Send request'}
               <Send class="size-3.5" strokeWidth={1.8} />
