@@ -8,24 +8,27 @@
   } from '#lib/modules/pomodoro/focus-protection.ts';
 
   type Props = {
+    view?: 'summary' | 'manager';
     enabled: boolean;
     blockedDomains: string[];
     connection: FocusProtectionConnection;
     errorMessage?: string;
     onToggle: () => void | Promise<void>;
     onBlocklistChange: (domains: string[]) => void | Promise<void>;
+    onManage?: () => void;
   };
 
   let {
+    view = 'summary',
     enabled,
     blockedDomains,
     connection,
     errorMessage = '',
     onToggle,
-    onBlocklistChange
+    onBlocklistChange,
+    onManage = () => {}
   }: Props = $props();
 
-  let managerOpen = $state(false);
   let domainDraft = $state('');
   let domainError = $state('');
 
@@ -72,167 +75,145 @@
   }
 </script>
 
-<div class="mt-4 border-t pt-4">
-  <div class="mb-1 text-[11px] font-medium text-muted-foreground">Focus protection</div>
+{#if view === 'summary'}
+  <div class="mt-4 border-t pt-4">
+    <div class="mb-1 text-[11px] font-medium text-muted-foreground">Focus protection</div>
 
-  <Button
-    variant="ghost"
-    class="flex h-10 w-full items-center justify-between rounded-lg px-1 text-[12px] font-normal"
-    role="switch"
-    aria-checked={enabled}
-    disabled={toggleDisabled}
-    onclick={onToggle}
-  >
-    <span>Block distracting websites</span>
-    <span
-      class={[
-        'relative h-[18px] w-8 shrink-0 rounded-full border transition-all duration-150',
-        enabled
-          ? 'border-primary bg-primary shadow-[0_1px_2px_rgba(36,104,242,0.18)]'
-          : 'border-border/80 bg-foreground/[0.07]'
-      ]}
-      aria-hidden="true"
+    <Button
+      variant="ghost"
+      class="flex h-10 w-full items-center justify-between rounded-lg px-1 text-[12px] font-normal"
+      role="switch"
+      aria-checked={enabled}
+      disabled={toggleDisabled}
+      onclick={onToggle}
     >
+      <span>Block distracting websites</span>
       <span
         class={[
-          'absolute left-0.5 top-0.5 size-3.5 rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.18)] transition-transform duration-150',
-          enabled ? 'translate-x-3.5' : 'translate-x-0'
+          'relative h-[18px] w-8 shrink-0 rounded-full border transition-all duration-150',
+          enabled
+            ? 'border-primary bg-primary shadow-[0_1px_2px_rgba(36,104,242,0.18)]'
+            : 'border-border/80 bg-foreground/[0.07]'
         ]}
-      ></span>
-    </span>
-  </Button>
+        aria-hidden="true"
+      >
+        <span
+          class={[
+            'absolute left-0.5 top-0.5 size-3.5 rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.18)] transition-transform duration-150',
+            enabled ? 'translate-x-3.5' : 'translate-x-0'
+          ]}
+        ></span>
+      </span>
+    </Button>
 
-  <Button
-    variant="ghost"
-    class="flex h-10 w-full items-center justify-between rounded-lg px-1 text-[12px] font-normal"
-    onclick={() => (managerOpen = true)}
-  >
-    <span>Blocked websites</span>
-    <span class="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
-      {blockedDomains.length}
-      <ChevronRight class="size-3.5" strokeWidth={1.7} />
-    </span>
-  </Button>
-
-  <div class="flex min-h-8 items-center justify-between gap-3 px-1 text-[10px]">
-    <span class="text-muted-foreground">Module extension</span>
-    <span
-      class={[
-        connection === 'active' || connection === 'ready'
-          ? 'text-success'
-          : connection === 'error'
-            ? 'text-destructive'
-            : 'text-muted-foreground'
-      ]}
+    <Button
+      variant="ghost"
+      class="flex h-10 w-full items-center justify-between rounded-lg px-1 text-[12px] font-normal"
+      onclick={onManage}
     >
-      {connectionLabel}
-    </span>
+      <span>Blocked websites</span>
+      <span class="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        {blockedDomains.length}
+        <ChevronRight class="size-3.5" strokeWidth={1.7} />
+      </span>
+    </Button>
+
+    <div class="flex min-h-8 items-center justify-between gap-3 px-1 text-[10px]">
+      <span class="text-muted-foreground">Module extension</span>
+      <span
+        class={[
+          connection === 'active' || connection === 'ready'
+            ? 'text-success'
+            : connection === 'error'
+              ? 'text-destructive'
+              : 'text-muted-foreground'
+        ]}
+      >
+        {connectionLabel}
+      </span>
+    </div>
+
+    {#if connection === 'missing'}
+      <p class="m-0 px-1 text-[10px] leading-[1.5] text-muted-foreground">
+        Install or load the Module Focus extension to enable protection.
+      </p>
+    {:else if errorMessage}
+      <p class="m-0 px-1 text-[10px] leading-[1.5] text-destructive">{errorMessage}</p>
+    {/if}
   </div>
-
-  {#if connection === 'missing'}
-    <p class="m-0 px-1 text-[10px] leading-[1.5] text-muted-foreground">
-      Install or load the Module Focus extension to enable protection.
+{:else}
+  <div>
+    <p class="mb-4 mt-0 text-[11px] leading-[1.55] text-muted-foreground">
+      Add the sites that usually break your focus. Every route on these domains is blocked during Focus.
     </p>
-  {:else if errorMessage}
-    <p class="m-0 px-1 text-[10px] leading-[1.5] text-destructive">{errorMessage}</p>
-  {/if}
-</div>
 
-{#if managerOpen}
-  <div
-    class="fixed inset-0 z-[120] grid place-items-center bg-foreground/[0.12] p-4 backdrop-blur-[3px]"
-    role="presentation"
-    onclick={(event) => {
-      if (event.target === event.currentTarget) managerOpen = false;
-    }}
-  >
-    <div
-      class="max-h-[min(620px,calc(100vh-32px))] w-full max-w-[390px] overflow-y-auto rounded-[18px] border border-white/[0.65] bg-background/[0.96] p-4 text-left shadow-[0_24px_70px_rgba(28,28,24,0.16)] backdrop-blur-xl"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="blocked-websites-title"
-    >
-      <div class="mb-4 flex items-center justify-between">
-        <h3 id="blocked-websites-title" class="m-0 text-[14px] font-medium">Blocked websites</h3>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          class="rounded-lg text-muted-foreground"
-          aria-label="Close blocked websites"
-          onclick={() => (managerOpen = false)}
-        >
-          <X class="size-4" strokeWidth={1.7} />
-        </Button>
-      </div>
+    <div class="flex gap-2">
+      <Input
+        class="h-9 flex-1 text-[12px]"
+        bind:value={domainDraft}
+        placeholder="youtube.com"
+        aria-label="Website to block"
+        onkeydown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            addDomain();
+          }
+        }}
+      />
+      <Button
+        size="sm"
+        class="h-9 shrink-0 rounded-lg px-3 text-[12px] font-medium shadow-none"
+        onclick={() => addDomain()}
+      >
+        Add
+      </Button>
+    </div>
 
-      <div class="flex gap-2">
-        <Input
-          class="h-9 flex-1 text-[12px]"
-          bind:value={domainDraft}
-          placeholder="youtube.com"
-          aria-label="Website to block"
-          onkeydown={(event) => {
-            if (event.key === 'Enter') {
-              event.preventDefault();
-              addDomain();
-            }
-          }}
-        />
-        <Button
-          size="sm"
-          class="h-9 shrink-0 rounded-lg px-3 text-[12px] font-medium shadow-none"
-          onclick={() => addDomain()}
-        >
-          Add
-        </Button>
-      </div>
+    {#if domainError}
+      <p class="mb-0 mt-2 text-[10px] text-destructive">{domainError}</p>
+    {/if}
 
-      {#if domainError}
-        <p class="mb-0 mt-2 text-[10px] text-destructive">{domainError}</p>
-      {/if}
-
-      <div class="mt-4">
-        {#if blockedDomains.length === 0}
-          <div class="rounded-xl border border-dashed px-4 py-7 text-center text-[11px] text-muted-foreground">
-            Add the websites that usually break your focus.
-          </div>
-        {:else}
-          <div class="divide-y">
-            {#each blockedDomains as domain}
-              <div class="flex min-h-10 items-center justify-between gap-3">
-                <span class="truncate text-[12px]">{domain}</span>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  class="shrink-0 rounded-lg text-muted-foreground"
-                  aria-label={`Remove ${domain}`}
-                  onclick={() => removeDomain(domain)}
-                >
-                  <X class="size-3.5" strokeWidth={1.7} />
-                </Button>
-              </div>
-            {/each}
-          </div>
-        {/if}
-      </div>
-
-      <div class="mt-5 border-t pt-4">
-        <div class="mb-2 text-[11px] font-medium text-muted-foreground">Suggested</div>
-        <div class="grid gap-1">
-          {#each suggestions.filter((domain) => !blockedDomains.includes(domain)) as domain}
-            <button
-              type="button"
-              class="flex h-9 items-center justify-between rounded-lg px-2 text-[12px] transition hover:bg-muted"
-              onclick={() => addDomain(domain)}
-            >
-              <span>{domain}</span>
-              <span class="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
-                <Plus class="size-3" strokeWidth={1.7} />
-                Add
-              </span>
-            </button>
+    <div class="mt-4">
+      {#if blockedDomains.length === 0}
+        <div class="rounded-xl border border-dashed px-4 py-7 text-center text-[11px] text-muted-foreground">
+          No websites blocked yet.
+        </div>
+      {:else}
+        <div class="divide-y">
+          {#each blockedDomains as domain}
+            <div class="flex min-h-10 items-center justify-between gap-3">
+              <span class="truncate text-[12px]">{domain}</span>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                class="shrink-0 rounded-lg text-muted-foreground"
+                aria-label={`Remove ${domain}`}
+                onclick={() => removeDomain(domain)}
+              >
+                <X class="size-3.5" strokeWidth={1.7} />
+              </Button>
+            </div>
           {/each}
         </div>
+      {/if}
+    </div>
+
+    <div class="mt-5 border-t pt-4">
+      <div class="mb-2 text-[11px] font-medium text-muted-foreground">Suggested</div>
+      <div class="grid gap-1">
+        {#each suggestions.filter((domain) => !blockedDomains.includes(domain)) as domain}
+          <button
+            type="button"
+            class="flex h-9 items-center justify-between rounded-lg px-2 text-[12px] transition hover:bg-muted"
+            onclick={() => addDomain(domain)}
+          >
+            <span>{domain}</span>
+            <span class="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+              <Plus class="size-3" strokeWidth={1.7} />
+              Add
+            </span>
+          </button>
+        {/each}
       </div>
     </div>
   </div>
