@@ -2,6 +2,7 @@
   import { Target, X } from 'lucide-svelte';
   import { Button } from "$lib/components/ui/button/index.js";
   import { Input } from "$lib/components/ui/input/index.js";
+  import { Dialog } from "$lib/components/ui/dialog/index.js";
   import {
     aggregateDailyActivity,
     buildHeatmapDays,
@@ -251,20 +252,20 @@
     <div class="overflow-x-auto pb-2">
       <div class="grid w-max grid-flow-col grid-rows-7 gap-1">
         {#each heatmapDays as day}
-          <button
-            type="button"
+          <Button
+            variant="ghost"
             class={[
-              'size-3 rounded-full transition',
+              'size-3 min-w-0 rounded-full border-0 p-0 shadow-none transition',
               day.future
                 ? 'cursor-default opacity-45'
                 : 'hover:outline hover:outline-2 hover:outline-foreground/15 hover:outline-offset-1'
-            ]}
+            ].join(' ')}
             style={`background: ${heatmapColor(day)}`}
             title={heatmapTitle(day)}
             aria-label={heatmapTitle(day)}
             disabled={day.future}
             onclick={() => inspectDay(day)}
-          ></button>
+          ></Button>
         {/each}
       </div>
     </div>
@@ -309,14 +310,14 @@
         {@const day = daily.find((item) => item.dateKey === dateKey)}
 
         <div class="border-t py-3">
-          <button
-            type="button"
-            class="mb-1 flex w-full items-center justify-between gap-4 rounded-full py-1 text-left"
+          <Button
+            variant="ghost"
+            class="mb-1 flex h-auto w-full items-center justify-between gap-4 rounded-full px-2 py-1 text-left font-normal shadow-none"
             onclick={() => openHistoryDay(dateKey)}
           >
             <strong class="text-[12px] font-medium">{formatDayLabel(dateKey)}</strong>
             <span class="text-[11px] text-muted-foreground">{formatFocusTotal(day?.focusedMs ?? 0)}</span>
-          </button>
+          </Button>
 
           {#each daySessions.slice(0, 6) as session}
             <div class="grid grid-cols-[68px_1fr_auto] items-center gap-3 py-2 max-[520px]:grid-cols-[54px_1fr_auto]">
@@ -338,18 +339,11 @@
     {/if}
   </div>
 
-  {#if goalOpen}
-    <div
-      class="fixed inset-0 z-[110] grid place-items-center bg-foreground/[0.12] p-4 backdrop-blur-[3px]"
-      role="presentation"
-      onclick={(event) => {
-        if (event.target === event.currentTarget) goalOpen = false;
-      }}
-    >
-      <div
-        class="w-full max-w-[390px] rounded-[18px] border border-white/[0.65] bg-background/[0.96] p-4 text-left shadow-[0_24px_70px_rgba(28,28,24,0.16)] backdrop-blur-xl"
-        role="dialog"
-        aria-modal="true"
+  <Dialog.Root bind:open={goalOpen}>
+    <Dialog.Portal>
+      <Dialog.Overlay class="fixed inset-0 z-[110] bg-foreground/[0.12] backdrop-blur-[3px]" />
+      <Dialog.Content
+        class="fixed left-1/2 top-1/2 z-[111] w-[calc(100%-2rem)] max-w-[390px] -translate-x-1/2 -translate-y-1/2 rounded-[18px] border border-white/[0.65] bg-background/[0.96] p-4 text-left shadow-[0_24px_70px_rgba(28,28,24,0.16)] backdrop-blur-xl outline-none"
         aria-labelledby="daily-goal-title"
       >
         <div class="mb-4 flex items-center justify-between">
@@ -392,24 +386,18 @@
         <Button class="mt-5 h-9 w-full rounded-full text-[12px] font-medium shadow-none" onclick={saveGoal}>
           Update target
         </Button>
-      </div>
-    </div>
-  {/if}
+      </Dialog.Content>
+    </Dialog.Portal>
+  </Dialog.Root>
 
-  {#if dayOpen && selectedDayKey}
-    <div
-      class="fixed inset-0 z-[110] grid place-items-center bg-foreground/[0.12] p-4 backdrop-blur-[3px]"
-      role="presentation"
-      onclick={(event) => {
-        if (event.target === event.currentTarget) dayOpen = false;
-      }}
-    >
-      <div
-        class="max-h-[min(620px,calc(100vh-32px))] w-full max-w-[410px] overflow-y-auto rounded-[18px] border border-white/[0.65] bg-background/[0.96] p-4 text-left shadow-[0_24px_70px_rgba(28,28,24,0.16)] backdrop-blur-xl"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="day-inspector-title"
-      >
+  {#if selectedDayKey}
+    <Dialog.Root bind:open={dayOpen}>
+      <Dialog.Portal>
+        <Dialog.Overlay class="fixed inset-0 z-[110] bg-foreground/[0.12] backdrop-blur-[3px]" />
+        <Dialog.Content
+          class="fixed left-1/2 top-1/2 z-[111] max-h-[min(620px,calc(100vh-32px))] w-[calc(100%-2rem)] max-w-[410px] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-[18px] border border-white/[0.65] bg-background/[0.96] p-4 text-left shadow-[0_24px_70px_rgba(28,28,24,0.16)] backdrop-blur-xl outline-none"
+          aria-labelledby="day-inspector-title"
+        >
         <div class="mb-4 flex items-center justify-between">
           <h3 id="day-inspector-title" class="m-0 text-[14px] font-medium">{formatLongDay(selectedDayKey)}</h3>
           <Button variant="ghost" size="icon-sm" class="rounded-full text-muted-foreground" aria-label="Close day details" onclick={() => (dayOpen = false)}>
@@ -447,8 +435,9 @@
             {/each}
           </div>
         {/if}
-      </div>
-    </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   {/if}
 
 </div>
