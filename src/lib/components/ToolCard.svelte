@@ -1,114 +1,78 @@
 <script lang="ts">
+  import { ArrowRight, CornerDownLeft, FileText, Files, Keyboard, Timer, Type } from 'lucide-svelte';
   import type { ModuleDefinition } from '#lib/platform/registry/types.ts';
 
   let { module }: { module: ModuleDefinition } = $props();
 
+  const tileStyle = {
+    'pdf-merge': 'background: linear-gradient(145deg, #F8C7D3 0%, #F1AEC0 56%, #E99CB2 100%);',
+    pomodoro: 'background: linear-gradient(145deg, #9BC2F7 0%, #80AEEF 54%, #709DE5 100%);',
+    typing: 'background: linear-gradient(145deg, #B9A5F5 0%, #A088EC 54%, #9075DF 100%);'
+  }[module.id];
+
   const tileClass = {
-    'pdf-merge': 'bg-[#F2AFC1] text-[#552433] border-[#DF94AA]',
-    pomodoro: 'bg-[#82B0F5] text-[#163A6B] border-[#6FA0E8]',
-    typing: 'bg-[#A48BEF] text-[#352568] border-[#9178DE]'
-  }[module.id] ?? 'bg-card text-foreground border-border';
+    'pdf-merge': 'text-[#552433] border-[#DF94AA]',
+    pomodoro: 'text-[#163A6B] border-[#6F9FE8]',
+    typing: 'text-[#352568] border-[#8E74DC]'
+  }[module.id] ?? 'text-foreground border-border';
 </script>
 
 <a
-  class={`group relative aspect-square min-w-0 overflow-hidden rounded-[22px] border p-4 transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_26px_rgba(35,31,26,0.10)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/[0.40] ${tileClass}`}
+  class={`group relative aspect-square min-w-0 overflow-hidden rounded-[22px] border p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.40),0_10px_24px_rgba(35,31,26,0.07)] transition duration-200 hover:-translate-y-1 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.46),0_16px_34px_rgba(35,31,26,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/[0.40] ${tileClass}`}
+  style={tileStyle}
   href={module.route}
   aria-label={module.name}
 >
+  <div
+    class="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.16)_0%,rgba(255,255,255,0)_46%,rgba(28,24,22,0.045)_100%)]"
+    aria-hidden="true"
+  ></div>
+
   <div class="relative z-20 text-[14px] font-[600] leading-tight tracking-[-0.02em]">
     {module.name}
   </div>
 
   {#if module.id === 'pdf-merge'}
-    <div
-      class="pointer-events-none absolute inset-x-3 bottom-2 h-[72%] transition-transform duration-200 group-hover:-translate-y-1"
-      aria-hidden="true"
-    >
-      <svg viewBox="0 0 220 170" class="h-full w-full" fill="none">
-        <g opacity="0.28" transform="translate(20 18) rotate(-10 70 70)">
-          <rect x="25" y="16" width="82" height="108" rx="13" fill="white" />
-          <path d="M79 16h28v28" fill="white" />
-          <path d="M79 16l28 28H79V16Z" fill="currentColor" opacity="0.20" />
-          <path d="M44 64h42M44 78h34M44 92h28" stroke="currentColor" stroke-width="6" stroke-linecap="round" opacity="0.35" />
-        </g>
+    <div class="pointer-events-none absolute inset-0" aria-hidden="true">
+      <div class="absolute bottom-[14%] left-[17%] grid h-[52%] w-[34%] rotate-[-10deg] place-items-center rounded-[18px] border border-white/[0.18] bg-white/[0.23] shadow-[0_14px_24px_rgba(90,41,57,0.10)] backdrop-blur-[2px] transition-transform duration-200 group-hover:translate-x-[-3px] group-hover:rotate-[-13deg]">
+        <Files class="size-[46%] opacity-55" strokeWidth={1.35} />
+      </div>
 
-        <g opacity="0.42" transform="translate(84 22) rotate(8 58 66)">
-          <rect x="20" y="14" width="86" height="112" rx="14" fill="white" />
-          <path d="M76 14h30v30" fill="white" />
-          <path d="M76 14l30 30H76V14Z" fill="currentColor" opacity="0.18" />
-          <text x="63" y="78" text-anchor="middle" fill="currentColor" font-size="20" font-weight="650" font-family="system-ui, sans-serif">PDF</text>
-        </g>
+      <div class="absolute bottom-[12%] right-[15%] grid h-[58%] w-[38%] rotate-[8deg] place-items-center rounded-[18px] border border-white/[0.24] bg-white/[0.34] shadow-[0_16px_28px_rgba(90,41,57,0.14)] backdrop-blur-[2px] transition-transform duration-200 group-hover:translate-x-[3px] group-hover:rotate-[11deg]">
+        <FileText class="size-[44%] opacity-70" strokeWidth={1.45} />
+      </div>
 
-        <g transform="translate(66 112)">
-          <rect x="0" y="0" width="62" height="34" rx="17" fill="currentColor" opacity="0.14" />
-          <path d="M18 17h26M36 9l8 8-8 8" stroke="currentColor" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" />
-        </g>
-      </svg>
+      <div class="absolute bottom-[10%] left-1/2 flex h-9 -translate-x-1/2 items-center gap-1.5 rounded-full border border-white/[0.18] bg-[#552433]/[0.11] px-3 backdrop-blur-sm">
+        <ArrowRight class="size-4" strokeWidth={1.8} />
+      </div>
     </div>
 
   {:else if module.id === 'pomodoro'}
-    <div
-      class="pointer-events-none absolute -right-3 bottom-0 h-[78%] w-[86%] transition-transform duration-200 group-hover:rotate-[-2deg] group-hover:scale-[1.02]"
-      aria-hidden="true"
-    >
-      <svg viewBox="0 0 190 180" class="h-full w-full" fill="none">
-        <circle cx="100" cy="100" r="66" fill="white" opacity="0.18" />
-        <circle cx="100" cy="100" r="53" stroke="currentColor" stroke-width="15" opacity="0.14" />
-        <path
-          d="M100 47a53 53 0 0 1 44 82"
-          stroke="currentColor"
-          stroke-width="15"
-          stroke-linecap="round"
-          opacity="0.46"
-        />
+    <div class="pointer-events-none absolute inset-0" aria-hidden="true">
+      <div class="absolute bottom-[10%] left-1/2 aspect-square w-[63%] -translate-x-1/2 rounded-full border-[12px] border-white/[0.18] shadow-[inset_0_10px_20px_rgba(255,255,255,0.10),0_18px_30px_rgba(24,58,107,0.12)] transition-transform duration-200 group-hover:scale-[1.025]">
+        <div class="absolute inset-[7%] rounded-full border border-[#163A6B]/[0.10] bg-white/[0.08]"></div>
+        <div class="absolute left-1/2 top-1/2 grid size-[46%] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-white/[0.12] backdrop-blur-sm">
+          <Timer class="size-[58%] opacity-70" strokeWidth={1.45} />
+        </div>
+        <div class="absolute right-[1%] top-[18%] h-[43%] w-[13%] rotate-[34deg] rounded-full bg-[#163A6B]/[0.28]"></div>
+      </div>
 
-        <rect x="85" y="15" width="30" height="17" rx="8.5" fill="currentColor" opacity="0.32" />
-        <rect x="95" y="26" width="10" height="16" rx="5" fill="currentColor" opacity="0.32" />
-
-        <path d="M100 100V67" stroke="currentColor" stroke-width="7" stroke-linecap="round" opacity="0.65" />
-        <path d="M100 100l24 16" stroke="currentColor" stroke-width="7" stroke-linecap="round" opacity="0.65" />
-
-        <text x="100" y="119" text-anchor="middle" fill="currentColor" font-size="31" font-weight="650" font-family="system-ui, sans-serif" opacity="0.84">25</text>
-      </svg>
+      <div class="absolute bottom-[69%] left-1/2 h-4 w-10 -translate-x-1/2 rounded-full bg-[#163A6B]/[0.18] shadow-[0_4px_10px_rgba(24,58,107,0.10)]"></div>
     </div>
 
   {:else}
-    <div
-      class="pointer-events-none absolute inset-x-2 bottom-1 h-[73%] transition-transform duration-200 group-hover:-translate-y-1 group-hover:rotate-[-1deg]"
-      aria-hidden="true"
-    >
-      <svg viewBox="0 0 220 170" class="h-full w-full" fill="none">
-        <g transform="translate(12 42) rotate(-6 100 55)">
-          <rect x="10" y="18" width="190" height="96" rx="20" fill="white" opacity="0.20" />
-          <rect x="20" y="28" width="170" height="76" rx="14" stroke="currentColor" stroke-width="4" opacity="0.18" />
+    <div class="pointer-events-none absolute inset-0" aria-hidden="true">
+      <div class="absolute bottom-[9%] left-1/2 grid h-[45%] w-[76%] -translate-x-1/2 rotate-[-5deg] place-items-center rounded-[24px] border border-white/[0.20] bg-white/[0.18] shadow-[0_18px_30px_rgba(53,37,104,0.14)] backdrop-blur-[2px] transition-transform duration-200 group-hover:-translate-y-1 group-hover:rotate-[-7deg]">
+        <Keyboard class="size-[68%] opacity-55" strokeWidth={1.25} />
+      </div>
 
-          <g fill="currentColor" opacity="0.42">
-            <rect x="31" y="39" width="22" height="17" rx="4" />
-            <rect x="59" y="39" width="22" height="17" rx="4" />
-            <rect x="87" y="39" width="22" height="17" rx="4" />
-            <rect x="115" y="39" width="22" height="17" rx="4" />
-            <rect x="143" y="39" width="22" height="17" rx="4" />
+      <div class="absolute right-[17%] top-[29%] grid size-14 rotate-[8deg] place-items-center rounded-[16px] border border-white/[0.20] bg-white/[0.24] shadow-[0_12px_20px_rgba(53,37,104,0.10)] backdrop-blur-sm transition-transform duration-200 group-hover:translate-y-[-3px] group-hover:rotate-[11deg]">
+        <Type class="size-6 opacity-70" strokeWidth={1.55} />
+      </div>
 
-            <rect x="38" y="62" width="22" height="17" rx="4" />
-            <rect x="66" y="62" width="22" height="17" rx="4" />
-            <rect x="94" y="62" width="22" height="17" rx="4" />
-            <rect x="122" y="62" width="22" height="17" rx="4" />
-            <rect x="150" y="62" width="22" height="17" rx="4" />
-
-            <rect x="55" y="85" width="92" height="13" rx="6.5" />
-          </g>
-        </g>
-
-        <g transform="translate(141 12) rotate(8)">
-          <rect width="48" height="48" rx="14" fill="white" opacity="0.26" />
-          <text x="24" y="31" text-anchor="middle" fill="currentColor" font-size="22" font-weight="650" font-family="system-ui, sans-serif">A</text>
-        </g>
-
-        <g transform="translate(24 18) rotate(-10)">
-          <rect width="42" height="42" rx="13" fill="white" opacity="0.18" />
-          <text x="21" y="28" text-anchor="middle" fill="currentColor" font-size="17" font-weight="650" font-family="system-ui, sans-serif">↵</text>
-        </g>
-      </svg>
+      <div class="absolute left-[16%] top-[31%] grid size-12 rotate-[-9deg] place-items-center rounded-[14px] border border-white/[0.16] bg-white/[0.18] backdrop-blur-sm transition-transform duration-200 group-hover:translate-y-[-2px] group-hover:rotate-[-12deg]">
+        <CornerDownLeft class="size-5 opacity-65" strokeWidth={1.55} />
+      </div>
     </div>
   {/if}
 </a>
