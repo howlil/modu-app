@@ -129,6 +129,26 @@ Icon rule:
 - do not hand-draw an SVG when an equivalent Lucide icon exists
 - custom illustration is allowed only when the composition itself carries product meaning beyond a single icon
 
+### Layout width
+
+Use one shared horizontal rhythm across Module:
+
+```text
+global page shell   1180px
+module content axis  860px
+mobile gutters       10px
+desktop gutters      16px
+```
+
+Rules:
+
+- every module route uses the 1180px outer shell with the same horizontal padding
+- title, primary navigation, and main module sections align to the 860px content axis
+- narrower widths such as the Pomodoro timer's 680px focus area are allowed only as inner task composition, never as a different page width
+- wider module sections must not escape the 860px axis merely because a view contains more data
+- the homepage may use intentional hero-copy and launcher-grid widths, but it keeps the same global horizontal gutters
+- avoid introducing one-off page max-width values without a product requirement
+
 ### Styling
 
 Tailwind CSS v4 is the styling system.
