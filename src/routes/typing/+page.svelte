@@ -635,7 +635,7 @@
           {#each LESSONS as lesson, index}
             <Button
               variant="ghost"
-              class="grid h-auto w-full grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-3 rounded-none border-b border-border px-1 py-3.5 text-left font-normal whitespace-normal shadow-none last:border-b-0 hover:bg-muted/50 max-[560px]:grid-cols-[28px_minmax(0,1fr)]"
+              class="grid h-auto w-full grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-3 rounded-full border-b border-border px-1 py-3.5 text-left font-normal whitespace-normal shadow-none last:border-b-0 hover:bg-muted/50 max-[560px]:grid-cols-[28px_minmax(0,1fr)]"
               onclick={() => setPrimaryTab('train')}
             >
               <span class="font-mono text-[10px] text-muted-foreground">
