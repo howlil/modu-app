@@ -288,14 +288,27 @@ async function handleMessage(message, sender) {
         throw new Error('Invalid focus session.');
       }
 
+      const now = Date.now();
+      const endsAt =
+        typeof message.endsAt === 'number' ? message.endsAt : null;
+
+      if (
+        message.startedAt > now + 60_000 ||
+        message.startedAt < now - MAX_ACTIVE_SESSION_MS ||
+        (endsAt !== null &&
+          (endsAt < message.startedAt ||
+            endsAt > message.startedAt + MAX_ACTIVE_SESSION_MS))
+      ) {
+        throw new Error('Invalid focus session timing.');
+      }
+
       const nextState = {
         ...state,
         controlOrigin: origin,
         activeSession: {
           sessionId: message.sessionId,
           startedAt: message.startedAt,
-          endsAt:
-            typeof message.endsAt === 'number' ? message.endsAt : null,
+          endsAt,
           overtimeEnabled: message.overtimeEnabled === true
         }
       };
