@@ -218,7 +218,7 @@ Pomodoro module contract:
 - idle state should not show redundant `Ready` copy; state text appears only when it adds information such as Focus, Paused, Overtime, or Complete
 - cycle copy must be semantically explicit, e.g. `Session 2 of 4`, and match the completed-dot state
 - Reset and Skip use quiet icon controls around the primary Start/Pause/Resume action
-- Sound, notifications, auto-start behavior, overtime, Wake Lock, custom durations, and Focus Protection live in Settings rather than the primary timer surface
+- Sound, ringtone choice, notifications, auto-start behavior, overtime, Wake Lock, custom durations, Focus Protection, and data controls live in Settings rather than the primary timer surface
 - Focus Protection is optional enforcement, not a separate productivity product: the user explicitly chooses blocked domains and the timer remains the core experience
 - Focus Protection is active during Focus running, paused, and overtime states; it is released for idle, short/long breaks, Reset, and Skip
 - website enforcement belongs to the Chromium companion extension; the Svelte app is only the control surface
@@ -230,6 +230,10 @@ Pomodoro module contract:
 - extension failure must never stop or invalidate the Pomodoro timer
 - the extension must not collect browsing history, page content, page titles, or visited URLs; only the blocklist and focus-session metadata are stored
 - Settings apply immediately; do not require a separate Save action for these local preferences
+- ringtone choices are short local procedural tones so completion audio remains license-free, offline-friendly, and consistent with the local-first contract
+- Pomodoro data management is centralized in Settings: export produces one full JSON backup of timer state, preferences, goals, blocked-site configuration, and activity history; delete removes all locally stored Pomodoro data
+- Activity is for inspection, not data administration; do not duplicate export/delete controls there
+- destructive data deletion uses inline confirmation inside the existing Settings drill-down rather than opening another modal
 - do not stack dialogs for nested settings; use a single modal with drill-down navigation and an explicit Back action for secondary views such as Blocked websites
 - keep only one modal overlay active for a settings task; Escape returns from a drill-down before closing the parent settings surface
 - scrollable surfaces may hide the visual scrollbar to preserve the quiet UI, but wheel, trackpad, touch, keyboard, and programmatic scrolling must remain functional
