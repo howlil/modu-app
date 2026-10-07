@@ -18,7 +18,7 @@
 </svelte:head>
 
 <section class="hero-cloud relative -mt-[68px] overflow-hidden pt-[68px]">
-  <div class="cloud-field pointer-events-none absolute inset-x-[-8%] bottom-[-12px] h-[53%]" aria-hidden="true">
+  <div class="cloud-field pointer-events-none absolute inset-x-0 bottom-[-12px] h-[53%]" aria-hidden="true">
     <span class="cloud cloud-1"></span>
     <span class="cloud cloud-2"></span>
     <span class="cloud cloud-3"></span>
