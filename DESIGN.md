@@ -196,9 +196,15 @@ Pomodoro module contract:
 - optional auto-start breaks and auto-start focus live in settings
 - overtime is available for focus sessions; it counts upward after the scheduled focus target and remains mutually exclusive with auto-start breaks
 - optional Screen Wake Lock keeps the display awake only while an active session is running and only on supported browsers
-- completed focus sessions are stored locally as lightweight history; the primary UI exposes only a compact Today summary
+- completed focus sessions are stored locally as lightweight history; the primary UI exposes only a quiet history summary
 - history stays local, bounded, and intentionally lightweight rather than becoming an analytics dashboard
-- keyboard shortcuts: Space start/pause, R reset, S skip, 1/2/3 switch mode
+- progressive disclosure is mandatory: the primary surface shows mode, timer, primary action, cycle, optional focus label, and quiet history only
+- Reset and Skip use quiet icon controls around the primary Start/Pause/Resume action
+- Sound, notifications, auto-start behavior, overtime, Wake Lock, and custom durations live in Settings rather than the primary timer surface
+- Settings apply immediately; do not require a separate Save action for these local preferences
+- the focus label is optional: show `+ Add focus` until the user chooses to add one, then allow lightweight inline editing
+- overtime keeps the progress ring visually complete while elapsed overtime counts upward
+- keyboard shortcuts remain functional but should not be permanently explained on the primary surface
 - keep the interface single-column, light-weight, and free of task-management or heavy analytics scope
 
 ## 7. Local-first contract
