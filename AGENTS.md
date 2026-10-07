@@ -53,6 +53,8 @@ Prefer deleting dead scaffold over preserving hypothetical architecture.
 - Never expose scaffold state, implementation notes, vertical-slice notes, or engineering rationale in user-facing copy.
 - Privacy copy belongs near sensitive input boundaries; do not repeat the same privacy claim across the app.
 - A Card is not the default container. Use it only when the content is a real independent object or functional group.
+- Use Lucide for UI icons when an equivalent icon exists; do not add bespoke SVG icons for ordinary actions or controls.
+- Restrained gradients are allowed for surface depth, but avoid loud decorative gradients.
 
 ## Architecture
 
