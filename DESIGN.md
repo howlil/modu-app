@@ -56,10 +56,11 @@ Home tool presentation:
 
 Global navigation:
 
-- navigation is always a visible fully rounded capsule with a restrained translucent surface
-- at the top of the page it follows the normal content width while keeping a small inset from the viewport edge
-- after scrolling it contracts into a narrower floating capsule and keeps visible top breathing room
-- use restrained glassmorphism: translucent background, subtle border, backdrop blur, soft shadow
+- at the top of the page, navigation is flat, transparent, and full-width within the normal content axis so it visually merges into the hero
+- do not show an island/capsule surface before scrolling
+- after scrolling, navigation contracts into a narrower fully rounded floating capsule with visible top breathing room
+- the hero background must continue behind the initial navbar with no vertical gap between the viewport edge, navbar, and hero field
+- use restrained glassmorphism only for the scrolled island state: translucent background, subtle border, backdrop blur, soft shadow
 - GitHub Sponsor and Star are real actions, not decorative badges
 
 Do not build search, categories, pinned tools, recent tools, or contextual sidebars before tool count/user behavior makes them necessary.
