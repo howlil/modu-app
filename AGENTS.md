@@ -29,6 +29,13 @@ INSPECT DIFF
 STOP
 ```
 
+## Git workflow
+
+- The working branch is `master`.
+- Apply requested changes directly to `master` unless the user explicitly asks for a feature branch or pull request.
+- Do not create a PR merely as ceremony for changes the user asked to execute directly.
+- Before writing, fetch the current file from `master`; after writing, verify the resulting `master` source.
+
 ## Current scope
 
 - Merge PDF
