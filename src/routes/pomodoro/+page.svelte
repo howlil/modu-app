@@ -794,12 +794,17 @@
   }
 
   async function deleteAllPomodoroData() {
-    try {
-      await stopFocusProtection();
-      await setFocusProtectionEnabled(false);
-      await syncFocusProtectionBlocklist([]);
-    } catch {
-      // Local deletion must still succeed if the optional extension is unavailable.
+    if (
+      focusProtectionConnection !== 'missing' &&
+      focusProtectionConnection !== 'checking'
+    ) {
+      try {
+        await stopFocusProtection();
+        await setFocusProtectionEnabled(false);
+        await syncFocusProtectionBlocklist([]);
+      } catch {
+        // Local deletion must still succeed if the optional extension is unavailable.
+      }
     }
 
     await releaseWakeLock();
