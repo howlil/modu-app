@@ -5,7 +5,7 @@
 
 <svelte:head><title>Typing Practice — Module</title></svelte:head>
 
-<section class="py-10 max-[760px]:py-7">
+<section class="mx-auto w-full max-w-[1180px] px-4 py-10 max-[760px]:px-2.5 max-[760px]:py-7">
   <ToolHeader title="Typing Practice" />
 
   <div class="mb-3 flex max-w-[380px] gap-1 rounded-lg border bg-muted p-1">
