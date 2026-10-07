@@ -6,6 +6,7 @@
   "permissions": [
     "storage",
     "alarms",
+    "webNavigation",
     "declarativeNetRequestWithHostAccess"
   ],
   "host_permissions": [
