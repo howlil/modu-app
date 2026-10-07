@@ -31,9 +31,17 @@ Home tool presentation:
 
 - tools render as compact square app tiles
 - each tile is 1:1 with a clear icon and short name
+- tiles may use distinct solid pastel surfaces to make each tool feel like an app
 - do not add descriptions inside the launcher grid
 - desktop uses a small 3-column grid; narrow screens use 2 columns
 - the tile itself is the interaction target; avoid extra arrows, badges, or metadata
+
+Scrolled navigation:
+
+- at the top of the page, navigation spans the normal content width
+- after scrolling, it contracts into a rounded floating capsule
+- use restrained glassmorphism: translucent background, subtle border, backdrop blur, soft shadow
+- GitHub Sponsor and Star are real actions, not decorative badges
 
 Do not build search, categories, pinned tools, recent tools, or contextual sidebars before tool count/user behavior makes them necessary.
 
