@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
   import { RotateCcw, Settings2, Volume2, VolumeX } from 'lucide-svelte';
-  import { Button } from '$lib/components/ui/button/index.js';
   import ToolHeader from '#lib/components/ToolHeader.svelte';
   import {
     DEFAULT_TYPING_PREFERENCES,
@@ -685,7 +684,7 @@
           <div>
             <span class="text-[11px] text-muted-foreground">Recent speed</span>
             <div class="mt-1 text-[28px] font-semibold tracking-[-0.04em]">
-              {recentTrainingSessions.at(-1)?.wpm ?? 0}
+              {recentTrainingSessions[recentTrainingSessions.length - 1]?.wpm ?? 0}
               <span class="text-[11px] font-normal tracking-normal text-muted-foreground">wpm</span>
             </div>
           </div>
