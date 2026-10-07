@@ -1,17 +1,6 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import {
-    Bell,
-    BellOff,
-    History,
-    Monitor,
-    RotateCcw,
-    Settings2,
-    SkipForward,
-    Volume2,
-    VolumeX,
-    X
-  } from 'lucide-svelte';
+  import { onMount, tick } from 'svelte';
+  import { History, Pencil, RotateCcw, Settings2, SkipForward, X } from 'lucide-svelte';
   import { Button } from "$lib/components/ui/button/index.js";
   import { Input } from "$lib/components/ui/input/index.js";
   import {
@@ -47,22 +36,25 @@
 
   const MODE_META: Record<
     PomodoroMode,
-    { label: string; copy: string; accent: string; soft: string }
+    { label: string; shortLabel: string; copy: string; accent: string; soft: string }
   > = {
     focus: {
       label: 'Focus',
+      shortLabel: 'Focus',
       copy: 'One focus block. Nothing else.',
       accent: '#2468f2',
       soft: '#eaf1ff'
     },
     short: {
       label: 'Short break',
+      shortLabel: 'Short',
       copy: 'Step away for a few minutes.',
       accent: '#4f8e72',
       soft: '#edf6f1'
     },
     long: {
       label: 'Long break',
+      shortLabel: 'Long',
       copy: 'Take a proper break before a new cycle.',
       accent: '#7560c8',
       soft: '#f0edfb'
@@ -83,13 +75,16 @@
   };
 
   let durations = $state<Record<PomodoroMode, number>>({ ...DEFAULT_DURATIONS });
-  let draftDurations = $state<Record<PomodoroMode, number>>({ ...DEFAULT_DURATIONS });
   let preferences = $state<PomodoroPreferences>({ ...DEFAULT_PREFERENCES });
-  let draftPreferences = $state<PomodoroPreferences>({ ...DEFAULT_PREFERENCES });
   let timer = $state<TimerState>(createTimer('focus', DEFAULT_DURATIONS.focus * 60_000));
   let focusText = $state('');
+  let focusDraft = $state('');
+  let focusEditing = $state(false);
+  let focusInput: HTMLInputElement | null = null;
   let soundEnabled = $state(true);
   let notificationsEnabled = $state(false);
+  let notificationsSupported = $state(false);
+  let wakeLockSupported = $state(false);
   let history = $state<FocusSession[]>([]);
   let settingsOpen = $state(false);
   let historyOpen = $state(false);
@@ -106,7 +101,7 @@
   );
   const progressRatio = $derived(
     timer.status === 'overtime'
-      ? 0
+      ? 1
       : timer.durationMs > 0
         ? Math.max(0, Math.min(1, timer.remainingMs / timer.durationMs))
         : 0
@@ -200,7 +195,6 @@
         short: clampMinutes(saved.durations?.short, 5, 60),
         long: clampMinutes(saved.durations?.long, 15, 120)
       };
-      draftDurations = { ...durations };
 
       preferences = {
         autoStartBreaks: saved.preferences?.autoStartBreaks === true,
@@ -208,7 +202,6 @@
         overtime: saved.preferences?.overtime !== false,
         keepAwake: saved.preferences?.keepAwake === true
       };
-      draftPreferences = { ...preferences };
 
       if (saved.timer && isMode(saved.timer.mode)) {
         const fallback = createTimer(saved.timer.mode, durationMs(saved.timer.mode));
@@ -242,6 +235,7 @@
       }
 
       focusText = typeof saved.focusText === 'string' ? saved.focusText.slice(0, 80) : '';
+      focusDraft = focusText;
       soundEnabled = saved.soundEnabled !== false;
       notificationsEnabled = saved.notificationsEnabled === true;
       history = Array.isArray(saved.history)
@@ -457,13 +451,13 @@
   }
 
   async function toggleNotifications() {
+    if (!notificationsSupported) return;
+
     if (notificationsEnabled) {
       notificationsEnabled = false;
       persist();
       return;
     }
-
-    if (typeof Notification === 'undefined') return;
 
     if (Notification.permission === 'default') {
       const permission = await Notification.requestPermission();
@@ -480,50 +474,68 @@
     persist();
   }
 
-  function openSettings() {
-    draftDurations = { ...durations };
-    draftPreferences = { ...preferences };
-    settingsOpen = true;
-  }
+  function togglePreference(key: keyof PomodoroPreferences) {
+    const nextValue = !preferences[key];
 
-  function toggleDraftPreference(key: keyof PomodoroPreferences) {
-    draftPreferences[key] = !draftPreferences[key];
-
-    if (key === 'autoStartBreaks' && draftPreferences.autoStartBreaks) {
-      draftPreferences.overtime = false;
-    }
-
-    if (key === 'overtime' && draftPreferences.overtime) {
-      draftPreferences.autoStartBreaks = false;
-    }
-  }
-
-  function saveSettings() {
-    durations = {
-      focus: clampMinutes(draftDurations.focus, 25, 180),
-      short: clampMinutes(draftDurations.short, 5, 60),
-      long: clampMinutes(draftDurations.long, 15, 120)
+    preferences = {
+      ...preferences,
+      [key]: nextValue
     };
 
-    preferences = { ...draftPreferences };
-
-    if (timer.status === 'idle') {
-      timer = switchMode(timer, timer.mode, durationMs(timer.mode));
+    if (key === 'autoStartBreaks' && nextValue) {
+      preferences = { ...preferences, overtime: false };
     }
 
-    settingsOpen = false;
+    if (key === 'overtime' && nextValue) {
+      preferences = { ...preferences, autoStartBreaks: false };
+    }
+
+    if (key === 'keepAwake' && !wakeLockSupported) {
+      preferences = { ...preferences, keepAwake: false };
+    }
+
     void syncWakeLock();
     persist();
   }
 
-  function updateFocusText(value: string) {
-    focusText = value.slice(0, 80);
+  function updateDuration(mode: PomodoroMode, value: string | number) {
+    const fallback = DEFAULT_DURATIONS[mode];
+    const max = mode === 'focus' ? 180 : mode === 'short' ? 60 : 120;
+    const minutes = clampMinutes(value, fallback, max);
+
+    durations = { ...durations, [mode]: minutes };
+
+    if (timer.status === 'idle' && timer.mode === mode) {
+      timer = switchMode(timer, mode, minutes * 60_000);
+    }
+
     persist();
+  }
+
+  async function beginFocusEdit() {
+    focusDraft = focusText;
+    focusEditing = true;
+    await tick();
+    focusInput?.focus();
+    focusInput?.select();
+  }
+
+  function commitFocusEdit() {
+    focusText = focusDraft.trim().slice(0, 80);
+    focusDraft = focusText;
+    focusEditing = false;
+    persist();
+  }
+
+  function cancelFocusEdit() {
+    focusDraft = focusText;
+    focusEditing = false;
   }
 
   async function requestWakeLock() {
     if (
       !preferences.keepAwake ||
+      !wakeLockSupported ||
       document.visibilityState !== 'visible' ||
       (timer.status !== 'running' && timer.status !== 'overtime') ||
       wakeLock
@@ -560,6 +572,7 @@
   async function syncWakeLock() {
     if (
       preferences.keepAwake &&
+      wakeLockSupported &&
       (timer.status === 'running' || timer.status === 'overtime')
     ) {
       await requestWakeLock();
@@ -575,7 +588,14 @@
   }
 
   onMount(() => {
+    notificationsSupported = typeof Notification !== 'undefined';
+    wakeLockSupported = 'wakeLock' in navigator;
+
     restore();
+
+    if (!notificationsSupported) notificationsEnabled = false;
+    if (!wakeLockSupported) preferences = { ...preferences, keepAwake: false };
+
     hydrated = true;
     persist();
     updateDocumentTitle();
@@ -608,6 +628,7 @@
         target?.isContentEditable;
 
       if (event.key === 'Escape') {
+        if (focusEditing) cancelFocusEdit();
         settingsOpen = false;
         historyOpen = false;
         return;
@@ -647,6 +668,7 @@
     timer.status;
     timer.remainingMs;
     timer.mode;
+    clockNow;
     updateDocumentTitle();
   });
 </script>
@@ -662,9 +684,9 @@
   class="mx-auto flex min-h-[calc(100vh-68px)] max-w-[680px] flex-col items-center px-2 pb-12 pt-5 text-center max-[700px]:pt-2.5"
   style={`--pomodoro-accent: ${modeMeta.accent}; --pomodoro-soft: ${modeMeta.soft};`}
 >
-  <div class="mb-7 flex w-full items-start justify-between gap-4">
+  <div class="mb-6 flex w-full items-start justify-between gap-4">
     <div class="text-left">
-      <h1 class="m-0 text-[30px] font-[500] leading-none tracking-[-0.045em]">Pomodoro</h1>
+      <h1 class="m-0 text-[28px] font-[500] leading-none tracking-[-0.045em]">Pomodoro</h1>
       <p class="mt-2 text-[12px] font-normal text-muted-foreground">{modeMeta.copy}</p>
     </div>
 
@@ -672,15 +694,16 @@
       variant="ghost"
       size="icon-sm"
       class="rounded-lg text-muted-foreground"
-      aria-label="Timer settings"
-      onclick={openSettings}
+      aria-label="Pomodoro settings"
+      title="Settings"
+      onclick={() => (settingsOpen = true)}
     >
       <Settings2 class="size-4" strokeWidth={1.7} />
     </Button>
   </div>
 
   <div
-    class="mb-7 flex items-center gap-1 rounded-[13px] border bg-muted p-1"
+    class="mb-6 flex items-center gap-1 rounded-[13px] border bg-muted p-1"
     role="tablist"
     aria-label="Timer mode"
   >
@@ -691,19 +714,19 @@
         role="tab"
         aria-selected={timer.mode === typedMode}
         class={[
-          'h-8 rounded-[9px] px-3 text-[12px] font-normal transition',
+          'h-[31px] rounded-[9px] px-3 text-[12px] font-normal transition',
           timer.mode === typedMode
             ? 'bg-card text-foreground shadow-[0_1px_2px_rgba(26,26,23,0.06)]'
             : 'text-muted-foreground hover:text-foreground'
         ]}
         onclick={() => switchPomodoroMode(typedMode)}
       >
-        {MODE_META[typedMode].label}
+        {MODE_META[typedMode].shortLabel}
       </button>
     {/each}
   </div>
 
-  <div class="relative size-[min(70vw,310px)]">
+  <div class="relative size-[min(70vw,300px)]">
     <svg class="size-full -rotate-90" viewBox="0 0 120 120" aria-hidden="true">
       <circle
         cx="60"
@@ -729,7 +752,7 @@
     </svg>
 
     <div class="absolute inset-0 grid place-content-center">
-      <div class="text-[clamp(58px,9vw,78px)] font-[420] leading-[0.9] tracking-[-0.055em] tabular-nums">
+      <div class="text-[clamp(56px,8vw,74px)] font-[410] leading-[0.9] tracking-[-0.055em] tabular-nums">
         {formattedTime}
       </div>
       <div class="mt-3 text-[12px] font-normal text-muted-foreground">
@@ -747,44 +770,76 @@
   </div>
 
   {#if timer.mode === 'focus'}
-    <div class="mt-4 w-full max-w-[360px]">
-      <input
-        class="w-full border-0 border-b border-transparent bg-transparent px-2 py-1.5 text-center text-[13px] font-normal outline-none placeholder:text-muted-foreground/60 hover:border-border focus:border-border"
-        type="text"
-        maxlength="80"
-        value={focusText}
-        placeholder="What are you focusing on?"
-        aria-label="Focus label"
-        oninput={(event) => updateFocusText(event.currentTarget.value)}
-      />
+    <div class="mt-3 grid min-h-9 w-full max-w-[360px] place-items-center">
+      {#if focusEditing}
+        <input
+          bind:this={focusInput}
+          class="w-full max-w-[300px] border-0 border-b border-border bg-transparent px-2 py-1.5 text-center text-[13px] font-normal outline-none placeholder:text-muted-foreground/60"
+          type="text"
+          maxlength="80"
+          bind:value={focusDraft}
+          placeholder="What are you focusing on?"
+          aria-label="Focus label"
+          onblur={commitFocusEdit}
+          onkeydown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              commitFocusEdit();
+            } else if (event.key === 'Escape') {
+              event.preventDefault();
+              cancelFocusEdit();
+            }
+          }}
+        />
+      {:else if focusText}
+        <button
+          type="button"
+          class="group inline-flex max-w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-[13px] font-normal text-foreground transition hover:bg-muted"
+          onclick={beginFocusEdit}
+        >
+          <span class="truncate">{focusText}</span>
+          <Pencil class="size-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" strokeWidth={1.7} />
+        </button>
+      {:else}
+        <button
+          type="button"
+          class="rounded-lg px-2 py-1.5 text-[12px] font-normal text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          onclick={beginFocusEdit}
+        >
+          + Add focus
+        </button>
+      {/if}
     </div>
   {/if}
 
-  <div class="mt-5">
-    <Button class="h-[42px] min-w-[136px] rounded-xl px-5 text-[13px] font-medium shadow-none" onclick={handlePrimary}>
-      {primaryLabel}
-    </Button>
-  </div>
-
-  <div class="mt-2 flex items-center justify-center gap-1">
+  <div class="mt-4 flex items-center justify-center gap-2.5">
     <Button
       variant="ghost"
-      size="sm"
-      class="h-8 rounded-lg px-2.5 text-[12px] font-normal text-muted-foreground"
+      size="icon"
+      class="size-[38px] rounded-[10px] text-muted-foreground"
+      aria-label="Reset timer"
+      title="Reset (R)"
       onclick={handleReset}
     >
-      <RotateCcw class="size-3.5" strokeWidth={1.7} />
-      Reset
+      <RotateCcw class="size-4" strokeWidth={1.7} />
+    </Button>
+
+    <Button
+      class="h-[42px] min-w-[132px] rounded-xl px-5 text-[13px] font-medium shadow-none"
+      onclick={handlePrimary}
+    >
+      {primaryLabel}
     </Button>
 
     <Button
       variant="ghost"
-      size="sm"
-      class="h-8 rounded-lg px-2.5 text-[12px] font-normal text-muted-foreground"
+      size="icon"
+      class="size-[38px] rounded-[10px] text-muted-foreground"
+      aria-label="Skip session"
+      title="Skip (S)"
       onclick={handleSkip}
     >
-      <SkipForward class="size-3.5" strokeWidth={1.7} />
-      Skip
+      <SkipForward class="size-4" strokeWidth={1.7} />
     </Button>
   </div>
 
@@ -797,8 +852,9 @@
         ></span>
       {/each}
     </div>
+
     <div class="mt-2 text-[11px] font-normal text-muted-foreground">
-      {timer.completedFocus >= 4 ? 'Long break next' : `Focus ${Math.min(timer.completedFocus + 1, 4)} of 4`}
+      {timer.completedFocus >= 4 ? 'Long break next' : `${Math.min(timer.completedFocus + 1, 4)} of 4`}
     </div>
 
     <button
@@ -807,7 +863,7 @@
       onclick={() => (historyOpen = true)}
     >
       <History class="size-3" strokeWidth={1.7} />
-      Today · {todaySessions.length} {todaySessions.length === 1 ? 'session' : 'sessions'} · {formatFocusTotal(todayFocusMs)}
+      History · {formatFocusTotal(todayFocusMs)}
     </button>
   </div>
 
@@ -824,51 +880,9 @@
         ? ' Continue while the flow lasts.'
         : timer.mode === 'focus'
           ? ' Take a break.'
-          : ' Ready for another focus block.'}
+          : ' Ready to focus.'}
     </p>
   {/if}
-
-  <div class="mt-7 flex items-center justify-center gap-2">
-    <Button
-      variant="outline"
-      size="sm"
-      class={[
-        'h-8 rounded-lg px-2.5 text-[11px] font-normal shadow-none',
-        soundEnabled ? 'bg-[var(--pomodoro-soft)]' : 'text-muted-foreground'
-      ]}
-      onclick={toggleSound}
-    >
-      {#if soundEnabled}
-        <Volume2 class="size-3.5" strokeWidth={1.7} />
-        Sound on
-      {:else}
-        <VolumeX class="size-3.5" strokeWidth={1.7} />
-        Sound off
-      {/if}
-    </Button>
-
-    <Button
-      variant="outline"
-      size="sm"
-      class={[
-        'h-8 rounded-lg px-2.5 text-[11px] font-normal shadow-none',
-        notificationsEnabled ? 'bg-[var(--pomodoro-soft)]' : 'text-muted-foreground'
-      ]}
-      onclick={toggleNotifications}
-    >
-      {#if notificationsEnabled}
-        <Bell class="size-3.5" strokeWidth={1.7} />
-        Notifications on
-      {:else}
-        <BellOff class="size-3.5" strokeWidth={1.7} />
-        Notifications off
-      {/if}
-    </Button>
-  </div>
-
-  <p class="mt-6 text-[10px] leading-5 text-muted-foreground/70 max-[620px]:hidden">
-    Space start/pause · R reset · S skip · 1/2/3 switch mode
-  </p>
 
   {#if settingsOpen}
     <div
@@ -899,70 +913,168 @@
           </Button>
         </div>
 
-        <div class="mb-5">
-          <div class="mb-3 text-[11px] font-medium text-muted-foreground">Durations</div>
-          <div class="grid gap-3">
-            <label class="grid grid-cols-[1fr_90px] items-center gap-3 text-[12px]">
-              Focus
-              <Input type="number" min="1" max="180" class="h-8 text-right text-[12px]" bind:value={draftDurations.focus} />
-            </label>
-            <label class="grid grid-cols-[1fr_90px] items-center gap-3 text-[12px]">
-              Short break
-              <Input type="number" min="1" max="60" class="h-8 text-right text-[12px]" bind:value={draftDurations.short} />
-            </label>
-            <label class="grid grid-cols-[1fr_90px] items-center gap-3 text-[12px]">
-              Long break
-              <Input type="number" min="1" max="120" class="h-8 text-right text-[12px]" bind:value={draftDurations.long} />
-            </label>
-          </div>
+        <div>
+          <div class="mb-2 text-[11px] font-medium text-muted-foreground">Timer</div>
+
+          <label class="grid min-h-10 grid-cols-[1fr_90px] items-center gap-3 text-[12px]">
+            Focus
+            <Input
+              type="number"
+              min="1"
+              max="180"
+              class="h-8 text-right text-[12px]"
+              value={durations.focus}
+              onchange={(event) => updateDuration('focus', event.currentTarget.value)}
+            />
+          </label>
+
+          <label class="grid min-h-10 grid-cols-[1fr_90px] items-center gap-3 text-[12px]">
+            Short
+            <Input
+              type="number"
+              min="1"
+              max="60"
+              class="h-8 text-right text-[12px]"
+              value={durations.short}
+              onchange={(event) => updateDuration('short', event.currentTarget.value)}
+            />
+          </label>
+
+          <label class="grid min-h-10 grid-cols-[1fr_90px] items-center gap-3 text-[12px]">
+            Long
+            <Input
+              type="number"
+              min="1"
+              max="120"
+              class="h-8 text-right text-[12px]"
+              value={durations.long}
+              onchange={(event) => updateDuration('long', event.currentTarget.value)}
+            />
+          </label>
         </div>
 
-        <div class="border-t pt-4">
-          <div class="mb-2 text-[11px] font-medium text-muted-foreground">Session flow</div>
+        <div class="mt-4 border-t pt-4">
+          <div class="mb-1 text-[11px] font-medium text-muted-foreground">Automation</div>
 
           {#each [
             ['autoStartBreaks', 'Auto-start breaks'],
             ['autoStartFocus', 'Auto-start focus'],
-            ['overtime', 'Continue counting overtime'],
-            ['keepAwake', 'Keep screen awake']
+            ['overtime', 'Count overtime']
           ] as option}
             {@const key = option[0] as keyof PomodoroPreferences}
-            <button
-              type="button"
-              class="flex w-full items-center justify-between rounded-lg px-1 py-2 text-left text-[12px]"
-              onclick={() => toggleDraftPreference(key)}
+            <Button
+              variant="ghost"
+              class="flex h-10 w-full items-center justify-between rounded-lg px-1 text-[12px] font-normal"
+              role="switch"
+              aria-checked={preferences[key]}
+              onclick={() => togglePreference(key)}
             >
-              <span class="inline-flex items-center gap-2">
-                {#if key === 'keepAwake'}
-                  <Monitor class="size-3.5 text-muted-foreground" strokeWidth={1.7} />
-                {/if}
-                {option[1]}
-              </span>
+              <span>{option[1]}</span>
               <span
                 class={[
                   'relative h-5 w-9 rounded-full transition-colors',
-                  draftPreferences[key] ? 'bg-primary' : 'bg-muted'
+                  preferences[key] ? 'bg-primary' : 'bg-muted'
                 ]}
                 aria-hidden="true"
               >
                 <span
                   class={[
                     'absolute top-0.5 size-4 rounded-full bg-white shadow-sm transition-transform',
-                    draftPreferences[key] ? 'translate-x-[18px]' : 'translate-x-0.5'
+                    preferences[key] ? 'translate-x-[18px]' : 'translate-x-0.5'
                   ]}
                 ></span>
               </span>
-            </button>
+            </Button>
           {/each}
         </div>
 
-        <p class="mt-3 text-[10px] leading-4 text-muted-foreground">
-          Overtime and auto-start breaks are mutually exclusive. Wake Lock works only in supported browsers.
-        </p>
+        <div class="mt-4 border-t pt-4">
+          <div class="mb-1 text-[11px] font-medium text-muted-foreground">System</div>
 
-        <Button class="mt-4 h-9 w-full rounded-lg text-[12px] font-medium shadow-none" onclick={saveSettings}>
-          Save
-        </Button>
+          <Button
+            variant="ghost"
+            class="flex h-10 w-full items-center justify-between rounded-lg px-1 text-[12px] font-normal"
+            role="switch"
+            aria-checked={notificationsEnabled}
+            disabled={!notificationsSupported}
+            onclick={toggleNotifications}
+          >
+            <span>
+              Notifications
+              {#if !notificationsSupported}
+                <span class="ml-1 text-[10px] text-muted-foreground">Unavailable</span>
+              {/if}
+            </span>
+            <span
+              class={[
+                'relative h-5 w-9 rounded-full transition-colors',
+                notificationsEnabled ? 'bg-primary' : 'bg-muted'
+              ]}
+              aria-hidden="true"
+            >
+              <span
+                class={[
+                  'absolute top-0.5 size-4 rounded-full bg-white shadow-sm transition-transform',
+                  notificationsEnabled ? 'translate-x-[18px]' : 'translate-x-0.5'
+                ]}
+              ></span>
+            </span>
+          </Button>
+
+          <Button
+            variant="ghost"
+            class="flex h-10 w-full items-center justify-between rounded-lg px-1 text-[12px] font-normal"
+            role="switch"
+            aria-checked={soundEnabled}
+            onclick={toggleSound}
+          >
+            <span>Sound</span>
+            <span
+              class={[
+                'relative h-5 w-9 rounded-full transition-colors',
+                soundEnabled ? 'bg-primary' : 'bg-muted'
+              ]}
+              aria-hidden="true"
+            >
+              <span
+                class={[
+                  'absolute top-0.5 size-4 rounded-full bg-white shadow-sm transition-transform',
+                  soundEnabled ? 'translate-x-[18px]' : 'translate-x-0.5'
+                ]}
+              ></span>
+            </span>
+          </Button>
+
+          <Button
+            variant="ghost"
+            class="flex h-10 w-full items-center justify-between rounded-lg px-1 text-[12px] font-normal"
+            role="switch"
+            aria-checked={preferences.keepAwake}
+            disabled={!wakeLockSupported}
+            onclick={() => togglePreference('keepAwake')}
+          >
+            <span>
+              Keep screen awake
+              {#if !wakeLockSupported}
+                <span class="ml-1 text-[10px] text-muted-foreground">Unavailable</span>
+              {/if}
+            </span>
+            <span
+              class={[
+                'relative h-5 w-9 rounded-full transition-colors',
+                preferences.keepAwake ? 'bg-primary' : 'bg-muted'
+              ]}
+              aria-hidden="true"
+            >
+              <span
+                class={[
+                  'absolute top-0.5 size-4 rounded-full bg-white shadow-sm transition-transform',
+                  preferences.keepAwake ? 'translate-x-[18px]' : 'translate-x-0.5'
+                ]}
+              ></span>
+            </span>
+          </Button>
+        </div>
       </div>
     </div>
   {/if}
@@ -983,11 +1095,14 @@
       >
         <div class="mb-4 flex items-center justify-between">
           <div>
-            <h2 id="pomodoro-history-title" class="m-0 text-[14px] font-medium tracking-[-0.02em]">Focus history</h2>
+            <h2 id="pomodoro-history-title" class="m-0 text-[14px] font-medium tracking-[-0.02em]">
+              Focus history
+            </h2>
             <p class="mt-1 text-[11px] text-muted-foreground">
               Today · {todaySessions.length} {todaySessions.length === 1 ? 'session' : 'sessions'} · {formatFocusTotal(todayFocusMs)}
             </p>
           </div>
+
           <Button
             variant="ghost"
             size="icon-sm"
@@ -1020,6 +1135,7 @@
                     })}
                   </div>
                 </div>
+
                 <div class="shrink-0 text-[11px] text-muted-foreground">
                   {formatFocusTotal(session.durationMs)}
                 </div>
