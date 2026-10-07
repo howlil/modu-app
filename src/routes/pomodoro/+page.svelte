@@ -15,7 +15,6 @@
   import { Button } from "$lib/components/ui/button/index.js";
   import { Input } from "$lib/components/ui/input/index.js";
   import {
-    completeTimer,
     createTimer,
     getNextMode,
     getOvertimeMs,
@@ -95,10 +94,11 @@
   let settingsOpen = $state(false);
   let historyOpen = $state(false);
   let hydrated = $state(false);
+  let clockNow = $state(Date.now());
   let wakeLock: { release: () => Promise<void> } | null = null;
 
   const modeMeta = $derived(MODE_META[timer.mode]);
-  const overtimeMs = $derived(getOvertimeMs(timer, Date.now()));
+  const overtimeMs = $derived(getOvertimeMs(timer, clockNow));
   const formattedTime = $derived(
     timer.status === 'overtime'
       ? `+${formatDuration(overtimeMs)}`
@@ -237,7 +237,7 @@
         } as TimerState;
 
         if (timer.status === 'running') {
-          timer = syncTimer(timer, Date.now(), preferences.overtime);
+          timer = syncTimer(timer, clockNow, preferences.overtime);
         }
       }
 
@@ -273,7 +273,7 @@
     if (typeof document === 'undefined') return;
 
     if (timer.status === 'overtime') {
-      document.title = `+${formatDuration(getOvertimeMs(timer))} · Overtime — Module`;
+      document.title = `+${formatDuration(getOvertimeMs(timer, clockNow))} · Overtime — Module`;
       return;
     }
 
@@ -368,6 +368,8 @@
   }
 
   function handleTick() {
+    clockNow = Date.now();
+
     if (timer.status === 'overtime') {
       updateDocumentTitle();
       return;
@@ -376,7 +378,7 @@
     if (timer.status !== 'running') return;
 
     const previousTimer = timer;
-    const nextTimer = syncTimer(timer, Date.now(), preferences.overtime);
+    const nextTimer = syncTimer(timer, clockNow, preferences.overtime);
     timer = nextTimer;
 
     if (previousTimer.status === 'running' && nextTimer.status === 'overtime') {
