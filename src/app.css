@@ -84,6 +84,13 @@
   * {
     box-sizing: border-box;
     border-color: var(--border);
+    scrollbar-width: none;
+  }
+
+  *::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
   }
 
   html {
