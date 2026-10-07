@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
-  import { Pencil, RotateCcw, Settings2, SkipForward, X } from 'lucide-svelte';
+  import { ArrowLeft, Pencil, RotateCcw, Settings2, SkipForward, X } from 'lucide-svelte';
   import { Button } from "$lib/components/ui/button/index.js";
   import { Input } from "$lib/components/ui/input/index.js";
   import ActivityView from '#lib/components/pomodoro/ActivityView.svelte';
@@ -44,6 +44,7 @@
   const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
   type PomodoroView = 'timer' | 'activity';
+  type SettingsPanel = 'main' | 'blocked-sites';
 
   type PomodoroPreferences = {
     autoStartBreaks: boolean;
@@ -114,6 +115,7 @@
   let activitySessions = $state<FocusActivitySession[]>([]);
   let legacyHistory = $state<LegacyFocusSession[]>([]);
   let settingsOpen = $state(false);
+  let settingsPanel = $state<SettingsPanel>('main');
   let hydrated = $state(false);
   let clockNow = $state(Date.now());
   let wakeLock: { release: () => Promise<void> } | null = null;
@@ -482,6 +484,16 @@
       focusProtectionError =
         error instanceof Error ? error.message : 'Focus protection unavailable.';
     }
+  }
+
+  function openSettings() {
+    settingsPanel = 'main';
+    settingsOpen = true;
+  }
+
+  function closeSettings() {
+    settingsOpen = false;
+    settingsPanel = 'main';
   }
 
   function updateDocumentTitle() {
@@ -898,8 +910,17 @@
         target?.isContentEditable;
 
       if (event.key === 'Escape') {
-        if (focusEditing) cancelFocusEdit();
-        settingsOpen = false;
+        if (focusEditing) {
+          cancelFocusEdit();
+          return;
+        }
+
+        if (settingsOpen && settingsPanel === 'blocked-sites') {
+          settingsPanel = 'main';
+          return;
+        }
+
+        if (settingsOpen) closeSettings();
         return;
       }
 
@@ -985,7 +1006,7 @@
         class="absolute right-0 -top-1 rounded-lg text-muted-foreground max-[520px]:right-1"
         aria-label="Pomodoro settings"
         title="Settings"
-        onclick={() => (settingsOpen = true)}
+        onclick={openSettings}
       >
         <Settings2 class="size-4" strokeWidth={1.7} />
       </Button>
@@ -1168,7 +1189,7 @@
       class="fixed inset-0 z-[100] grid place-items-center bg-foreground/[0.12] p-4 backdrop-blur-[3px]"
       role="presentation"
       onclick={(event) => {
-        if (event.target === event.currentTarget) settingsOpen = false;
+        if (event.target === event.currentTarget) closeSettings();
       }}
     >
       <div
@@ -1177,14 +1198,38 @@
         aria-modal="true"
         aria-labelledby="pomodoro-settings-title"
       >
-        <div class="mb-4 flex items-center justify-between">
-          <h2 id="pomodoro-settings-title" class="m-0 text-[14px] font-medium tracking-[-0.02em]">Pomodoro settings</h2>
-          <Button variant="ghost" size="icon-sm" class="rounded-lg text-muted-foreground" aria-label="Close settings" onclick={() => (settingsOpen = false)}>
+        <div class="mb-4 flex items-center justify-between gap-2">
+          <div class="flex min-w-0 items-center gap-1">
+            {#if settingsPanel === 'blocked-sites'}
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                class="shrink-0 rounded-lg text-muted-foreground"
+                aria-label="Back to Pomodoro settings"
+                onclick={() => (settingsPanel = 'main')}
+              >
+                <ArrowLeft class="size-4" strokeWidth={1.7} />
+              </Button>
+            {/if}
+
+            <h2 id="pomodoro-settings-title" class="m-0 truncate text-[14px] font-medium tracking-[-0.02em]">
+              {settingsPanel === 'main' ? 'Pomodoro settings' : 'Blocked websites'}
+            </h2>
+          </div>
+
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            class="shrink-0 rounded-lg text-muted-foreground"
+            aria-label="Close settings"
+            onclick={closeSettings}
+          >
             <X class="size-4" strokeWidth={1.7} />
           </Button>
         </div>
 
-        <div>
+        {#if settingsPanel === 'main'}
+          <div>
           <div class="mb-2 text-[11px] font-medium text-muted-foreground">Timer</div>
 
           {#each [
@@ -1251,6 +1296,7 @@
           errorMessage={focusProtectionError}
           onToggle={toggleFocusProtection}
           onBlocklistChange={updateBlockedDomains}
+          onManage={() => (settingsPanel = 'blocked-sites')}
         />
 
         <div class="mt-4 border-t pt-4">
@@ -1346,6 +1392,17 @@
             </span>
           </Button>
         </div>
+        {:else}
+          <FocusProtectionSettings
+            view="manager"
+            enabled={focusProtectionEnabled}
+            {blockedDomains}
+            connection={focusProtectionConnection}
+            errorMessage={focusProtectionError}
+            onToggle={toggleFocusProtection}
+            onBlocklistChange={updateBlockedDomains}
+          />
+        {/if}
       </div>
     </div>
   {/if}
