@@ -425,40 +425,40 @@
 
     <Tabs.Root bind:value={primaryTab} class="gap-0">
       <Tabs.List
-        variant="line"
-        class="-mt-2 h-9 w-full min-w-0 justify-start rounded-none border-b border-border p-0"
+        variant="default"
+        class="-mt-2 h-9 w-full min-w-0 justify-start rounded-full bg-muted/65 p-1"
       >
         <Tabs.Trigger
           value="train"
-          class="h-9 flex-none rounded-none px-2.5 py-0 text-[13px] font-normal data-[state=active]:font-medium"
+          class="h-7 flex-none rounded-full px-3 py-0 text-[12px] font-normal data-[state=active]:font-medium data-[state=active]:shadow-none"
           onclick={() => setPrimaryTab('train')}
         >
           Train
         </Tabs.Trigger>
         <Tabs.Trigger
           value="lessons"
-          class="h-9 flex-none rounded-none px-2.5 py-0 text-[13px] font-normal data-[state=active]:font-medium"
+          class="h-7 flex-none rounded-full px-3 py-0 text-[12px] font-normal data-[state=active]:font-medium data-[state=active]:shadow-none"
           onclick={() => setPrimaryTab('lessons')}
         >
           Lessons
         </Tabs.Trigger>
         <Tabs.Trigger
           value="test"
-          class="h-9 flex-none rounded-none px-2.5 py-0 text-[13px] font-normal data-[state=active]:font-medium"
+          class="h-7 flex-none rounded-full px-3 py-0 text-[12px] font-normal data-[state=active]:font-medium data-[state=active]:shadow-none"
           onclick={() => setPrimaryTab('test')}
         >
           Test
         </Tabs.Trigger>
         <Tabs.Trigger
           value="progress"
-          class="h-9 flex-none rounded-none px-2.5 py-0 text-[13px] font-normal data-[state=active]:font-medium"
+          class="h-7 flex-none rounded-full px-3 py-0 text-[12px] font-normal data-[state=active]:font-medium data-[state=active]:shadow-none"
           onclick={() => setPrimaryTab('progress')}
         >
           Progress
         </Tabs.Trigger>
         <Tabs.Trigger
           value="settings"
-          class="ml-auto size-8 flex-none rounded-lg p-0 after:hidden data-[state=active]:bg-muted"
+          class="ml-auto size-7 flex-none rounded-full p-0 after:hidden data-[state=active]:bg-background data-[state=active]:shadow-none"
           aria-label="Typing settings"
           onclick={() => setPrimaryTab('settings')}
         >
