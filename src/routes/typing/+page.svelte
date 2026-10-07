@@ -1,7 +1,10 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
-  import { RotateCcw, Settings2, Volume2, VolumeX } from 'lucide-svelte';
+  import { RotateCcw, Settings2 } from 'lucide-svelte';
   import { Button } from '$lib/components/ui/button/index.js';
+  import * as Tabs from '$lib/components/ui/tabs/index.js';
+  import { Switch } from '$lib/components/ui/switch/index.js';
+  import * as ToggleGroup from '$lib/components/ui/toggle-group/index.js';
   import ToolHeader from '#lib/components/ToolHeader.svelte';
   import {
     DEFAULT_TYPING_PREFERENCES,
@@ -29,15 +32,14 @@
     playTypingKeySound
   } from '#lib/modules/typing/sounds.ts';
 
-  type TypingView = 'train' | 'progress' | 'settings';
-  type TrainMode = 'adaptive' | 'lessons' | 'test';
+  type PrimaryTab = 'train' | 'lessons' | 'test' | 'progress' | 'settings';
 
   const STATE_KEY = 'module-typing-state-v1';
   const PREFERENCES_KEY = 'module-typing-preferences-v1';
   const BLOCK_KEY = 'module-typing-block-v1';
 
-  let activeView = $state<TypingView>('train');
-  let trainMode = $state<TrainMode>('adaptive');
+  let primaryTab = $state<PrimaryTab>('train');
+  let testMode = $state('time');
   let learningState = $state<TypingLearningState>(createInitialTypingState());
   let preferences = $state<TypingPreferences>({ ...DEFAULT_TYPING_PREFERENCES });
   let blockIndex = $state(0);
@@ -141,8 +143,7 @@
 
       if (
         isControl ||
-        activeView !== 'train' ||
-        (trainMode !== 'adaptive' && trainMode !== 'test') ||
+        (primaryTab !== 'train' && primaryTab !== 'test') ||
         runComplete ||
         event.metaKey ||
         event.ctrlKey ||
@@ -249,7 +250,7 @@
       );
     }
 
-    if (trainMode === 'adaptive') {
+    if (primaryTab === 'train') {
       recordTypingAttempt(
         learningState,
         expected,
@@ -284,7 +285,7 @@
       attempts > 0 ? Math.round(((attempts - errors) / attempts) * 100) : 100;
     const finalWpm = Math.round((typedIndex / 5) / (durationMs / 60_000));
 
-    if (trainMode === 'adaptive') {
+    if (primaryTab === 'train') {
       const reviewedKeys =
         currentBlock.kind === 'warmup' ? dueKeys(learningState) : [];
 
@@ -310,7 +311,7 @@
           finalAccuracy >= preferences.masteryAccuracy
         );
       }
-    } else if (trainMode === 'test') {
+    } else if (primaryTab === 'test') {
       learningState.sessions.push({
         at: Date.now(),
         kind: 'test',
@@ -330,12 +331,11 @@
     startAdaptiveBlock();
   }
 
-  function setTrainMode(mode: TrainMode) {
-    trainMode = mode;
-    activeView = 'train';
+  function setPrimaryTab(tab: PrimaryTab) {
+    primaryTab = tab;
 
-    if (mode === 'adaptive') startAdaptiveBlock(false);
-    if (mode === 'test') startTest();
+    if (tab === 'train') startAdaptiveBlock(false);
+    if (tab === 'test') startTest();
   }
 
   function cycleGuide() {
@@ -422,66 +422,50 @@
   <div class="mx-auto w-full max-w-[860px] min-w-0">
     <ToolHeader title="Typing" />
 
-    <nav class="-mt-2 flex min-w-0 items-center gap-1 border-b border-border" aria-label="Typing">
-      <Button
-        variant="ghost"
-        size="sm"
-        class={activeView === 'train' && trainMode === 'adaptive'
-          ? "h-9 rounded-none border-b-2 border-foreground bg-transparent px-2.5 text-[13px] font-medium text-foreground shadow-none hover:bg-transparent"
-          : "h-9 rounded-none border-b-2 border-transparent bg-transparent px-2.5 text-[13px] font-normal text-muted-foreground shadow-none hover:bg-transparent hover:text-foreground"}
-        onclick={() => setTrainMode('adaptive')}
+    <Tabs.Root bind:value={primaryTab} class="gap-0">
+      <Tabs.List
+        variant="line"
+        class="-mt-2 h-9 w-full min-w-0 justify-start rounded-none border-b border-border p-0"
       >
-        Train
-      </Button>
+        <Tabs.Trigger
+          value="train"
+          class="h-9 flex-none rounded-none px-2.5 py-0 text-[13px] font-normal data-[state=active]:font-medium"
+          onclick={() => setPrimaryTab('train')}
+        >
+          Train
+        </Tabs.Trigger>
+        <Tabs.Trigger
+          value="lessons"
+          class="h-9 flex-none rounded-none px-2.5 py-0 text-[13px] font-normal data-[state=active]:font-medium"
+          onclick={() => setPrimaryTab('lessons')}
+        >
+          Lessons
+        </Tabs.Trigger>
+        <Tabs.Trigger
+          value="test"
+          class="h-9 flex-none rounded-none px-2.5 py-0 text-[13px] font-normal data-[state=active]:font-medium"
+          onclick={() => setPrimaryTab('test')}
+        >
+          Test
+        </Tabs.Trigger>
+        <Tabs.Trigger
+          value="progress"
+          class="h-9 flex-none rounded-none px-2.5 py-0 text-[13px] font-normal data-[state=active]:font-medium"
+          onclick={() => setPrimaryTab('progress')}
+        >
+          Progress
+        </Tabs.Trigger>
+        <Tabs.Trigger
+          value="settings"
+          class="ml-auto size-8 flex-none rounded-lg p-0 after:hidden data-[state=active]:bg-muted"
+          aria-label="Typing settings"
+          onclick={() => setPrimaryTab('settings')}
+        >
+          <Settings2 class="size-4" strokeWidth={1.8} />
+        </Tabs.Trigger>
+      </Tabs.List>
 
-      <Button
-        variant="ghost"
-        size="sm"
-        class={activeView === 'train' && trainMode === 'lessons'
-          ? "h-9 rounded-none border-b-2 border-foreground bg-transparent px-2.5 text-[13px] font-medium text-foreground shadow-none hover:bg-transparent"
-          : "h-9 rounded-none border-b-2 border-transparent bg-transparent px-2.5 text-[13px] font-normal text-muted-foreground shadow-none hover:bg-transparent hover:text-foreground"}
-        onclick={() => setTrainMode('lessons')}
-      >
-        Lessons
-      </Button>
-
-      <Button
-        variant="ghost"
-        size="sm"
-        class={activeView === 'train' && trainMode === 'test'
-          ? "h-9 rounded-none border-b-2 border-foreground bg-transparent px-2.5 text-[13px] font-medium text-foreground shadow-none hover:bg-transparent"
-          : "h-9 rounded-none border-b-2 border-transparent bg-transparent px-2.5 text-[13px] font-normal text-muted-foreground shadow-none hover:bg-transparent hover:text-foreground"}
-        onclick={() => setTrainMode('test')}
-      >
-        Test
-      </Button>
-
-      <Button
-        variant="ghost"
-        size="sm"
-        class={activeView === 'progress'
-          ? "h-9 rounded-none border-b-2 border-foreground bg-transparent px-2.5 text-[13px] font-medium text-foreground shadow-none hover:bg-transparent"
-          : "h-9 rounded-none border-b-2 border-transparent bg-transparent px-2.5 text-[13px] font-normal text-muted-foreground shadow-none hover:bg-transparent hover:text-foreground"}
-        onclick={() => (activeView = 'progress')}
-      >
-        Progress
-      </Button>
-
-      <Button
-        variant="ghost"
-        size="icon"
-        class={activeView === 'settings'
-          ? "ml-auto size-8 shrink-0 rounded-lg bg-muted text-foreground shadow-none"
-          : "ml-auto size-8 shrink-0 rounded-lg text-muted-foreground shadow-none hover:bg-muted hover:text-foreground"}
-        aria-label="Typing settings"
-        onclick={() => (activeView = 'settings')}
-      >
-        <Settings2 class="size-4" strokeWidth={1.8} />
-      </Button>
-    </nav>
-
-    {#if activeView === 'train' && trainMode === 'adaptive'}
-      <main class="min-w-0 pt-7 max-[640px]:pt-6">
+      <Tabs.Content value="train" class="min-w-0 pt-7 max-[640px]:pt-6">
         <div class="flex min-w-0 items-start justify-between gap-5">
           <div class="min-w-0">
             <h2 class="m-0 truncate text-[14px] font-medium tracking-[-0.015em]">
@@ -501,7 +485,7 @@
         </div>
 
         <div
-          class="mt-8 w-full min-h-[168px] min-w-0 max-w-full overflow-x-clip outline-none ring-ring focus-visible:ring-2 max-[640px]:mt-7 max-[640px]:min-h-[150px]"
+          class="mt-8 min-h-[168px] w-full min-w-0 max-w-full overflow-x-clip outline-none ring-ring focus-visible:ring-2 max-[640px]:mt-7 max-[640px]:min-h-[150px]"
           role="textbox"
           aria-label="Typing practice"
           aria-multiline="true"
@@ -638,10 +622,9 @@
             {/if}
           </div>
         </div>
-      </main>
+      </Tabs.Content>
 
-    {:else if activeView === 'train' && trainMode === 'lessons'}
-      <main class="pt-7">
+      <Tabs.Content value="lessons" class="pt-7">
         <div class="mb-5">
           <h2 class="m-0 text-[18px] font-semibold tracking-[-0.03em]">Lessons</h2>
           <p class="mt-1 text-[11px] text-muted-foreground">Learn the movement, then reinforce it in Train.</p>
@@ -652,7 +635,7 @@
             <Button
               variant="ghost"
               class="grid h-auto w-full grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-3 rounded-none border-b border-border px-1 py-3.5 text-left font-normal whitespace-normal shadow-none last:border-b-0 hover:bg-muted/50 max-[560px]:grid-cols-[28px_minmax(0,1fr)]"
-              onclick={() => setTrainMode('adaptive')}
+              onclick={() => setPrimaryTab('train')}
             >
               <span class="font-mono text-[10px] text-muted-foreground">
                 {String(index + 1).padStart(2, '0')}
@@ -669,17 +652,22 @@
             </Button>
           {/each}
         </div>
-      </main>
+      </Tabs.Content>
 
-    {:else if activeView === 'train' && trainMode === 'test'}
-      <main class="min-w-0 pt-7">
+      <Tabs.Content value="test" class="min-w-0 pt-7">
         <div class="flex min-w-0 items-center justify-between gap-4 border-b border-border pb-3 max-[560px]:items-start max-[560px]:flex-col">
-          <div class="flex items-center gap-1">
-            <Button variant="ghost" size="sm" class="h-7 px-2 text-[11px] font-medium shadow-none">Time</Button>
-            <Button variant="ghost" size="sm" class="h-7 px-2 text-[11px] font-normal text-muted-foreground shadow-none" disabled>Words</Button>
-            <Button variant="ghost" size="sm" class="h-7 px-2 text-[11px] font-normal text-muted-foreground shadow-none" disabled>Paragraph</Button>
-            <Button variant="ghost" size="sm" class="h-7 px-2 text-[11px] font-normal text-muted-foreground shadow-none" disabled>Custom</Button>
-          </div>
+          <ToggleGroup.Root
+            type="single"
+            bind:value={testMode}
+            size="sm"
+            spacing={1}
+            class="max-w-full flex-wrap"
+          >
+            <ToggleGroup.Item value="time" class="text-[11px] font-medium">Time</ToggleGroup.Item>
+            <ToggleGroup.Item value="words" class="text-[11px]" disabled>Words</ToggleGroup.Item>
+            <ToggleGroup.Item value="paragraph" class="text-[11px]" disabled>Paragraph</ToggleGroup.Item>
+            <ToggleGroup.Item value="custom" class="text-[11px]" disabled>Custom</ToggleGroup.Item>
+          </ToggleGroup.Root>
 
           <div class="flex shrink-0 items-baseline gap-4 tabular-nums">
             <span><strong class="text-[18px] font-semibold">{wpm}</strong> <small class="text-[9px] text-muted-foreground">wpm</small></span>
@@ -688,7 +676,7 @@
         </div>
 
         <div
-          class="mt-8 w-full min-h-[180px] min-w-0 max-w-full overflow-x-clip outline-none ring-ring focus-visible:ring-2"
+          class="mt-8 min-h-[180px] w-full min-w-0 max-w-full overflow-x-clip outline-none ring-ring focus-visible:ring-2"
           role="textbox"
           aria-label="Typing test"
           tabindex="0"
@@ -721,10 +709,9 @@
             Restart
           </Button>
         </div>
-      </main>
+      </Tabs.Content>
 
-    {:else if activeView === 'progress'}
-      <main class="pt-7">
+      <Tabs.Content value="progress" class="pt-7">
         <div>
           <h2 class="m-0 text-[18px] font-semibold tracking-[-0.03em]">Progress</h2>
           <p class="mt-1 text-[11px] text-muted-foreground">What changed, and what still needs work.</p>
@@ -810,10 +797,9 @@
             </div>
           </section>
         </div>
-      </main>
+      </Tabs.Content>
 
-    {:else}
-      <main class="pt-7">
+      <Tabs.Content value="settings" class="pt-7">
         <div class="border-b border-border pb-4">
           <h2 class="m-0 text-[18px] font-semibold tracking-[-0.03em]">Settings</h2>
         </div>
@@ -824,19 +810,11 @@
               <strong class="block text-[12px] font-medium">Keyboard sound</strong>
               <span class="mt-0.5 block text-[10px] text-muted-foreground">Quiet local key clicks.</span>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              class="h-8 shrink-0 px-2 text-[11px] font-normal shadow-none"
-              aria-pressed={preferences.keyboardSound}
+            <Switch
+              checked={preferences.keyboardSound}
+              aria-label="Keyboard sound"
               onclick={() => togglePreference('keyboardSound')}
-            >
-              {#if preferences.keyboardSound}
-                <Volume2 class="size-3.5" strokeWidth={1.8} /> On
-              {:else}
-                <VolumeX class="size-3.5" strokeWidth={1.8} /> Off
-              {/if}
-            </Button>
+            />
           </div>
 
           <div class="flex items-center justify-between gap-5 py-4">
@@ -844,15 +822,11 @@
               <strong class="block text-[12px] font-medium">Strict correction</strong>
               <span class="mt-0.5 block text-[10px] text-muted-foreground">Wrong keys stay on the current character.</span>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              class="h-8 shrink-0 px-2 text-[11px] font-normal shadow-none"
-              aria-pressed={preferences.strictCorrection}
+            <Switch
+              checked={preferences.strictCorrection}
+              aria-label="Strict correction"
               onclick={() => togglePreference('strictCorrection')}
-            >
-              {preferences.strictCorrection ? 'On' : 'Off'}
-            </Button>
+            />
           </div>
 
           <div class="flex items-center justify-between gap-5 py-4">
@@ -860,15 +834,11 @@
               <strong class="block text-[12px] font-medium">Guide fading</strong>
               <span class="mt-0.5 block text-[10px] text-muted-foreground">Hide keyboard help as keys stabilize.</span>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              class="h-8 shrink-0 px-2 text-[11px] font-normal shadow-none"
-              aria-pressed={preferences.automaticGuideFading}
+            <Switch
+              checked={preferences.automaticGuideFading}
+              aria-label="Guide fading"
               onclick={() => togglePreference('automaticGuideFading')}
-            >
-              {preferences.automaticGuideFading ? 'On' : 'Off'}
-            </Button>
+            />
           </div>
 
           <div class="flex items-center justify-between gap-5 py-4">
@@ -881,7 +851,7 @@
             <span class="shrink-0 text-[11px] tabular-nums">{preferences.masteryAccuracy}%</span>
           </div>
         </div>
-      </main>
-    {/if}
+      </Tabs.Content>
+    </Tabs.Root>
   </div>
 </section>
