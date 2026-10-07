@@ -7,6 +7,6 @@
 
 <AppHeader />
 
-<main class="w-full">
+<main class="w-full min-w-0 overflow-x-clip">
   {@render children()}
 </main>
