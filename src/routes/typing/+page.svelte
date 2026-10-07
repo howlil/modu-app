@@ -371,6 +371,22 @@
     return '';
   }
 
+  function textRuns(text: string) {
+    const runs: Array<{ text: string; start: number; whitespace: boolean }> = [];
+    const matcher = /\S+|\s+/g;
+    let match: RegExpExecArray | null;
+
+    while ((match = matcher.exec(text)) !== null) {
+      runs.push({
+        text: match[0],
+        start: match.index,
+        whitespace: /^\s+$/.test(match[0])
+      });
+    }
+
+    return runs;
+  }
+
   function characterClass(characterIndex: number) {
     const isCurrent = characterIndex === typedIndex;
 
@@ -485,15 +501,25 @@
         </div>
 
         <div
-          class="mt-8 min-h-[168px] min-w-0 max-w-full outline-none ring-ring focus-visible:ring-2 max-[640px]:mt-7 max-[640px]:min-h-[150px]"
+          class="mt-8 w-full min-h-[168px] min-w-0 max-w-full overflow-x-clip outline-none ring-ring focus-visible:ring-2 max-[640px]:mt-7 max-[640px]:min-h-[150px]"
           role="textbox"
           aria-label="Typing practice"
           aria-multiline="true"
           tabindex="0"
         >
-          <div class="max-w-full whitespace-pre-wrap break-words font-mono text-[clamp(21px,3.1vw,29px)] leading-[1.7] tracking-[-0.02em] text-muted-foreground/70 [overflow-wrap:anywhere]">
-            {#each [...drillText] as character, characterIndex}
-              <span class={characterClass(characterIndex)}>{character}</span>
+          <div class="block w-full min-w-0 max-w-full overflow-x-clip font-mono text-[clamp(20px,2.8vw,27px)] leading-[1.72] tracking-[-0.02em] text-muted-foreground/70">
+            {#each textRuns(drillText) as run}
+              {#if run.whitespace}
+                {#each [...run.text] as character, localIndex}
+                  <span class={characterClass(run.start + localIndex)}> </span><wbr />
+                {/each}
+              {:else}
+                <span class="inline-block max-w-full break-all align-baseline">
+                  {#each [...run.text] as character, localIndex}
+                    <span class={characterClass(run.start + localIndex)}>{character}</span>
+                  {/each}
+                </span>
+              {/if}
             {/each}
           </div>
         </div>
@@ -662,14 +688,24 @@
         </div>
 
         <div
-          class="mt-8 min-h-[180px] min-w-0 max-w-full outline-none ring-ring focus-visible:ring-2"
+          class="mt-8 w-full min-h-[180px] min-w-0 max-w-full overflow-x-clip outline-none ring-ring focus-visible:ring-2"
           role="textbox"
           aria-label="Typing test"
           tabindex="0"
         >
-          <div class="max-w-full whitespace-pre-wrap break-words font-mono text-[clamp(21px,3.1vw,29px)] leading-[1.7] tracking-[-0.02em] text-muted-foreground/70 [overflow-wrap:anywhere]">
-            {#each [...drillText] as character, characterIndex}
-              <span class={characterClass(characterIndex)}>{character}</span>
+          <div class="block w-full min-w-0 max-w-full overflow-x-clip font-mono text-[clamp(20px,2.8vw,27px)] leading-[1.72] tracking-[-0.02em] text-muted-foreground/70">
+            {#each textRuns(drillText) as run}
+              {#if run.whitespace}
+                {#each [...run.text] as character, localIndex}
+                  <span class={characterClass(run.start + localIndex)}> </span><wbr />
+                {/each}
+              {:else}
+                <span class="inline-block max-w-full break-all align-baseline">
+                  {#each [...run.text] as character, localIndex}
+                    <span class={characterClass(run.start + localIndex)}>{character}</span>
+                  {/each}
+                </span>
+              {/if}
             {/each}
           </div>
         </div>
