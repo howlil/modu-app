@@ -17,10 +17,10 @@
   });
 </script>
 
-<div class="sticky top-0 z-50 h-[68px] pointer-events-none">
+<div class="sticky top-0 z-50 h-[72px] pointer-events-none">
   <header
     class={scrolled
-      ? "pointer-events-auto mx-auto mt-2 flex h-12 w-[calc(100%-20px)] max-w-[920px] items-center rounded-2xl border border-white/[0.55] bg-background/[0.72] shadow-[0_10px_35px_rgba(28,28,24,0.08)] backdrop-blur-xl transition-all duration-200"
+      ? "pointer-events-auto mx-auto mt-3 flex h-12 w-[calc(100%-20px)] max-w-[920px] items-center rounded-full border border-white/[0.55] bg-background/[0.72] shadow-[0_10px_35px_rgba(28,28,24,0.08)] backdrop-blur-xl transition-all duration-200"
       : "pointer-events-auto flex h-14 w-full items-center border border-transparent bg-transparent shadow-none backdrop-blur-0 transition-all duration-200"}
   >
     <div
@@ -45,7 +45,7 @@
           rel="noreferrer"
           variant="outline"
           size="sm"
-          class="h-8 rounded-xl border-border/[0.75] bg-white/[0.50] px-2.5 text-xs font-normal shadow-none backdrop-blur-sm hover:bg-white/[0.80] max-[520px]:px-2"
+          class="h-8 rounded-full border-border/[0.75] bg-white/[0.50] px-2.5 text-xs font-normal shadow-none backdrop-blur-sm hover:bg-white/[0.80] max-[520px]:px-2"
         >
           <Heart class="size-3.5 text-[#BF4B71]" strokeWidth={1.8} />
           <span class="max-[430px]:hidden">Sponsor</span>
@@ -56,7 +56,7 @@
           target="_blank"
           rel="noreferrer"
           size="sm"
-          class="h-8 rounded-xl bg-foreground px-2.5 text-xs font-normal text-background shadow-none hover:bg-foreground/90 max-[520px]:px-2"
+          class="h-8 rounded-full bg-foreground px-2.5 text-xs font-normal text-background shadow-none hover:bg-foreground/90 max-[520px]:px-2"
         >
           <Github class="size-3.5" strokeWidth={1.8} />
           <span class="max-[520px]:hidden">Star on GitHub</span>
