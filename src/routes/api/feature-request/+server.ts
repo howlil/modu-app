@@ -1,3 +1,4 @@
+import { env } from 'cloudflare:workers';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
@@ -18,7 +19,7 @@ function githubIssueUrl(title: string, body: string) {
   return 'https://github.com/' + repository + '/issues/new?' + params.toString();
 }
 
-export const POST: RequestHandler = async ({ request, platform, url }) => {
+export const POST: RequestHandler = async ({ request, url }) => {
   const origin = request.headers.get('origin');
 
   if (origin && origin !== url.origin) {
@@ -51,9 +52,7 @@ export const POST: RequestHandler = async ({ request, platform, url }) => {
     '\n\n---\nSubmitted from Modu.';
 
   const fallbackUrl = githubIssueUrl(title, issueBody);
-  const token = (
-    platform as { env?: { GITHUB_TOKEN?: string } } | undefined
-  )?.env?.GITHUB_TOKEN;
+  const token = (env as { GITHUB_TOKEN?: string }).GITHUB_TOKEN;
 
   if (!token) {
     return json(
