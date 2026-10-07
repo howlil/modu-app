@@ -254,7 +254,7 @@
           <button
             type="button"
             class={[
-              'size-3 rounded-[3px] transition',
+              'size-3 rounded-full transition',
               day.future
                 ? 'cursor-default opacity-45'
                 : 'hover:outline hover:outline-2 hover:outline-foreground/15 hover:outline-offset-1'
