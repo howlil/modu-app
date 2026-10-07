@@ -1525,7 +1525,7 @@
               {#each RINGTONE_OPTIONS as option}
                 <button
                   type="button"
-                  class="flex min-h-12 w-full items-center justify-between gap-4 py-2 text-left"
+                  class="flex min-h-12 w-full items-center justify-between gap-4 rounded-full px-2 py-2 text-left transition hover:bg-muted/60"
                   onclick={() => selectRingtone(option.id)}
                 >
                   <span class="min-w-0">
