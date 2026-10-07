@@ -10,14 +10,14 @@
   }[module.id] ?? 'bg-card text-foreground border-border';
 
   const iconSurfaceClass = {
-    'pdf-merge': 'bg-white/24 text-[#6A2940]',
-    pomodoro: 'bg-white/24 text-[#174A88]',
-    typing: 'bg-white/24 text-[#49338A]'
-  }[module.id] ?? 'bg-white/30 text-current';
+    'pdf-merge': 'bg-white/[0.24] text-[#6A2940]',
+    pomodoro: 'bg-white/[0.24] text-[#174A88]',
+    typing: 'bg-white/[0.24] text-[#49338A]'
+  }[module.id] ?? 'bg-white/[0.30] text-current';
 </script>
 
 <a
-  class={`group relative flex aspect-square min-w-0 overflow-hidden rounded-[22px] border p-4 transition duration-150 hover:-translate-y-0.5 hover:shadow-[0_12px_26px_rgba(35,31,26,0.10)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 ${tileClass}`}
+  class={`group relative flex aspect-square min-w-0 overflow-hidden rounded-[22px] border p-4 transition duration-150 hover:-translate-y-0.5 hover:shadow-[0_12px_26px_rgba(35,31,26,0.10)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/[0.40] ${tileClass}`}
   href={module.route}
   aria-label={module.name}
 >
@@ -49,7 +49,7 @@
   </div>
 
   <div
-    class="pointer-events-none absolute -bottom-5 -right-4 size-28 rounded-[30px] bg-white/14 rotate-[-12deg] transition-transform duration-200 group-hover:rotate-[-7deg] group-hover:scale-105"
+    class="pointer-events-none absolute -bottom-5 -right-4 size-28 rounded-[30px] bg-white/[0.14] rotate-[-12deg] transition-transform duration-200 group-hover:rotate-[-7deg] group-hover:scale-105"
     aria-hidden="true"
   ></div>
 </a>
