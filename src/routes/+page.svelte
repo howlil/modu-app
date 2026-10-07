@@ -3,6 +3,14 @@
   import { Button } from "$lib/components/ui/button/index.js";
   import ToolCard from '#lib/components/ToolCard.svelte';
   import { modules } from '#lib/platform/registry/modules.ts';
+  import type { ModuleDefinition } from '#lib/platform/registry/types.ts';
+
+  const imageCompressPreview: ModuleDefinition = {
+    id: 'image-compress',
+    name: 'Image Compress',
+    route: '#',
+    layout: 'file-transform'
+  };
 </script>
 
 <svelte:head>
@@ -53,12 +61,14 @@
 <section id="tools" class="border-t border-border/[0.70] py-10 max-[700px]:py-8" aria-labelledby="tools-title">
   <div class="mb-4 flex max-w-[860px] items-end justify-between gap-4">
     <h2 id="tools-title" class="m-0 text-[14px] font-medium tracking-[-0.015em]">Tools</h2>
-    <span class="text-[12px] font-normal text-muted-foreground">{modules.length} available</span>
+    <span class="text-[12px] font-normal text-muted-foreground">{modules.length} available · 1 preview</span>
   </div>
 
   <div class="grid max-w-[860px] grid-cols-3 gap-3 max-[560px]:grid-cols-2">
     {#each modules as module}
       <ToolCard {module} />
     {/each}
+
+    <ToolCard module={imageCompressPreview} preview />
   </div>
 </section>
