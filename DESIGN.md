@@ -196,9 +196,13 @@ Pomodoro module contract:
 - optional auto-start breaks and auto-start focus live in settings
 - overtime is available for focus sessions; it counts upward after the scheduled focus target and remains mutually exclusive with auto-start breaks
 - optional Screen Wake Lock keeps the display awake only while an active session is running and only on supported browsers
-- completed focus sessions are stored locally as lightweight history; the primary UI exposes only a quiet history summary
-- history stays local, bounded, and intentionally lightweight rather than becoming an analytics dashboard
-- progressive disclosure is mandatory: the primary surface shows mode, timer, primary action, cycle, optional focus label, and quiet history only
+- completed focus sessions are stored locally as Activity history; the timer surface exposes only a quiet Today summary
+- growing Activity history uses IndexedDB while active timer state and preferences stay in localStorage
+- Activity includes daily focus target, 52-week goal-relative heatmap, weekly summary, recent sessions, day inspection, and local JSON/CSV export
+- heatmap intensity is based on focused time relative to the goal that applied to that day, not raw Pomodoro count
+- history stays local and intentionally lightweight rather than becoming a productivity-score dashboard
+- progressive disclosure is mandatory: the primary Timer surface shows mode, timer, primary action, cycle, optional focus label, and quiet Today activity only
+- Timer / Activity navigation shares one centered visual axis with the Pomodoro title; Activity content may widen for data density without pulling the header off-center
 - Reset and Skip use quiet icon controls around the primary Start/Pause/Resume action
 - Sound, notifications, auto-start behavior, overtime, Wake Lock, and custom durations live in Settings rather than the primary timer surface
 - Settings apply immediately; do not require a separate Save action for these local preferences
