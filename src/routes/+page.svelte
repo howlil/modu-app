@@ -26,7 +26,7 @@
     <span class="cloud cloud-5"></span>
   </div>
 
-  <div class="relative z-10 grid min-h-[570px] place-items-center py-[72px] pb-[98px] text-center max-[700px]:min-h-[500px] max-[700px]:py-14">
+  <div class="relative z-10 grid min-h-[570px] place-items-center px-4 py-[72px] pb-[98px] text-center max-[760px]:px-2.5 max-[700px]:min-h-[500px] max-[700px]:py-14">
     <div class="mx-auto w-full max-w-[820px]">
       <h1 class="m-0 text-[clamp(42px,6vw,64px)] font-[520] leading-[0.98] tracking-[-0.055em]">
         Useful tools.<br />Nothing extra.
@@ -43,7 +43,7 @@
   </div>
 </section>
 
-<section id="tools" class="pb-16 pt-2 max-[700px]:pb-12">
+<section id="tools" class="px-4 pb-16 pt-2 max-[760px]:px-2.5 max-[700px]:pb-12">
   <div class="mx-auto grid w-full max-w-[1040px] grid-cols-4 gap-3 max-[820px]:grid-cols-2">
     {#each modules as module}
       <ToolCard {module} />
