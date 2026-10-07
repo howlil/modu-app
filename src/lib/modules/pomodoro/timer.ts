@@ -1,5 +1,5 @@
 export type PomodoroMode = 'focus' | 'short' | 'long';
-export type TimerStatus = 'idle' | 'running' | 'paused' | 'complete';
+export type TimerStatus = 'idle' | 'running' | 'paused' | 'complete' | 'overtime';
 
 export interface TimerState {
   mode: PomodoroMode;
@@ -7,6 +7,7 @@ export interface TimerState {
   durationMs: number;
   remainingMs: number;
   endsAt: number | null;
+  overtimeStartedAt: number | null;
   completedFocus: number;
 }
 
@@ -21,15 +22,22 @@ export function createTimer(
     durationMs,
     remainingMs: durationMs,
     endsAt: null,
+    overtimeStartedAt: null,
     completedFocus
   };
 }
 
 export function getRemainingMs(timer: TimerState, now = Date.now()) {
-  if (timer.status === 'complete') return 0;
+  if (timer.status === 'complete' || timer.status === 'overtime') return 0;
   if (timer.status !== 'running' || timer.endsAt === null) return timer.remainingMs;
 
   return Math.max(0, timer.endsAt - now);
+}
+
+export function getOvertimeMs(timer: TimerState, now = Date.now()) {
+  if (timer.status !== 'overtime' || timer.overtimeStartedAt === null) return 0;
+
+  return Math.max(0, now - timer.overtimeStartedAt);
 }
 
 export function startTimer(timer: TimerState, now = Date.now()): TimerState {
@@ -39,7 +47,8 @@ export function startTimer(timer: TimerState, now = Date.now()): TimerState {
     ...timer,
     status: remainingMs === 0 ? 'complete' : 'running',
     remainingMs,
-    endsAt: remainingMs === 0 ? null : now + remainingMs
+    endsAt: remainingMs === 0 ? null : now + remainingMs,
+    overtimeStartedAt: null
   };
 }
 
@@ -54,7 +63,11 @@ export function pauseTimer(timer: TimerState, now = Date.now()): TimerState {
   };
 }
 
-export function syncTimer(timer: TimerState, now = Date.now()): TimerState {
+export function syncTimer(
+  timer: TimerState,
+  now = Date.now(),
+  allowOvertime = false
+): TimerState {
   if (timer.status !== 'running') return timer;
 
   const remainingMs = getRemainingMs(timer, now);
@@ -63,7 +76,24 @@ export function syncTimer(timer: TimerState, now = Date.now()): TimerState {
     return { ...timer, remainingMs };
   }
 
+  if (allowOvertime && timer.mode === 'focus') {
+    return beginOvertime(timer, timer.endsAt ?? now);
+  }
+
   return completeTimer({ ...timer, remainingMs: 0, endsAt: null });
+}
+
+export function beginOvertime(timer: TimerState, startedAt = Date.now()): TimerState {
+  if (timer.mode !== 'focus') return completeTimer(timer);
+
+  return {
+    ...timer,
+    status: 'overtime',
+    remainingMs: 0,
+    endsAt: null,
+    overtimeStartedAt: startedAt,
+    completedFocus: Math.min(4, timer.completedFocus + 1)
+  };
 }
 
 export function resetTimer(timer: TimerState): TimerState {
@@ -71,13 +101,14 @@ export function resetTimer(timer: TimerState): TimerState {
     ...timer,
     status: 'idle',
     remainingMs: timer.durationMs,
-    endsAt: null
+    endsAt: null,
+    overtimeStartedAt: null
   };
 }
 
 export function completeTimer(timer: TimerState): TimerState {
   const completedFocus =
-    timer.mode === 'focus'
+    timer.mode === 'focus' && timer.status !== 'overtime'
       ? Math.min(4, timer.completedFocus + 1)
       : timer.mode === 'long'
         ? 0
@@ -88,6 +119,7 @@ export function completeTimer(timer: TimerState): TimerState {
     status: 'complete',
     remainingMs: 0,
     endsAt: null,
+    overtimeStartedAt: null,
     completedFocus
   };
 }
@@ -103,6 +135,7 @@ export function switchMode(
     durationMs,
     remainingMs: durationMs,
     endsAt: null,
+    overtimeStartedAt: null,
     completedFocus: timer.completedFocus
   };
 }
