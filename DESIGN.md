@@ -230,6 +230,9 @@ Pomodoro module contract:
 - extension failure must never stop or invalidate the Pomodoro timer
 - the extension must not collect browsing history, page content, page titles, or visited URLs; only the blocklist and focus-session metadata are stored
 - Settings apply immediately; do not require a separate Save action for these local preferences
+- do not stack dialogs for nested settings; use a single modal with drill-down navigation and an explicit Back action for secondary views such as Blocked websites
+- keep only one modal overlay active for a settings task; Escape returns from a drill-down before closing the parent settings surface
+- scrollable surfaces may hide the visual scrollbar to preserve the quiet UI, but wheel, trackpad, touch, keyboard, and programmatic scrolling must remain functional
 - the focus label is optional: show `+ Add focus` until the user chooses to add one, then allow lightweight inline editing
 - overtime keeps the progress ring visually complete while elapsed overtime counts upward
 - keyboard shortcuts remain functional but should not be permanently explained on the primary surface
