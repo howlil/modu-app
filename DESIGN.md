@@ -224,7 +224,9 @@ Pomodoro module contract:
 - website enforcement belongs to the Chromium companion extension; the Svelte app is only the control surface
 - extension state must be explicit in UI: checking, requires extension, connected, active, or unavailable; never imply protection is active when enforcement failed
 - blocked domains are normalized to hostnames, deduplicated, stored locally, and must never include the Module control surface
-- use Manifest V3 declarativeNetRequest session rules for active blocking; the extension must recover an active session after browser restart and discard stale protection safely
+- use Manifest V3 declarativeNetRequest session rules for fresh top-level navigations, plus a webNavigation guard for SPA history-state route changes and a sweep of already-open blocked tabs when protection starts
+- blocking a domain means every route on that domain and its subdomains; route-level SPA navigation must not bypass protection
+- the extension must recover an active session after browser restart and discard stale protection safely
 - extension failure must never stop or invalidate the Pomodoro timer
 - the extension must not collect browsing history, page content, page titles, or visited URLs; only the blocklist and focus-session metadata are stored
 - Settings apply immediately; do not require a separate Save action for these local preferences
