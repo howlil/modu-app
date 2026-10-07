@@ -1087,7 +1087,7 @@
       <Button
         variant="ghost"
         size="icon-sm"
-        class="absolute right-0 -top-1 rounded-lg text-muted-foreground max-[520px]:right-1"
+        class="absolute right-0 -top-1 rounded-full text-muted-foreground max-[520px]:right-1"
         aria-label="Pomodoro settings"
         title="Settings"
         onclick={openSettings}
@@ -1188,7 +1188,7 @@
           {:else if focusText}
             <button
               type="button"
-              class="group inline-flex max-w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-[13px] font-normal text-foreground transition hover:bg-muted"
+              class="group inline-flex max-w-full items-center gap-1.5 rounded-full px-2 py-1.5 text-[13px] font-normal text-foreground transition hover:bg-muted"
               onclick={beginFocusEdit}
             >
               <span class="truncate">{focusText}</span>
@@ -1197,7 +1197,7 @@
           {:else}
             <button
               type="button"
-              class="rounded-lg px-2 py-1.5 text-[12px] font-normal text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              class="rounded-full px-2 py-1.5 text-[12px] font-normal text-muted-foreground transition hover:bg-muted hover:text-foreground"
               onclick={beginFocusEdit}
             >
               + Add focus
@@ -1207,15 +1207,15 @@
       {/if}
 
       <div class="mt-3.5 flex items-center justify-center gap-[11px]">
-        <Button variant="ghost" size="icon" class="size-[38px] rounded-[10px] text-muted-foreground" aria-label="Reset timer" title="Reset (R)" onclick={handleReset}>
+        <Button variant="ghost" size="icon" class="size-[38px] rounded-full text-muted-foreground" aria-label="Reset timer" title="Reset (R)" onclick={handleReset}>
           <RotateCcw class="size-4" strokeWidth={1.7} />
         </Button>
 
-        <Button class="h-[42px] min-w-[132px] rounded-xl px-5 text-[13px] font-medium shadow-none" onclick={handlePrimary}>
+        <Button class="h-[42px] min-w-[132px] rounded-full px-5 text-[13px] font-medium shadow-none" onclick={handlePrimary}>
           {primaryLabel}
         </Button>
 
-        <Button variant="ghost" size="icon" class="size-[38px] rounded-[10px] text-muted-foreground" aria-label="Skip session" title="Skip (S)" onclick={handleSkip}>
+        <Button variant="ghost" size="icon" class="size-[38px] rounded-full text-muted-foreground" aria-label="Skip session" title="Skip (S)" onclick={handleSkip}>
           <SkipForward class="size-4" strokeWidth={1.7} />
         </Button>
       </div>
@@ -1233,7 +1233,7 @@
 
         <button
           type="button"
-          class="mt-2 rounded-lg px-2 py-1 text-[11px] font-normal text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          class="mt-2 rounded-full px-2 py-1 text-[11px] font-normal text-muted-foreground transition hover:bg-muted hover:text-foreground"
           onclick={() => (activeView = 'activity')}
         >
           {formatFocusTotal(todayFocusMs)} today
@@ -1287,7 +1287,7 @@
               <Button
                 variant="ghost"
                 size="icon-sm"
-                class="shrink-0 rounded-lg text-muted-foreground"
+                class="shrink-0 rounded-full text-muted-foreground"
                 aria-label="Back to Pomodoro settings"
                 onclick={() => openSettingsPanel('main')}
               >
@@ -1309,7 +1309,7 @@
           <Button
             variant="ghost"
             size="icon-sm"
-            class="shrink-0 rounded-lg text-muted-foreground"
+            class="shrink-0 rounded-full text-muted-foreground"
             aria-label="Close settings"
             onclick={closeSettings}
           >
@@ -1352,7 +1352,7 @@
             {@const key = option[0] as keyof PomodoroPreferences}
             <Button
               variant="ghost"
-              class="flex h-10 w-full items-center justify-between rounded-lg px-1 text-[12px] font-normal"
+              class="flex h-10 w-full items-center justify-between rounded-full px-1 text-[12px] font-normal"
               role="switch"
               aria-checked={preferences[key]}
               onclick={() => togglePreference(key)}
@@ -1393,7 +1393,7 @@
 
           <Button
             variant="ghost"
-            class="flex h-10 w-full items-center justify-between rounded-lg px-1 text-[12px] font-normal"
+            class="flex h-10 w-full items-center justify-between rounded-full px-1 text-[12px] font-normal"
             role="switch"
             aria-checked={notificationsEnabled}
             disabled={!notificationsSupported}
@@ -1425,7 +1425,7 @@
 
           <Button
             variant="ghost"
-            class="flex h-10 w-full items-center justify-between rounded-lg px-1 text-[12px] font-normal"
+            class="flex h-10 w-full items-center justify-between rounded-full px-1 text-[12px] font-normal"
             role="switch"
             aria-checked={soundEnabled}
             onclick={toggleSound}
@@ -1451,7 +1451,7 @@
 
           <Button
             variant="ghost"
-            class="flex h-10 w-full items-center justify-between rounded-lg px-1 text-[12px] font-normal"
+            class="flex h-10 w-full items-center justify-between rounded-full px-1 text-[12px] font-normal"
             onclick={() => openSettingsPanel('ringtone')}
           >
             <span>Ringtone</span>
@@ -1463,7 +1463,7 @@
 
           <Button
             variant="ghost"
-            class="flex h-10 w-full items-center justify-between rounded-lg px-1 text-[12px] font-normal"
+            class="flex h-10 w-full items-center justify-between rounded-full px-1 text-[12px] font-normal"
             role="switch"
             aria-checked={preferences.keepAwake}
             disabled={!wakeLockSupported}
@@ -1498,7 +1498,7 @@
           <div class="mb-1 text-[11px] font-medium text-muted-foreground">Data</div>
           <Button
             variant="ghost"
-            class="flex h-10 w-full items-center justify-between rounded-lg px-1 text-[12px] font-normal"
+            class="flex h-10 w-full items-center justify-between rounded-full px-1 text-[12px] font-normal"
             onclick={() => openSettingsPanel('data')}
           >
             <span>Export & delete data</span>
@@ -1547,7 +1547,7 @@
 
             <Button
               variant="outline"
-              class="h-10 w-full justify-start rounded-lg text-[12px] font-normal shadow-none"
+              class="h-10 w-full justify-start rounded-full text-[12px] font-normal shadow-none"
               onclick={exportAllPomodoroData}
             >
               <Download class="size-3.5" strokeWidth={1.7} />
@@ -1562,7 +1562,7 @@
               {#if !deleteConfirm}
                 <Button
                   variant="ghost"
-                  class="h-10 w-full justify-start rounded-lg px-2 text-[12px] font-normal text-destructive"
+                  class="h-10 w-full justify-start rounded-full px-2 text-[12px] font-normal text-destructive"
                   onclick={() => {
                     deleteConfirm = true;
                     dataMessage = '';
@@ -1582,7 +1582,7 @@
                     <Button
                       variant="ghost"
                       size="sm"
-                      class="h-8 rounded-lg text-[11px] font-normal"
+                      class="h-8 rounded-full text-[11px] font-normal"
                       onclick={() => (deleteConfirm = false)}
                     >
                       Cancel
@@ -1590,7 +1590,7 @@
                     <Button
                       variant="destructive"
                       size="sm"
-                      class="h-8 rounded-lg text-[11px] font-medium shadow-none"
+                      class="h-8 rounded-full text-[11px] font-medium shadow-none"
                       onclick={deleteAllPomodoroData}
                     >
                       Delete all
