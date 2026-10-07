@@ -8,12 +8,13 @@
 <svelte:head><title>Merge PDF — Module</title></svelte:head>
 
 <section class="mx-auto w-full max-w-[1180px] px-4 py-10 max-[760px]:px-2.5 max-[760px]:py-7">
-  <ToolHeader
-    title="Merge PDF"
-    description="Combine PDFs into one file."
-  />
+  <div class="mx-auto w-full max-w-[860px] min-w-0">
+    <ToolHeader
+      title="Merge PDF"
+      description="Combine PDFs into one file."
+    />
 
-  <div class="grid grid-cols-[minmax(0,1fr)_280px] items-start gap-4 max-[860px]:grid-cols-1">
+    <div class="grid grid-cols-[minmax(0,1fr)_280px] items-start gap-4 max-[760px]:grid-cols-1">
     <Card.Root class="min-h-56 justify-center gap-0 border-dashed py-0 shadow-none">
       <Card.Content class="grid place-items-center p-6 text-center">
         <div>
@@ -39,5 +40,6 @@
         <Button class="w-full" disabled>Merge PDF</Button>
       </Card.Content>
     </Card.Root>
+    </div>
   </div>
 </section>
