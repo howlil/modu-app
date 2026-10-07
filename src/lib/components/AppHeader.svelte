@@ -17,16 +17,16 @@
   });
 </script>
 
-<div class="sticky top-0 z-50 h-[76px] pointer-events-none">
+<div class="sticky top-0 z-50 h-[68px] pointer-events-none">
   <header
     class={scrolled
       ? "pointer-events-auto mx-auto mt-3 flex h-12 w-[calc(100%-20px)] max-w-[1080px] items-center rounded-full border border-white/[0.65] bg-background/[0.82] shadow-[0_10px_35px_rgba(28,28,24,0.08)] backdrop-blur-xl transition-all duration-200"
-      : "pointer-events-auto mx-auto mt-2 flex h-14 w-[calc(100%-20px)] max-w-[1280px] items-center rounded-full border border-white/[0.72] bg-background/[0.90] shadow-[0_8px_28px_rgba(28,28,24,0.07)] backdrop-blur-xl transition-all duration-200"}
+      : "pointer-events-auto flex h-[68px] w-full items-center border border-transparent bg-transparent shadow-none backdrop-blur-0 transition-all duration-200"}
   >
     <div
       class={scrolled
         ? "mx-auto flex h-full w-full items-center justify-between gap-3 px-3.5"
-        : "mx-auto flex h-full w-full items-center justify-between gap-3 px-4 max-[700px]:px-2.5"}
+        : "mx-auto flex h-full w-full max-w-[1180px] items-center justify-between gap-3 px-4 max-[700px]:px-2.5"}
     >
       <a class="inline-flex items-center gap-2.5 text-[14px] font-[600] tracking-[-0.02em]" href="/">
         <span class="grid size-6 grid-cols-2 gap-[3px] rounded-md bg-primary p-[5px]" aria-hidden="true">
