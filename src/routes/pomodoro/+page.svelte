@@ -1111,7 +1111,7 @@
             role="tab"
             aria-selected={timer.mode === typedMode}
             class={[
-              'h-[31px] rounded-[9px] px-3 text-[12px] font-normal transition',
+              'h-[31px] rounded-full px-3 text-[12px] font-normal transition',
               timer.mode === typedMode
                 ? 'bg-card text-foreground shadow-[0_1px_2px_rgba(26,26,23,0.06)]'
                 : 'text-muted-foreground hover:text-foreground'
