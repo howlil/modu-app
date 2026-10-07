@@ -56,10 +56,11 @@ Home tool presentation:
 
 Global navigation:
 
+- the app header is a fixed overlay; it must not reserve a white block above the homepage hero
 - at the top of the page, navigation is flat, transparent, and full-width within the normal content axis so it visually merges into the hero
-- do not show an island/capsule surface before scrolling
-- after scrolling, navigation contracts into a narrower fully rounded floating capsule with visible top breathing room
-- the hero background must continue behind the initial navbar with no vertical gap between the viewport edge, navbar, and hero field
+- do not show an island/capsule surface before the page has scrolled past the initial header height
+- after that threshold, navigation contracts into a narrower fully rounded floating capsule with visible top breathing room
+- normal routes reserve the fixed header height at the layout level; the homepage cancels that space so the hero background starts at viewport y=0 while its content remains padded below the header
 - use restrained glassmorphism only for the scrolled island state: translucent background, subtle border, backdrop blur, soft shadow
 - GitHub Sponsor and Star are real actions, not decorative badges
 
