@@ -762,37 +762,35 @@
   class="mx-auto min-h-[calc(100vh-68px)] w-full max-w-[920px] px-2 pb-14 pt-5 max-[700px]:pt-2.5"
   style={`--pomodoro-accent: ${modeMeta.accent}; --pomodoro-soft: ${modeMeta.soft};`}
 >
-  <div class="relative mx-auto mb-7 w-full max-w-[680px] text-center">
+  <div class="relative mx-auto mb-4 w-full max-w-[460px] text-center">
     <h1 class="m-0 text-[28px] font-[500] leading-none tracking-[-0.045em]">Pomodoro</h1>
     <p class="mt-2 text-[12px] font-normal text-muted-foreground">
       {activeView === 'timer' ? modeMeta.copy : 'Focus time, goals, and session history.'}
     </p>
 
-    <div class="mt-4 flex justify-center">
-      <div class="flex items-center gap-1 rounded-[11px] border bg-muted p-1">
-        {#each ['timer', 'activity'] as view}
-          {@const typedView = view as PomodoroView}
-          <button
-            type="button"
-            class={[
-              'h-7 rounded-[7px] px-2.5 text-[11px] font-normal transition',
-              activeView === typedView
-                ? 'bg-card text-foreground shadow-[0_1px_2px_rgba(26,26,23,0.06)]'
-                : 'text-muted-foreground hover:text-foreground'
-            ]}
-            onclick={() => (activeView = typedView)}
-          >
-            {typedView === 'timer' ? 'Timer' : 'Activity'}
-          </button>
-        {/each}
-      </div>
+    <div class="mt-3 flex justify-center gap-[18px]">
+      {#each ['timer', 'activity'] as view}
+        {@const typedView = view as PomodoroView}
+        <button
+          type="button"
+          class={[
+            'relative h-7 px-0.5 text-[12px] font-normal transition',
+            activeView === typedView
+              ? 'text-foreground after:absolute after:inset-x-0 after:-bottom-0.5 after:h-px after:rounded-full after:bg-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+          ]}
+          onclick={() => (activeView = typedView)}
+        >
+          {typedView === 'timer' ? 'Timer' : 'Activity'}
+        </button>
+      {/each}
     </div>
 
     {#if activeView === 'timer'}
       <Button
         variant="ghost"
         size="icon-sm"
-        class="absolute right-0 top-0 rounded-lg text-muted-foreground max-[520px]:right-1"
+        class="absolute right-0 -top-1 rounded-lg text-muted-foreground max-[520px]:right-1"
         aria-label="Pomodoro settings"
         title="Settings"
         onclick={() => (settingsOpen = true)}
@@ -805,7 +803,7 @@
   {#if activeView === 'timer'}
     <div class="mx-auto flex max-w-[680px] flex-col items-center text-center">
       <div
-        class="mb-6 flex items-center gap-1 rounded-[13px] border bg-muted p-1"
+        class="mb-[22px] flex items-center gap-1 rounded-[13px] border bg-muted p-1"
         role="tablist"
         aria-label="Timer mode"
       >
@@ -828,16 +826,16 @@
         {/each}
       </div>
 
-      <div class="relative size-[min(70vw,300px)]">
+      <div class="relative size-[min(72vw,274px)]">
         <svg class="size-full -rotate-90" viewBox="0 0 120 120" aria-hidden="true">
-          <circle cx="60" cy="60" r={RADIUS} fill="none" stroke="var(--muted)" stroke-opacity="0.12" stroke-width="8" />
+          <circle cx="60" cy="60" r={RADIUS} fill="none" stroke="var(--muted)" stroke-opacity="0.12" stroke-width="6" />
           <circle
             cx="60"
             cy="60"
             r={RADIUS}
             fill="none"
             stroke="var(--pomodoro-accent)"
-            stroke-width="8"
+            stroke-width="6"
             stroke-linecap="round"
             stroke-dasharray={CIRCUMFERENCE}
             stroke-dashoffset={progressOffset}
@@ -849,7 +847,7 @@
           <div class="text-[clamp(56px,8vw,74px)] font-[410] leading-[0.9] tracking-[-0.055em] tabular-nums">
             {formattedTime}
           </div>
-          <div class="mt-3 text-[12px] font-normal text-muted-foreground">
+          <div class="mt-2.5 min-h-[15px] text-[11px] font-normal text-muted-foreground">
             {timer.status === 'running'
               ? modeMeta.label
               : timer.status === 'paused'
@@ -858,13 +856,13 @@
                   ? 'Overtime'
                   : timer.status === 'complete'
                     ? 'Complete'
-                    : 'Ready'}
+                    : ''}
           </div>
         </div>
       </div>
 
       {#if timer.mode === 'focus'}
-        <div class="mt-3 grid min-h-9 w-full max-w-[360px] place-items-center">
+        <div class="mt-3.5 grid min-h-9 w-full max-w-[330px] place-items-center">
           {#if focusEditing}
             <input
               bind:this={focusInput}
@@ -906,7 +904,7 @@
         </div>
       {/if}
 
-      <div class="mt-4 flex items-center justify-center gap-2.5">
+      <div class="mt-3.5 flex items-center justify-center gap-[11px]">
         <Button variant="ghost" size="icon" class="size-[38px] rounded-[10px] text-muted-foreground" aria-label="Reset timer" title="Reset (R)" onclick={handleReset}>
           <RotateCcw class="size-4" strokeWidth={1.7} />
         </Button>
@@ -920,7 +918,7 @@
         </Button>
       </div>
 
-      <div class="mt-5">
+      <div class="mt-[18px]">
         <div class="flex items-center justify-center gap-2" aria-label="Focus cycle">
           {#each [0, 1, 2, 3] as index}
             <span class="size-1.5 rounded-full transition-colors" style={`background: ${index < timer.completedFocus ? modeMeta.accent : '#d7d7d1'};`}></span>
@@ -928,7 +926,7 @@
         </div>
 
         <div class="mt-2 text-[11px] font-normal text-muted-foreground">
-          {timer.completedFocus >= 4 ? 'Long break next' : `${Math.min(timer.completedFocus + 1, 4)} of 4`}
+          {timer.completedFocus >= 4 ? 'Long break next' : `Session ${Math.min(timer.completedFocus + 1, 4)} of 4`}
         </div>
 
         <button
@@ -936,7 +934,7 @@
           class="mt-2 rounded-lg px-2 py-1 text-[11px] font-normal text-muted-foreground transition hover:bg-muted hover:text-foreground"
           onclick={() => (activeView = 'activity')}
         >
-          Today · {formatFocusTotal(todayFocusMs)}
+          {formatFocusTotal(todayFocusMs)} today
         </button>
       </div>
 
