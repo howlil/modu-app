@@ -93,7 +93,12 @@ Current installed primitives:
 
 - Button
 - Card
+- Dialog
 - Input
+- Tabs
+- Switch
+- Toggle
+- Toggle Group
 
 When another generic UI component is needed, install it from the official shadcn-svelte registry:
 
