@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
-  import { ArrowLeft, Pencil, RotateCcw, Settings2, SkipForward, X } from 'lucide-svelte';
+  import { ArrowLeft, Check, ChevronRight, Download, Pencil, RotateCcw, Settings2, SkipForward, Trash2, X } from 'lucide-svelte';
   import { Button } from "$lib/components/ui/button/index.js";
   import { Input } from "$lib/components/ui/input/index.js";
   import ActivityView from '#lib/components/pomodoro/ActivityView.svelte';
@@ -27,6 +27,13 @@
     type FocusProtectionExtensionStatus
   } from '#lib/modules/pomodoro/focus-protection.ts';
   import {
+    DEFAULT_RINGTONE,
+    RINGTONE_OPTIONS,
+    isPomodoroRingtone,
+    playPomodoroRingtone,
+    type PomodoroRingtone
+  } from '#lib/modules/pomodoro/sounds.ts';
+  import {
     createTimer,
     getNextMode,
     getOvertimeMs,
@@ -44,7 +51,7 @@
   const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
   type PomodoroView = 'timer' | 'activity';
-  type SettingsPanel = 'main' | 'blocked-sites';
+  type SettingsPanel = 'main' | 'blocked-sites' | 'ringtone' | 'data';
 
   type PomodoroPreferences = {
     autoStartBreaks: boolean;
@@ -103,6 +110,7 @@
   let focusEditing = $state(false);
   let focusInput: HTMLInputElement | null = null;
   let soundEnabled = $state(true);
+  let ringtone = $state<PomodoroRingtone>(DEFAULT_RINGTONE);
   let notificationsEnabled = $state(false);
   let notificationsSupported = $state(false);
   let wakeLockSupported = $state(false);
@@ -116,6 +124,8 @@
   let legacyHistory = $state<LegacyFocusSession[]>([]);
   let settingsOpen = $state(false);
   let settingsPanel = $state<SettingsPanel>('main');
+  let deleteConfirm = $state(false);
+  let dataMessage = $state('');
   let hydrated = $state(false);
   let clockNow = $state(Date.now());
   let wakeLock: { release: () => Promise<void> } | null = null;
@@ -220,6 +230,7 @@
         preferences,
         focusText,
         soundEnabled,
+        ringtone,
         notificationsEnabled,
         focusProtection: {
           enabled: focusProtectionEnabled,
@@ -243,6 +254,7 @@
         preferences?: Partial<PomodoroPreferences>;
         focusText?: string;
         soundEnabled?: boolean;
+        ringtone?: unknown;
         notificationsEnabled?: boolean;
         focusProtection?: {
           enabled?: boolean;
@@ -322,6 +334,7 @@
       focusText = typeof saved.focusText === 'string' ? saved.focusText.slice(0, 80) : '';
       focusDraft = focusText;
       soundEnabled = saved.soundEnabled !== false;
+      ringtone = isPomodoroRingtone(saved.ringtone) ? saved.ringtone : DEFAULT_RINGTONE;
       notificationsEnabled = saved.notificationsEnabled === true;
       focusProtectionEnabled = saved.focusProtection?.enabled === true;
       blockedDomains = normalizeBlocklist(saved.focusProtection?.blockedDomains ?? []);
@@ -488,12 +501,22 @@
 
   function openSettings() {
     settingsPanel = 'main';
+    deleteConfirm = false;
+    dataMessage = '';
     settingsOpen = true;
+  }
+
+  function openSettingsPanel(panel: SettingsPanel) {
+    settingsPanel = panel;
+    deleteConfirm = false;
+    dataMessage = '';
   }
 
   function closeSettings() {
     settingsOpen = false;
     settingsPanel = 'main';
+    deleteConfirm = false;
+    dataMessage = '';
   }
 
   function updateDocumentTitle() {
@@ -677,7 +700,7 @@
   }
 
   function announceCompletion() {
-    if (soundEnabled) playCompletionSound();
+    if (soundEnabled) void playPomodoroRingtone(ringtone);
 
     if (
       notificationsEnabled &&
@@ -692,35 +715,6 @@
               : 'Focus complete. Take a break.'
             : 'Break complete. Ready to focus.'
       });
-    }
-  }
-
-  function playCompletionSound() {
-    if (typeof window === 'undefined') return;
-
-    try {
-      const AudioContextClass =
-        window.AudioContext ??
-        (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-
-      if (!AudioContextClass) return;
-
-      const context = new AudioContextClass();
-      const oscillator = context.createOscillator();
-      const gain = context.createGain();
-
-      oscillator.frequency.value = 620;
-      gain.gain.value = 0.035;
-      oscillator.connect(gain);
-      gain.connect(context.destination);
-      oscillator.start();
-
-      window.setTimeout(() => {
-        oscillator.stop();
-        void context.close();
-      }, 180);
-    } catch {
-      // Sound is optional.
     }
   }
 
@@ -746,6 +740,96 @@
   function toggleSound() {
     soundEnabled = !soundEnabled;
     persist();
+  }
+
+  function selectRingtone(nextRingtone: PomodoroRingtone) {
+    ringtone = nextRingtone;
+    soundEnabled = true;
+    persist();
+    void playPomodoroRingtone(nextRingtone);
+  }
+
+  function downloadFile(filename: string, content: string, type: string) {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function exportAllPomodoroData() {
+    const payload = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      timer,
+      durations,
+      preferences,
+      focusText,
+      sound: {
+        enabled: soundEnabled,
+        ringtone
+      },
+      notificationsEnabled,
+      focusProtection: {
+        enabled: focusProtectionEnabled,
+        blockedDomains
+      },
+      dailyGoal: {
+        hours: dailyGoalHours,
+        schedule: goalSchedule
+      },
+      activitySessions
+    };
+
+    downloadFile(
+      'module-pomodoro-backup.json',
+      JSON.stringify(payload, null, 2),
+      'application/json'
+    );
+
+    dataMessage = 'Exported all Pomodoro data.';
+  }
+
+  async function deleteAllPomodoroData() {
+    try {
+      await stopFocusProtection();
+      await setFocusProtectionEnabled(false);
+      await syncFocusProtectionBlocklist([]);
+    } catch {
+      // Local deletion must still succeed if the optional extension is unavailable.
+    }
+
+    await releaseWakeLock();
+    await clearFocusSessions();
+
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+
+    durations = { ...DEFAULT_DURATIONS };
+    preferences = { ...DEFAULT_PREFERENCES };
+    timer = createTimer('focus', DEFAULT_DURATIONS.focus * 60_000);
+    sessionStartedAt = null;
+    focusText = '';
+    focusDraft = '';
+    focusEditing = false;
+    soundEnabled = true;
+    ringtone = DEFAULT_RINGTONE;
+    notificationsEnabled = false;
+    focusProtectionEnabled = false;
+    blockedDomains = [];
+    focusProtectionError = '';
+    dailyGoalHours = 8;
+    goalSchedule = 'weekdays';
+    activitySessions = [];
+    legacyHistory = [];
+    activeView = 'timer';
+    deleteConfirm = false;
+    dataMessage = 'All Pomodoro data deleted.';
+    updateDocumentTitle();
   }
 
   function togglePreference(key: keyof PomodoroPreferences) {
@@ -915,8 +999,8 @@
           return;
         }
 
-        if (settingsOpen && settingsPanel === 'blocked-sites') {
-          settingsPanel = 'main';
+        if (settingsOpen && settingsPanel !== 'main') {
+          openSettingsPanel('main');
           return;
         }
 
@@ -1180,7 +1264,6 @@
       {goalSchedule}
       {clockNow}
       onGoalChange={updateGoal}
-      onClear={clearActivity}
     />
   {/if}
 
@@ -1200,20 +1283,26 @@
       >
         <div class="mb-4 flex items-center justify-between gap-2">
           <div class="flex min-w-0 items-center gap-1">
-            {#if settingsPanel === 'blocked-sites'}
+            {#if settingsPanel !== 'main'}
               <Button
                 variant="ghost"
                 size="icon-sm"
                 class="shrink-0 rounded-lg text-muted-foreground"
                 aria-label="Back to Pomodoro settings"
-                onclick={() => (settingsPanel = 'main')}
+                onclick={() => openSettingsPanel('main')}
               >
                 <ArrowLeft class="size-4" strokeWidth={1.7} />
               </Button>
             {/if}
 
             <h2 id="pomodoro-settings-title" class="m-0 truncate text-[14px] font-medium tracking-[-0.02em]">
-              {settingsPanel === 'main' ? 'Pomodoro settings' : 'Blocked websites'}
+              {settingsPanel === 'main'
+                ? 'Pomodoro settings'
+                : settingsPanel === 'blocked-sites'
+                  ? 'Blocked websites'
+                  : settingsPanel === 'ringtone'
+                    ? 'Ringtone'
+                    : 'Data'}
             </h2>
           </div>
 
@@ -1296,7 +1385,7 @@
           errorMessage={focusProtectionError}
           onToggle={toggleFocusProtection}
           onBlocklistChange={updateBlockedDomains}
-          onManage={() => (settingsPanel = 'blocked-sites')}
+          onManage={() => openSettingsPanel('blocked-sites')}
         />
 
         <div class="mt-4 border-t pt-4">
@@ -1363,6 +1452,18 @@
           <Button
             variant="ghost"
             class="flex h-10 w-full items-center justify-between rounded-lg px-1 text-[12px] font-normal"
+            onclick={() => openSettingsPanel('ringtone')}
+          >
+            <span>Ringtone</span>
+            <span class="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              {RINGTONE_OPTIONS.find((option) => option.id === ringtone)?.label ?? 'Soft chime'}
+              <ChevronRight class="size-3.5" strokeWidth={1.7} />
+            </span>
+          </Button>
+
+          <Button
+            variant="ghost"
+            class="flex h-10 w-full items-center justify-between rounded-lg px-1 text-[12px] font-normal"
             role="switch"
             aria-checked={preferences.keepAwake}
             disabled={!wakeLockSupported}
@@ -1392,7 +1493,19 @@
             </span>
           </Button>
         </div>
-        {:else}
+
+        <div class="mt-4 border-t pt-4">
+          <div class="mb-1 text-[11px] font-medium text-muted-foreground">Data</div>
+          <Button
+            variant="ghost"
+            class="flex h-10 w-full items-center justify-between rounded-lg px-1 text-[12px] font-normal"
+            onclick={() => openSettingsPanel('data')}
+          >
+            <span>Export & delete data</span>
+            <ChevronRight class="size-3.5 text-muted-foreground" strokeWidth={1.7} />
+          </Button>
+        </div>
+        {:else if settingsPanel === 'blocked-sites'}
           <FocusProtectionSettings
             view="manager"
             enabled={focusProtectionEnabled}
@@ -1402,6 +1515,91 @@
             onToggle={toggleFocusProtection}
             onBlocklistChange={updateBlockedDomains}
           />
+        {:else if settingsPanel === 'ringtone'}
+          <div>
+            <p class="mb-3 mt-0 text-[11px] leading-[1.55] text-muted-foreground">
+              Pick a short local tone for session completion. Selecting one also previews it.
+            </p>
+
+            <div class="divide-y">
+              {#each RINGTONE_OPTIONS as option}
+                <button
+                  type="button"
+                  class="flex min-h-12 w-full items-center justify-between gap-4 py-2 text-left"
+                  onclick={() => selectRingtone(option.id)}
+                >
+                  <span class="min-w-0">
+                    <span class="block text-[12px]">{option.label}</span>
+                    <span class="mt-0.5 block text-[10px] text-muted-foreground">{option.description}</span>
+                  </span>
+                  {#if ringtone === option.id}
+                    <Check class="size-4 shrink-0 text-primary" strokeWidth={1.8} />
+                  {/if}
+                </button>
+              {/each}
+            </div>
+          </div>
+        {:else}
+          <div>
+            <p class="mb-4 mt-0 text-[11px] leading-[1.55] text-muted-foreground">
+              Export or remove all Pomodoro data stored in this browser, including settings, blocked sites, goals, and activity history.
+            </p>
+
+            <Button
+              variant="outline"
+              class="h-10 w-full justify-start rounded-lg text-[12px] font-normal shadow-none"
+              onclick={exportAllPomodoroData}
+            >
+              <Download class="size-3.5" strokeWidth={1.7} />
+              Export all data
+            </Button>
+
+            {#if dataMessage}
+              <p class="mb-0 mt-2 text-[10px] text-muted-foreground">{dataMessage}</p>
+            {/if}
+
+            <div class="mt-5 border-t pt-4">
+              {#if !deleteConfirm}
+                <Button
+                  variant="ghost"
+                  class="h-10 w-full justify-start rounded-lg px-2 text-[12px] font-normal text-destructive"
+                  onclick={() => {
+                    deleteConfirm = true;
+                    dataMessage = '';
+                  }}
+                >
+                  <Trash2 class="size-3.5" strokeWidth={1.7} />
+                  Delete all data
+                </Button>
+              {:else}
+                <div class="rounded-xl border border-destructive/20 bg-destructive/[0.035] p-3">
+                  <p class="m-0 text-[11px] leading-[1.5]">
+                    Delete timer settings, Focus Protection data, goals, and all activity history?
+                  </p>
+                  <p class="mb-0 mt-1 text-[10px] text-muted-foreground">This cannot be undone.</p>
+
+                  <div class="mt-3 flex justify-end gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      class="h-8 rounded-lg text-[11px] font-normal"
+                      onclick={() => (deleteConfirm = false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      class="h-8 rounded-lg text-[11px] font-medium shadow-none"
+                      onclick={deleteAllPomodoroData}
+                    >
+                      Delete all
+                    </Button>
+                  </div>
+                </div>
+              {/if}
+            </div>
+          </div>
         {/if}
       </div>
     </div>
