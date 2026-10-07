@@ -4,11 +4,7 @@ const RULE_ID_BASE = 10000;
 const RULE_ID_MAX = 10199;
 const MAX_BLOCKED_DOMAINS = 200;
 const MAX_ACTIVE_SESSION_MS = 24 * 60 * 60 * 1000;
-const ALLOWED_CONTROL_ORIGINS = new Set([
-  'https://modu.howlil.site',
-  'http://localhost',
-  'http://127.0.0.1'
-]);
+const PRODUCTION_CONTROL_ORIGIN = 'https://modu.howlil.site';
 const PROTECTED_DOMAINS = new Set([
   'modu.howlil.site',
   'localhost',
@@ -115,7 +111,14 @@ function controlOriginFromSender(sender) {
     const url = new URL(source);
     const origin = url.origin;
 
-    if (ALLOWED_CONTROL_ORIGINS.has(origin)) return origin;
+    if (origin === PRODUCTION_CONTROL_ORIGIN) return origin;
+
+    if (
+      url.protocol === 'http:' &&
+      (url.hostname === 'localhost' || url.hostname === '127.0.0.1')
+    ) {
+      return origin;
+    }
   } catch {
     return null;
   }
