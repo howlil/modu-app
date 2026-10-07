@@ -41,6 +41,7 @@ Home tool presentation:
 - each tile is 1:1 with a clear icon and short name
 - tiles may use distinct solid pastel surfaces to make each tool feel like an app
 - each tile should have a distinct illustration/composition tied to the tool; do not reuse the same icon-box layout with only a different glyph
+- use restrained light-to-dark color shifts, inset highlights, and soft shadows to create depth without glossy effects
 - do not add descriptions inside the launcher grid
 - desktop uses a small 3-column grid; narrow screens use 2 columns
 - the tile itself is the interaction target; avoid extra arrows, badges, or metadata
@@ -105,6 +106,12 @@ Those components should compose shadcn primitives rather than recreate buttons, 
 
 Native semantic HTML remains valid for structural elements such as `section`, `header`, `label`, headings, and text.
 
+Icon rule:
+
+- Lucide is the default icon source for UI actions, controls, and simple tool symbolism
+- do not hand-draw an SVG when an equivalent Lucide icon exists
+- custom illustration is allowed only when the composition itself carries product meaning beyond a single icon
+
 ### Styling
 
 Tailwind CSS v4 is the styling system.
@@ -135,7 +142,7 @@ Prefer semantic classes such as `bg-card`, `text-muted-foreground`, `border-bord
 
 Avoid:
 
-- decorative gradients
+- loud or decorative gradients; restrained gradients are allowed only when they add depth or hierarchy
 - inner shadows
 - card spam
 - bespoke button/input/card implementations
