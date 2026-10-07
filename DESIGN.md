@@ -54,11 +54,11 @@ Home tool presentation:
 - tool grid should stay visually balanced for the current count: with four launcher cards, use 4 columns on wide screens and 2 columns below tablet width; avoid a single orphan card on a new row
 - the tile itself is the interaction target; avoid extra arrows, badges, or metadata
 
-Scrolled navigation:
+Global navigation:
 
-- at the top of the page, navigation spans the normal content width and stays transparent so it visually merges with the hero
-- do not show a default navbar border, fill, or blur before scrolling
-- after scrolling, it contracts into a rounded floating capsule
+- navigation is always a visible fully rounded capsule with a restrained translucent surface
+- at the top of the page it follows the normal content width while keeping a small inset from the viewport edge
+- after scrolling it contracts into a narrower floating capsule and keeps visible top breathing room
 - use restrained glassmorphism: translucent background, subtle border, backdrop blur, soft shadow
 - GitHub Sponsor and Star are real actions, not decorative badges
 
@@ -220,9 +220,10 @@ Pomodoro module contract:
 - heatmap intensity is based on focused time relative to the goal that applied to that day, not raw Pomodoro count
 - history stays local and intentionally lightweight rather than becoming a productivity-score dashboard
 - progressive disclosure is mandatory: the primary Timer surface shows mode, timer, primary action, cycle, optional focus label, and quiet Today activity only
-- Timer / Activity navigation shares one centered visual axis with the Pomodoro title; Activity content may widen for data density without pulling the header off-center
-- distinguish page-level navigation from timer-mode controls: Timer / Activity uses quiet text tabs with an active underline, while Focus / Short / Long remains a compact segmented control
-- keep Settings within the compact Pomodoro header axis rather than floating at the edge of the wider Activity container
+- Pomodoro uses the same top hierarchy as Typing: ToolHeader title, then one compact fully rounded navigation bar
+- Timer / Activity are pill tabs on the left of that bar; Settings stays aligned on the right
+- Activity content may widen for data density without pulling the title/navigation axis off-center
+- distinguish page-level navigation from timer-mode controls: Timer / Activity is the module navigation bar, while Focus / Short / Long remains a compact mode selector
 - the timer ring is supportive, not the hero: keep it compact with a thin stroke so the time value remains the strongest visual element
 - idle state should not show redundant `Ready` copy; state text appears only when it adds information such as Focus, Paused, Overtime, or Complete
 - cycle copy must be semantically explicit, e.g. `Session 2 of 4`, and match the completed-dot state
@@ -281,7 +282,7 @@ Typing module contract:
 - keyboard/finger guidance fades as practiced keys stabilize and can be manually reduced or hidden
 - keyboard sound is optional, local, and procedural through Web Audio; no remote audio asset or license dependency is required
 - the typing sound engine reuses one AudioContext instead of creating a new context for every keystroke
-- correct keys use a short quiet click; Space uses a slightly lower click; incorrect keys use a distinct dull click
+- typing sound uses a restrained mechanical-keyboard character: switch click, low-mid body/thock, subtle case resonance, and quiet release clack; Space is lower/heavier and incorrect input remains audibly distinct
 - Test mode records performance history but must not update key mastery or adaptive weakness
 - custom/test text must never influence the adaptive learner model
 - Progress shows only actionable signals: recent performance, weak keys/transitions, and due review
