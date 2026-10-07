@@ -1,27 +1,30 @@
 <script lang="ts">
-  import { ArrowRight, CornerDownLeft, FileText, Files, Keyboard, Timer, Type } from 'lucide-svelte';
+  import { ArrowRight, CornerDownLeft, FileImage, FileText, Files, Keyboard, Minimize2, Timer, Type } from 'lucide-svelte';
   import type { ModuleDefinition } from '#lib/platform/registry/types.ts';
 
-  let { module }: { module: ModuleDefinition } = $props();
+  let { module, preview = false }: { module: ModuleDefinition; preview?: boolean } = $props();
 
   const tileStyle = {
     'pdf-merge': 'background: linear-gradient(145deg, #F8C7D3 0%, #F1AEC0 56%, #E99CB2 100%);',
     pomodoro: 'background: linear-gradient(145deg, #9BC2F7 0%, #80AEEF 54%, #709DE5 100%);',
-    typing: 'background: linear-gradient(145deg, #B9A5F5 0%, #A088EC 54%, #9075DF 100%);'
+    typing: 'background: linear-gradient(145deg, #B9A5F5 0%, #A088EC 54%, #9075DF 100%);',
+    'image-compress': 'background: linear-gradient(145deg, #C8E8CD 0%, #AEDCB8 54%, #98CFA7 100%);'
   }[module.id];
 
   const tileClass = {
     'pdf-merge': 'text-[#552433] border-[#DF94AA]',
     pomodoro: 'text-[#163A6B] border-[#6F9FE8]',
-    typing: 'text-[#352568] border-[#8E74DC]'
+    typing: 'text-[#352568] border-[#8E74DC]',
+    'image-compress': 'text-[#234B30] border-[#8DC49A]'
   }[module.id] ?? 'text-foreground border-border';
 </script>
 
 <a
-  class={`group relative aspect-square min-w-0 overflow-hidden rounded-[22px] border p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.40),0_10px_24px_rgba(35,31,26,0.07)] transition duration-200 hover:-translate-y-1 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.46),0_16px_34px_rgba(35,31,26,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/[0.40] ${tileClass}`}
+  class={`${preview ? '' : 'group'} relative aspect-square min-w-0 overflow-hidden rounded-[22px] border p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.40),0_10px_24px_rgba(35,31,26,0.07)] ${preview ? 'cursor-default' : 'transition duration-200 hover:-translate-y-1 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.46),0_16px_34px_rgba(35,31,26,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/[0.40]'} ${tileClass}`}
   style={tileStyle}
-  href={module.route}
+  href={preview ? undefined : module.route}
   aria-label={module.name}
+  aria-disabled={preview}
 >
   <div
     class="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.16)_0%,rgba(255,255,255,0)_46%,rgba(28,24,22,0.045)_100%)]"
@@ -58,6 +61,17 @@
       </div>
 
       <div class="absolute bottom-[69%] left-1/2 h-4 w-10 -translate-x-1/2 rounded-full bg-[#163A6B]/[0.18] shadow-[0_4px_10px_rgba(24,58,107,0.10)]"></div>
+    </div>
+
+  {:else if module.id === 'image-compress'}
+    <div class="pointer-events-none absolute inset-0" aria-hidden="true">
+      <div class="absolute bottom-[11%] left-1/2 grid h-[58%] w-[68%] -translate-x-1/2 place-items-center rounded-[24px] border border-white/[0.24] bg-white/[0.22] shadow-[0_16px_28px_rgba(35,75,48,0.12)] backdrop-blur-[2px]">
+        <FileImage class="size-[43%] opacity-65" strokeWidth={1.35} />
+      </div>
+
+      <div class="absolute bottom-[9%] right-[12%] grid size-14 place-items-center rounded-full border border-white/[0.24] bg-white/[0.34] shadow-[0_10px_20px_rgba(35,75,48,0.12)] backdrop-blur-sm">
+        <Minimize2 class="size-6 opacity-70" strokeWidth={1.55} />
+      </div>
     </div>
 
   {:else}
