@@ -154,6 +154,10 @@ Module maps those tokens to its identity:
 
 Prefer semantic classes such as `bg-card`, `text-muted-foreground`, `border-border`, and `bg-primary` over one-off raw colors.
 
+- Action buttons use fully rounded pill geometry by default through the shared shadcn `Button` primitive.
+- Compact toggle actions may use the same pill geometry; structural rows, cards, fields, and visualization elements are not forced into pills.
+- The global navigation becomes a fully rounded floating capsule after scroll and keeps visible top breathing room from the viewport edge.
+
 Avoid:
 
 - loud or decorative gradients; restrained gradients are allowed only when they add depth or hierarchy
