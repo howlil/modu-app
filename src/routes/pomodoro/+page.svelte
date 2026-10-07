@@ -4,6 +4,7 @@
   import { Button } from "$lib/components/ui/button/index.js";
   import { Input } from "$lib/components/ui/input/index.js";
   import ActivityView from '#lib/components/pomodoro/ActivityView.svelte';
+  import FocusProtectionSettings from '#lib/components/pomodoro/FocusProtectionSettings.svelte';
   import {
     clearFocusSessions,
     loadFocusSessions,
@@ -15,6 +16,16 @@
     type GoalSchedule,
     type LegacyFocusSession
   } from '#lib/modules/pomodoro/activity.ts';
+  import {
+    normalizeBlocklist,
+    pingFocusProtection,
+    setFocusProtectionEnabled,
+    startFocusProtection,
+    stopFocusProtection,
+    syncFocusProtectionBlocklist,
+    type FocusProtectionConnection,
+    type FocusProtectionExtensionStatus
+  } from '#lib/modules/pomodoro/focus-protection.ts';
   import {
     createTimer,
     getNextMode,
@@ -94,6 +105,10 @@
   let notificationsEnabled = $state(false);
   let notificationsSupported = $state(false);
   let wakeLockSupported = $state(false);
+  let focusProtectionEnabled = $state(false);
+  let blockedDomains = $state<string[]>([]);
+  let focusProtectionConnection = $state<FocusProtectionConnection>('checking');
+  let focusProtectionError = $state('');
   let dailyGoalHours = $state(8);
   let goalSchedule = $state<GoalSchedule>('weekdays');
   let activitySessions = $state<FocusActivitySession[]>([]);
@@ -191,6 +206,10 @@
         focusText,
         soundEnabled,
         notificationsEnabled,
+        focusProtection: {
+          enabled: focusProtectionEnabled,
+          blockedDomains
+        },
         sessionStartedAt,
         dailyGoalHours,
         goalSchedule
@@ -210,6 +229,10 @@
         focusText?: string;
         soundEnabled?: boolean;
         notificationsEnabled?: boolean;
+        focusProtection?: {
+          enabled?: boolean;
+          blockedDomains?: string[];
+        };
         sessionStartedAt?: number | null;
         dailyGoalHours?: number;
         goalSchedule?: GoalSchedule;
@@ -285,6 +308,8 @@
       focusDraft = focusText;
       soundEnabled = saved.soundEnabled !== false;
       notificationsEnabled = saved.notificationsEnabled === true;
+      focusProtectionEnabled = saved.focusProtection?.enabled === true;
+      blockedDomains = normalizeBlocklist(saved.focusProtection?.blockedDomains ?? []);
       legacyHistory = Array.isArray(saved.history) ? saved.history : [];
     } catch {
       localStorage.removeItem(STORAGE_KEY);
@@ -299,6 +324,151 @@
     }
 
     activitySessions = await loadFocusSessions();
+  }
+
+  function applyProtectionStatus(status: FocusProtectionExtensionStatus | null) {
+    if (!status) return;
+    focusProtectionConnection = status.active ? 'active' : 'ready';
+    focusProtectionError = '';
+  }
+
+  function currentFocusSessionId() {
+    return `focus-${sessionStartedAt ?? Date.now()}`;
+  }
+
+  async function syncFocusProtection(currentTimer = timer) {
+    if (
+      focusProtectionConnection === 'missing' ||
+      focusProtectionConnection === 'checking'
+    ) {
+      return;
+    }
+
+    try {
+      if (
+        !focusProtectionEnabled ||
+        currentTimer.mode !== 'focus' ||
+        !['running', 'paused', 'overtime'].includes(currentTimer.status)
+      ) {
+        const response = await stopFocusProtection();
+        if (!response.ok) throw new Error(response.error || 'Unable to stop protection.');
+        applyProtectionStatus(response.data ?? null);
+        return;
+      }
+
+      const startedAt = sessionStartedAt ?? Date.now();
+      if (sessionStartedAt === null) sessionStartedAt = startedAt;
+
+      const response = await startFocusProtection({
+        sessionId: currentFocusSessionId(),
+        startedAt,
+        endsAt: currentTimer.status === 'running' ? currentTimer.endsAt : null,
+        overtimeEnabled:
+          currentTimer.status === 'overtime' || preferences.overtime
+      });
+
+      if (!response.ok) {
+        throw new Error(response.error || 'Unable to start protection.');
+      }
+
+      applyProtectionStatus(response.data ?? null);
+    } catch (error) {
+      focusProtectionConnection = 'error';
+      focusProtectionError =
+        error instanceof Error ? error.message : 'Focus protection unavailable.';
+    }
+  }
+
+  async function connectFocusProtection() {
+    focusProtectionConnection = 'checking';
+    focusProtectionError = '';
+
+    const detected = await pingFocusProtection();
+
+    if (!detected) {
+      focusProtectionConnection = 'missing';
+      return;
+    }
+
+    try {
+      const blocklistResponse = await syncFocusProtectionBlocklist(blockedDomains);
+      if (!blocklistResponse.ok) {
+        throw new Error(blocklistResponse.error || 'Unable to sync blocked websites.');
+      }
+
+      const enabledResponse = await setFocusProtectionEnabled(focusProtectionEnabled);
+      if (!enabledResponse.ok) {
+        throw new Error(enabledResponse.error || 'Unable to sync focus protection.');
+      }
+
+      applyProtectionStatus(enabledResponse.data ?? detected);
+
+      if (focusProtectionEnabled) {
+        await syncFocusProtection(timer);
+      }
+    } catch (error) {
+      focusProtectionConnection = 'error';
+      focusProtectionError =
+        error instanceof Error ? error.message : 'Focus protection unavailable.';
+    }
+  }
+
+  async function toggleFocusProtection() {
+    if (
+      focusProtectionConnection === 'checking' ||
+      focusProtectionConnection === 'missing'
+    ) {
+      return;
+    }
+
+    const nextEnabled = !focusProtectionEnabled;
+    focusProtectionEnabled = nextEnabled;
+    persist();
+
+    try {
+      const response = await setFocusProtectionEnabled(nextEnabled);
+      if (!response.ok) throw new Error(response.error || 'Unable to update protection.');
+
+      applyProtectionStatus(response.data ?? null);
+
+      if (nextEnabled) {
+        const blocklistResponse = await syncFocusProtectionBlocklist(blockedDomains);
+        if (!blocklistResponse.ok) {
+          throw new Error(blocklistResponse.error || 'Unable to sync blocked websites.');
+        }
+
+        await syncFocusProtection(timer);
+      }
+    } catch (error) {
+      focusProtectionConnection = 'error';
+      focusProtectionError =
+        error instanceof Error ? error.message : 'Focus protection unavailable.';
+    }
+  }
+
+  async function updateBlockedDomains(domains: string[]) {
+    blockedDomains = normalizeBlocklist(domains);
+    persist();
+
+    if (
+      focusProtectionConnection === 'checking' ||
+      focusProtectionConnection === 'missing'
+    ) {
+      return;
+    }
+
+    try {
+      const response = await syncFocusProtectionBlocklist(blockedDomains);
+      if (!response.ok) {
+        throw new Error(response.error || 'Unable to sync blocked websites.');
+      }
+
+      applyProtectionStatus(response.data ?? null);
+    } catch (error) {
+      focusProtectionConnection = 'error';
+      focusProtectionError =
+        error instanceof Error ? error.message : 'Focus protection unavailable.';
+    }
   }
 
   function updateDocumentTitle() {
@@ -373,6 +543,7 @@
     timer = switchMode(timer, mode, durationMs(mode));
     sessionStartedAt = null;
     void syncWakeLock();
+    void syncFocusProtection(timer);
     persist();
   }
 
@@ -383,12 +554,14 @@
 
     timer = startTimer(timer, Date.now());
     void syncWakeLock();
+    void syncFocusProtection(timer);
     persist();
   }
 
   function pause() {
     timer = pauseTimer(timer, Date.now());
     void syncWakeLock();
+    void syncFocusProtection(timer);
     persist();
   }
 
@@ -398,6 +571,7 @@
     sessionStartedAt = nextMode === 'focus' ? Date.now() : null;
     timer = startTimer(timer, Date.now());
     void syncWakeLock();
+    void syncFocusProtection(timer);
     persist();
   }
 
@@ -426,6 +600,7 @@
     timer = resetTimer(timer);
     sessionStartedAt = null;
     void syncWakeLock();
+    void syncFocusProtection(timer);
     persist();
   }
 
@@ -450,6 +625,7 @@
     if (previousTimer.status === 'running' && nextTimer.status === 'overtime') {
       announceCompletion();
       void syncWakeLock();
+      void syncFocusProtection(nextTimer);
       persist();
       return;
     }
@@ -461,6 +637,7 @@
 
       announceCompletion();
       void syncWakeLock();
+      void syncFocusProtection(nextTimer);
       persist();
 
       const shouldAutoStart =
@@ -567,6 +744,7 @@
     }
 
     void syncWakeLock();
+    void syncFocusProtection(timer);
     persist();
   }
 
@@ -676,6 +854,7 @@
 
     hydrated = true;
     void loadActivity().then(() => persist());
+    void connectFocusProtection();
     updateDocumentTitle();
     void syncWakeLock();
 
@@ -1046,6 +1225,15 @@
             </Button>
           {/each}
         </div>
+
+        <FocusProtectionSettings
+          enabled={focusProtectionEnabled}
+          {blockedDomains}
+          connection={focusProtectionConnection}
+          errorMessage={focusProtectionError}
+          onToggle={toggleFocusProtection}
+          onBlocklistChange={updateBlockedDomains}
+        />
 
         <div class="mt-4 border-t pt-4">
           <div class="mb-1 text-[11px] font-medium text-muted-foreground">System</div>
