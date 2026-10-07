@@ -165,7 +165,38 @@ SvelteKit 3 compatibility: Module restores `$lib -> src/lib` in `vite.config.ts`
 
 UIArc remains a visual/interaction reference while its official implementation is React-only. Do not manually port its React components into Svelte.
 
-## 6. Local-first contract
+## 6. Pomodoro module contract
+
+Pomodoro is a focused single-column tool, not a productivity dashboard.
+
+Core flow:
+
+```text
+choose mode
+→ start
+→ stay focused
+→ pause/resume if needed
+→ complete
+→ continue to the correct break/focus mode
+```
+
+Pomodoro module contract:
+
+- Focus defaults to 25 minutes, short break to 5, long break to 15
+- running time derives from an absolute `endsAt`; never rely on a decrement-only counter
+- pause stores exact remaining time and resume derives a new `endsAt`
+- running sessions recover correctly after tab sleep, backgrounding, refresh, and reopen
+- timer state, cycle progress, durations, sound/notification preferences, and optional focus label persist locally
+- browser title shows countdown while running/paused and completion state when finished
+- 4 completed focus sessions lead to a long break; completing the long break resets the cycle
+- primary action is state-driven: Start → Pause → Resume → Start break/focus
+- Reset and Skip remain secondary controls
+- sound and browser notifications are opt-in controls; notification permission is requested only after explicit user action
+- custom durations stay behind settings so the primary timer remains visually quiet
+- keyboard shortcuts: Space start/pause, R reset, S skip, 1/2/3 switch mode
+- keep the interface single-column, light-weight, and free of task-management or analytics scope
+
+## 7. Local-first contract
 
 ```text
 user input/file
@@ -179,7 +210,7 @@ Do not send user content to APIs, analytics, logs, or third parties unless the p
 
 Do not claim offline support until it is implemented and tested.
 
-## 7. Engineering boundary
+## 8. Engineering boundary
 
 ```text
 routes/UI
@@ -193,7 +224,7 @@ Do not create platform abstractions before a concrete requirement needs them.
 
 The small Module Registry remains because Home already consumes shared metadata.
 
-## 8. Deployment
+## 9. Deployment
 
 ```text
 GitHub
@@ -215,13 +246,13 @@ Cloudflare runs `bun run build`, then `npx wrangler deploy`. `wrangler.jsonc` po
 
 Workers Builds is the intended deployment model for this repository.
 
-## 9. Definition of done
+## 10. Definition of done
 
 A module is done when its core job works, privacy copy matches reality, errors are recoverable, mobile/keyboard basics work, relevant deterministic logic is tested, and build/check passes.
 
 UI work is complete only when generic controls use shadcn-svelte instead of unnecessary bespoke primitives.
 
-## 10. Decision rule
+## 11. Decision rule
 
 ```text
 What current user-visible requirement needs this?
