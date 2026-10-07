@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "Module Focus Protection",
+  "version": "0.1.0",
+  "description": "Block user-selected distracting websites while a Module Pomodoro focus session is active.",
+  "permissions": [
+    "storage",
+    "alarms",
+    "declarativeNetRequestWithHostAccess"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://modu.howlil.site/*",
+        "http://localhost/*",
+        "http://127.0.0.1/*"
+      ],
+      "js": ["content-bridge.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "blocked/index.html",
+        "blocked/style.css",
+        "blocked/blocked.js"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
