@@ -1,10 +1,9 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
-  import { ArrowLeft, Check, ChevronRight, Download, Pencil, RotateCcw, Settings2, SkipForward, Trash2, X } from 'lucide-svelte';
+  import { ArrowLeft, Check, ChevronRight, Download, Pencil, RotateCcw, Settings2, SkipForward, Trash2 } from 'lucide-svelte';
   import { Button } from "$lib/components/ui/button/index.js";
   import { Input } from "$lib/components/ui/input/index.js";
   import { Switch } from "$lib/components/ui/switch/index.js";
-  import { Dialog } from "$lib/components/ui/dialog/index.js";
   import * as Tabs from '$lib/components/ui/tabs/index.js';
   import ToolHeader from '#lib/components/ToolHeader.svelte';
   import ActivityView from '#lib/components/pomodoro/ActivityView.svelte';
@@ -54,7 +53,7 @@
   const RADIUS = 52;
   const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
-  type PomodoroView = 'timer' | 'activity';
+  type PomodoroView = 'timer' | 'activity' | 'settings';
   type SettingsPanel = 'main' | 'blocked-sites' | 'ringtone' | 'data';
 
   type PomodoroPreferences = {
@@ -126,7 +125,6 @@
   let goalSchedule = $state<GoalSchedule>('weekdays');
   let activitySessions = $state<FocusActivitySession[]>([]);
   let legacyHistory = $state<LegacyFocusSession[]>([]);
-  let settingsOpen = $state(false);
   let settingsPanel = $state<SettingsPanel>('main');
   let deleteConfirm = $state(false);
   let dataMessage = $state('');
@@ -135,7 +133,7 @@
   let wakeLock: { release: () => Promise<void> } | null = null;
 
   $effect(() => {
-    if (!settingsOpen) {
+    if (activeView !== 'settings') {
       settingsPanel = 'main';
       deleteConfirm = false;
       dataMessage = '';
@@ -511,22 +509,15 @@
     }
   }
 
-  function openSettings() {
+  function openSettingsPage() {
     settingsPanel = 'main';
     deleteConfirm = false;
     dataMessage = '';
-    settingsOpen = true;
+    activeView = 'settings';
   }
 
   function openSettingsPanel(panel: SettingsPanel) {
     settingsPanel = panel;
-    deleteConfirm = false;
-    dataMessage = '';
-  }
-
-  function closeSettings() {
-    settingsOpen = false;
-    settingsPanel = 'main';
     deleteConfirm = false;
     dataMessage = '';
   }
@@ -536,6 +527,11 @@
 
     if (activeView === 'activity') {
       document.title = 'Pomodoro Activity — Module';
+      return;
+    }
+
+    if (activeView === 'settings') {
+      document.title = 'Pomodoro Settings — Module';
       return;
     }
 
@@ -1011,16 +1007,16 @@
           return;
         }
 
-        if (settingsOpen && settingsPanel !== 'main') {
+        if (activeView === 'settings' && settingsPanel !== 'main') {
           openSettingsPanel('main');
           return;
         }
 
-        if (settingsOpen) closeSettings();
+        if (activeView === 'settings') return;
         return;
       }
 
-      if (isTyping || settingsOpen || activeView !== 'timer') return;
+      if (isTyping || activeView !== 'timer') return;
 
       if (event.code === 'Space') {
         event.preventDefault();
@@ -1092,16 +1088,15 @@
           Activity
         </Tabs.Trigger>
 
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          class="ml-auto size-7 rounded-full text-muted-foreground shadow-none"
+        <Tabs.Trigger
+          value="settings"
+          class="ml-auto size-7 flex-none rounded-full p-0 after:hidden data-[state=active]:bg-background data-[state=active]:shadow-none"
           aria-label="Pomodoro settings"
           title="Settings"
-          onclick={openSettings}
+          onclick={openSettingsPage}
         >
           <Settings2 class="size-4" strokeWidth={1.7} />
-        </Button>
+        </Tabs.Trigger>
       </Tabs.List>
     </Tabs.Root>
   </div>
@@ -1265,7 +1260,7 @@
         </p>
       {/if}
     </div>
-  {:else}
+  {:else if activeView === 'activity'}
     <ActivityView
       sessions={activitySessions}
       goalHours={dailyGoalHours}
@@ -1273,50 +1268,31 @@
       {clockNow}
       onGoalChange={updateGoal}
     />
-  {/if}
-
-  <Dialog.Root bind:open={settingsOpen}>
-    <Dialog.Portal>
-      <Dialog.Overlay class="fixed inset-0 z-[100] bg-foreground/[0.12] backdrop-blur-[3px]" />
-      <Dialog.Content
-        class="fixed left-1/2 top-1/2 z-[101] max-h-[min(720px,calc(100vh-32px))] w-[calc(100%-2rem)] max-w-[410px] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-[18px] border border-white/[0.65] bg-background/[0.96] p-4 text-left shadow-[0_24px_70px_rgba(28,28,24,0.16)] backdrop-blur-xl outline-none"
-        aria-labelledby="pomodoro-settings-title"
-      >
-        <div class="mb-4 flex items-center justify-between gap-2">
-          <div class="flex min-w-0 items-center gap-1">
-            {#if settingsPanel !== 'main'}
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                class="shrink-0 rounded-full text-muted-foreground"
-                aria-label="Back to Pomodoro settings"
-                onclick={() => openSettingsPanel('main')}
-              >
-                <ArrowLeft class="size-4" strokeWidth={1.7} />
-              </Button>
-            {/if}
-
-            <h2 id="pomodoro-settings-title" class="m-0 truncate text-[14px] font-medium tracking-[-0.02em]">
-              {settingsPanel === 'main'
-                ? 'Pomodoro settings'
-                : settingsPanel === 'blocked-sites'
-                  ? 'Blocked websites'
-                  : settingsPanel === 'ringtone'
-                    ? 'Ringtone'
-                    : 'Data'}
-            </h2>
-          </div>
-
+  {:else}
+    <div class="mx-auto w-full max-w-[680px] text-left">
+      <div class="mb-6 flex min-h-8 items-center gap-1">
+        {#if settingsPanel !== 'main'}
           <Button
             variant="ghost"
             size="icon-sm"
             class="shrink-0 rounded-full text-muted-foreground"
-            aria-label="Close settings"
-            onclick={closeSettings}
+            aria-label="Back to Pomodoro settings"
+            onclick={() => openSettingsPanel('main')}
           >
-            <X class="size-4" strokeWidth={1.7} />
+            <ArrowLeft class="size-4" strokeWidth={1.7} />
           </Button>
-        </div>
+        {/if}
+
+        <h2 class="m-0 truncate text-[18px] font-semibold tracking-[-0.03em]">
+          {settingsPanel === 'main'
+            ? 'Settings'
+            : settingsPanel === 'blocked-sites'
+              ? 'Blocked websites'
+              : settingsPanel === 'ringtone'
+                ? 'Ringtone'
+                : 'Data'}
+        </h2>
+      </div>
 
         {#if settingsPanel === 'main'}
           <div>
@@ -1534,7 +1510,6 @@
             </div>
           </div>
         {/if}
-      </Dialog.Content>
-    </Dialog.Portal>
-  </Dialog.Root>
+    </div>
+  {/if}
 </section>
