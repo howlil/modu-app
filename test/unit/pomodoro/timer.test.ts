@@ -4,6 +4,7 @@ import {
   completeTimer,
   createTimer,
   getNextMode,
+  getOvertimeMs,
   getRemainingMs,
   pauseTimer,
   startTimer,
@@ -51,6 +52,26 @@ describe('pomodoro timer', () => {
     expect(complete.status).toBe('complete');
     expect(complete.remainingMs).toBe(0);
     expect(complete.completedFocus).toBe(1);
+  });
+
+  it('can enter overtime at the scheduled focus end without double-counting focus', () => {
+    const running = startTimer(createTimer('focus', 5_000), 1_000);
+    const overtime = syncTimer(running, 8_000, true);
+
+    expect(overtime.status).toBe('overtime');
+    expect(overtime.completedFocus).toBe(1);
+    expect(overtime.overtimeStartedAt).toBe(6_000);
+    expect(getOvertimeMs(overtime, 9_500)).toBe(3_500);
+
+    const complete = completeTimer(overtime);
+    expect(complete.completedFocus).toBe(1);
+  });
+
+  it('does not use overtime for break modes', () => {
+    const running = startTimer(createTimer('short', 5_000), 1_000);
+    const complete = syncTimer(running, 8_000, true);
+
+    expect(complete.status).toBe('complete');
   });
 
   it('uses a short break until the fourth completed focus session', () => {
