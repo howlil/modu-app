@@ -203,6 +203,11 @@ Pomodoro module contract:
 - history stays local and intentionally lightweight rather than becoming a productivity-score dashboard
 - progressive disclosure is mandatory: the primary Timer surface shows mode, timer, primary action, cycle, optional focus label, and quiet Today activity only
 - Timer / Activity navigation shares one centered visual axis with the Pomodoro title; Activity content may widen for data density without pulling the header off-center
+- distinguish page-level navigation from timer-mode controls: Timer / Activity uses quiet text tabs with an active underline, while Focus / Short / Long remains a compact segmented control
+- keep Settings within the compact Pomodoro header axis rather than floating at the edge of the wider Activity container
+- the timer ring is supportive, not the hero: keep it compact with a thin stroke so the time value remains the strongest visual element
+- idle state should not show redundant `Ready` copy; state text appears only when it adds information such as Focus, Paused, Overtime, or Complete
+- cycle copy must be semantically explicit, e.g. `Session 2 of 4`, and match the completed-dot state
 - Reset and Skip use quiet icon controls around the primary Start/Pause/Resume action
 - Sound, notifications, auto-start behavior, overtime, Wake Lock, and custom durations live in Settings rather than the primary timer surface
 - Settings apply immediately; do not require a separate Save action for these local preferences
