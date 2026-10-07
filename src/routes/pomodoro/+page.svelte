@@ -972,15 +972,17 @@
               <span>{option[1]}</span>
               <span
                 class={[
-                  'relative h-5 w-9 rounded-full transition-colors',
-                  preferences[key] ? 'bg-primary' : 'bg-muted'
+                  'relative h-[18px] w-8 shrink-0 rounded-full border transition-all duration-150',
+                  preferences[key]
+                    ? 'border-primary bg-primary shadow-[0_1px_2px_rgba(36,104,242,0.18)]'
+                    : 'border-border/80 bg-foreground/[0.07]'
                 ]}
                 aria-hidden="true"
               >
                 <span
                   class={[
-                    'absolute top-0.5 size-4 rounded-full bg-white shadow-sm transition-transform',
-                    preferences[key] ? 'translate-x-[18px]' : 'translate-x-0.5'
+                    'absolute left-0.5 top-0.5 size-3.5 rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.18)] transition-transform duration-150',
+                    preferences[key] ? 'translate-x-3.5' : 'translate-x-0'
                   ]}
                 ></span>
               </span>
@@ -1007,15 +1009,17 @@
             </span>
             <span
               class={[
-                'relative h-5 w-9 rounded-full transition-colors',
-                notificationsEnabled ? 'bg-primary' : 'bg-muted'
+                'relative h-[18px] w-8 shrink-0 rounded-full border transition-all duration-150',
+                notificationsEnabled
+                  ? 'border-primary bg-primary shadow-[0_1px_2px_rgba(36,104,242,0.18)]'
+                  : 'border-border/80 bg-foreground/[0.07]'
               ]}
               aria-hidden="true"
             >
               <span
                 class={[
-                  'absolute top-0.5 size-4 rounded-full bg-white shadow-sm transition-transform',
-                  notificationsEnabled ? 'translate-x-[18px]' : 'translate-x-0.5'
+                  'absolute left-0.5 top-0.5 size-3.5 rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.18)] transition-transform duration-150',
+                  notificationsEnabled ? 'translate-x-3.5' : 'translate-x-0'
                 ]}
               ></span>
             </span>
@@ -1031,15 +1035,17 @@
             <span>Sound</span>
             <span
               class={[
-                'relative h-5 w-9 rounded-full transition-colors',
-                soundEnabled ? 'bg-primary' : 'bg-muted'
+                'relative h-[18px] w-8 shrink-0 rounded-full border transition-all duration-150',
+                soundEnabled
+                  ? 'border-primary bg-primary shadow-[0_1px_2px_rgba(36,104,242,0.18)]'
+                  : 'border-border/80 bg-foreground/[0.07]'
               ]}
               aria-hidden="true"
             >
               <span
                 class={[
-                  'absolute top-0.5 size-4 rounded-full bg-white shadow-sm transition-transform',
-                  soundEnabled ? 'translate-x-[18px]' : 'translate-x-0.5'
+                  'absolute left-0.5 top-0.5 size-3.5 rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.18)] transition-transform duration-150',
+                  soundEnabled ? 'translate-x-3.5' : 'translate-x-0'
                 ]}
               ></span>
             </span>
@@ -1061,15 +1067,17 @@
             </span>
             <span
               class={[
-                'relative h-5 w-9 rounded-full transition-colors',
-                preferences.keepAwake ? 'bg-primary' : 'bg-muted'
+                'relative h-[18px] w-8 shrink-0 rounded-full border transition-all duration-150',
+                preferences.keepAwake
+                  ? 'border-primary bg-primary shadow-[0_1px_2px_rgba(36,104,242,0.18)]'
+                  : 'border-border/80 bg-foreground/[0.07]'
               ]}
               aria-hidden="true"
             >
               <span
                 class={[
-                  'absolute top-0.5 size-4 rounded-full bg-white shadow-sm transition-transform',
-                  preferences.keepAwake ? 'translate-x-[18px]' : 'translate-x-0.5'
+                  'absolute left-0.5 top-0.5 size-3.5 rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.18)] transition-transform duration-150',
+                  preferences.keepAwake ? 'translate-x-3.5' : 'translate-x-0'
                 ]}
               ></span>
             </span>
