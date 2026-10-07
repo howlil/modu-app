@@ -1,8 +1,20 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
-  import { History, Pencil, RotateCcw, Settings2, SkipForward, X } from 'lucide-svelte';
+  import { Pencil, RotateCcw, Settings2, SkipForward, X } from 'lucide-svelte';
   import { Button } from "$lib/components/ui/button/index.js";
   import { Input } from "$lib/components/ui/input/index.js";
+  import ActivityView from '#lib/components/pomodoro/ActivityView.svelte';
+  import {
+    clearFocusSessions,
+    loadFocusSessions,
+    localDateKey,
+    migrateLegacySessions,
+    saveFocusSession,
+    saveFocusSessions,
+    type FocusActivitySession,
+    type GoalSchedule,
+    type LegacyFocusSession
+  } from '#lib/modules/pomodoro/activity.ts';
   import {
     createTimer,
     getNextMode,
@@ -20,12 +32,7 @@
   const RADIUS = 52;
   const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
-  type FocusSession = {
-    id: string;
-    endedAt: number;
-    durationMs: number;
-    label: string;
-  };
+  type PomodoroView = 'timer' | 'activity';
 
   type PomodoroPreferences = {
     autoStartBreaks: boolean;
@@ -74,9 +81,11 @@
     keepAwake: false
   };
 
+  let activeView = $state<PomodoroView>('timer');
   let durations = $state<Record<PomodoroMode, number>>({ ...DEFAULT_DURATIONS });
   let preferences = $state<PomodoroPreferences>({ ...DEFAULT_PREFERENCES });
   let timer = $state<TimerState>(createTimer('focus', DEFAULT_DURATIONS.focus * 60_000));
+  let sessionStartedAt = $state<number | null>(null);
   let focusText = $state('');
   let focusDraft = $state('');
   let focusEditing = $state(false);
@@ -85,9 +94,11 @@
   let notificationsEnabled = $state(false);
   let notificationsSupported = $state(false);
   let wakeLockSupported = $state(false);
-  let history = $state<FocusSession[]>([]);
+  let dailyGoalHours = $state(8);
+  let goalSchedule = $state<GoalSchedule>('weekdays');
+  let activitySessions = $state<FocusActivitySession[]>([]);
+  let legacyHistory = $state<LegacyFocusSession[]>([]);
   let settingsOpen = $state(false);
-  let historyOpen = $state(false);
   let hydrated = $state(false);
   let clockNow = $state(Date.now());
   let wakeLock: { release: () => Promise<void> } | null = null;
@@ -107,10 +118,6 @@
         : 0
   );
   const progressOffset = $derived(CIRCUMFERENCE * (1 - progressRatio));
-  const todaySessions = $derived(history.filter((session) => isToday(session.endedAt)));
-  const todayFocusMs = $derived(
-    todaySessions.reduce((total, session) => total + session.durationMs, 0)
-  );
   const primaryLabel = $derived(
     timer.status === 'running'
       ? 'Pause'
@@ -123,6 +130,13 @@
               ? 'Start break'
               : 'Start focus'
             : 'Start'
+  );
+  const goalMs = $derived(dailyGoalHours * 3_600_000);
+  const todayKey = $derived(localDateKey(clockNow));
+  const todayFocusMs = $derived(
+    activitySessions
+      .filter((session) => localDateKey(session.endedAt) === todayKey)
+      .reduce((total, session) => total + session.actualDurationMs, 0)
   );
 
   function durationMs(mode: PomodoroMode) {
@@ -147,15 +161,22 @@
     return `${hours}h ${minutes}m`;
   }
 
-  function isToday(timestamp: number) {
-    const date = new Date(timestamp);
-    const today = new Date();
+  function clampMinutes(value: unknown, fallback: number, max: number) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return fallback;
 
-    return (
-      date.getFullYear() === today.getFullYear() &&
-      date.getMonth() === today.getMonth() &&
-      date.getDate() === today.getDate()
-    );
+    return Math.max(1, Math.min(max, Math.round(numeric)));
+  }
+
+  function clampGoalHours(value: unknown) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return 8;
+
+    return Math.max(1, Math.min(16, Math.round(numeric * 2) / 2));
+  }
+
+  function isMode(value: unknown): value is PomodoroMode {
+    return value === 'focus' || value === 'short' || value === 'long';
   }
 
   function persist() {
@@ -170,7 +191,9 @@
         focusText,
         soundEnabled,
         notificationsEnabled,
-        history
+        sessionStartedAt,
+        dailyGoalHours,
+        goalSchedule
       })
     );
   }
@@ -187,7 +210,10 @@
         focusText?: string;
         soundEnabled?: boolean;
         notificationsEnabled?: boolean;
-        history?: FocusSession[];
+        sessionStartedAt?: number | null;
+        dailyGoalHours?: number;
+        goalSchedule?: GoalSchedule;
+        history?: LegacyFocusSession[];
       };
 
       durations = {
@@ -202,6 +228,10 @@
         overtime: saved.preferences?.overtime !== false,
         keepAwake: saved.preferences?.keepAwake === true
       };
+
+      dailyGoalHours = clampGoalHours(saved.dailyGoalHours);
+      goalSchedule =
+        saved.goalSchedule === 'every-day' ? 'every-day' : 'weekdays';
 
       if (saved.timer && isMode(saved.timer.mode)) {
         const fallback = createTimer(saved.timer.mode, durationMs(saved.timer.mode));
@@ -234,37 +264,50 @@
         }
       }
 
+      sessionStartedAt =
+        typeof saved.sessionStartedAt === 'number' ? saved.sessionStartedAt : null;
+
+      if (
+        sessionStartedAt === null &&
+        timer.mode === 'focus' &&
+        (timer.status === 'running' || timer.status === 'paused' || timer.status === 'overtime')
+      ) {
+        if (timer.status === 'overtime' && timer.overtimeStartedAt !== null) {
+          sessionStartedAt = timer.overtimeStartedAt - timer.durationMs;
+        } else if (timer.endsAt !== null) {
+          sessionStartedAt = timer.endsAt - timer.durationMs;
+        } else {
+          sessionStartedAt = Date.now() - Math.max(0, timer.durationMs - timer.remainingMs);
+        }
+      }
+
       focusText = typeof saved.focusText === 'string' ? saved.focusText.slice(0, 80) : '';
       focusDraft = focusText;
       soundEnabled = saved.soundEnabled !== false;
       notificationsEnabled = saved.notificationsEnabled === true;
-      history = Array.isArray(saved.history)
-        ? saved.history
-            .filter(
-              (session) =>
-                typeof session?.endedAt === 'number' &&
-                typeof session?.durationMs === 'number'
-            )
-            .slice(0, 120)
-        : [];
+      legacyHistory = Array.isArray(saved.history) ? saved.history : [];
     } catch {
       localStorage.removeItem(STORAGE_KEY);
     }
   }
 
-  function clampMinutes(value: unknown, fallback: number, max: number) {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric)) return fallback;
+  async function loadActivity() {
+    if (legacyHistory.length > 0) {
+      await saveFocusSessions(migrateLegacySessions(legacyHistory, goalMs));
+      legacyHistory = [];
+      persist();
+    }
 
-    return Math.max(1, Math.min(max, Math.round(numeric)));
-  }
-
-  function isMode(value: unknown): value is PomodoroMode {
-    return value === 'focus' || value === 'short' || value === 'long';
+    activitySessions = await loadFocusSessions();
   }
 
   function updateDocumentTitle() {
     if (typeof document === 'undefined') return;
+
+    if (activeView === 'activity') {
+      document.title = 'Pomodoro Activity — Module';
+      return;
+    }
 
     if (timer.status === 'overtime') {
       document.title = `+${formatDuration(getOvertimeMs(timer, clockNow))} · Overtime — Module`;
@@ -282,35 +325,62 @@
         : 'Pomodoro — Module';
   }
 
-  function recordFocusSession(actualDurationMs: number) {
+  function newSessionId() {
+    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+      return crypto.randomUUID();
+    }
+
+    return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
+
+  function recordFocusSession(
+    plannedDurationMs: number,
+    actualDurationMs: number,
+    overtimeDurationMs: number
+  ) {
     const endedAt = Date.now();
+    const session: FocusActivitySession = {
+      id: newSessionId(),
+      startedAt: sessionStartedAt ?? endedAt - actualDurationMs,
+      endedAt,
+      plannedDurationMs,
+      actualDurationMs: Math.max(plannedDurationMs, actualDurationMs),
+      overtimeMs: Math.max(0, overtimeDurationMs),
+      label: focusText.trim(),
+      goalMs,
+      status: 'completed'
+    };
 
-    history = [
-      {
-        id: `${endedAt}-${history.length}`,
-        endedAt,
-        durationMs: Math.max(timer.durationMs, actualDurationMs),
-        label: focusText.trim()
-      },
-      ...history
-    ].slice(0, 120);
-
+    sessionStartedAt = null;
+    activitySessions = [session, ...activitySessions].sort((a, b) => b.endedAt - a.endedAt);
+    void saveFocusSession(session);
     persist();
   }
 
   function finalizeOvertimeSession() {
     if (timer.status !== 'overtime') return;
-    recordFocusSession(timer.durationMs + getOvertimeMs(timer));
+
+    const overtimeDurationMs = getOvertimeMs(timer);
+    recordFocusSession(
+      timer.durationMs,
+      timer.durationMs + overtimeDurationMs,
+      overtimeDurationMs
+    );
   }
 
   function switchPomodoroMode(mode: PomodoroMode) {
     finalizeOvertimeSession();
     timer = switchMode(timer, mode, durationMs(mode));
+    sessionStartedAt = null;
     void syncWakeLock();
     persist();
   }
 
   function start() {
+    if (timer.mode === 'focus' && timer.status === 'idle' && sessionStartedAt === null) {
+      sessionStartedAt = Date.now();
+    }
+
     timer = startTimer(timer, Date.now());
     void syncWakeLock();
     persist();
@@ -325,6 +395,7 @@
   function startNextMode() {
     const nextMode = getNextMode(timer);
     timer = switchMode(timer, nextMode, durationMs(nextMode));
+    sessionStartedAt = nextMode === 'focus' ? Date.now() : null;
     timer = startTimer(timer, Date.now());
     void syncWakeLock();
     persist();
@@ -353,6 +424,7 @@
   function handleReset() {
     finalizeOvertimeSession();
     timer = resetTimer(timer);
+    sessionStartedAt = null;
     void syncWakeLock();
     persist();
   }
@@ -384,7 +456,7 @@
 
     if (previousTimer.status === 'running' && nextTimer.status === 'complete') {
       if (previousTimer.mode === 'focus') {
-        recordFocusSession(previousTimer.durationMs);
+        recordFocusSession(previousTimer.durationMs, previousTimer.durationMs, 0);
       }
 
       announceCompletion();
@@ -532,6 +604,17 @@
     focusEditing = false;
   }
 
+  function updateGoal(hours: number, schedule: GoalSchedule) {
+    dailyGoalHours = clampGoalHours(hours);
+    goalSchedule = schedule;
+    persist();
+  }
+
+  async function clearActivity() {
+    await clearFocusSessions();
+    activitySessions = [];
+  }
+
   async function requestWakeLock() {
     if (
       !preferences.keepAwake ||
@@ -582,11 +665,6 @@
     await releaseWakeLock();
   }
 
-  function clearHistory() {
-    history = [];
-    persist();
-  }
-
   onMount(() => {
     notificationsSupported = typeof Notification !== 'undefined';
     wakeLockSupported = 'wakeLock' in navigator;
@@ -598,6 +676,7 @@
 
     hydrated = true;
     persist();
+    void loadActivity();
     updateDocumentTitle();
     void syncWakeLock();
 
@@ -630,11 +709,10 @@
       if (event.key === 'Escape') {
         if (focusEditing) cancelFocusEdit();
         settingsOpen = false;
-        historyOpen = false;
         return;
       }
 
-      if (isTyping || settingsOpen || historyOpen) return;
+      if (isTyping || settingsOpen || activeView !== 'timer') return;
 
       if (event.code === 'Space') {
         event.preventDefault();
@@ -669,6 +747,7 @@
     timer.remainingMs;
     timer.mode;
     clockNow;
+    activeView;
     updateDocumentTitle();
   });
 </script>
@@ -676,212 +755,218 @@
 <svelte:head>
   <meta
     name="description"
-    content="A focused local Pomodoro timer with breaks, session cycles, and persistence."
+    content="A local Pomodoro timer with focus goals, activity heatmap, and session history."
   />
 </svelte:head>
 
 <section
-  class="mx-auto flex min-h-[calc(100vh-68px)] max-w-[680px] flex-col items-center px-2 pb-12 pt-5 text-center max-[700px]:pt-2.5"
+  class="mx-auto min-h-[calc(100vh-68px)] w-full max-w-[920px] px-2 pb-14 pt-5 max-[700px]:pt-2.5"
   style={`--pomodoro-accent: ${modeMeta.accent}; --pomodoro-soft: ${modeMeta.soft};`}
 >
-  <div class="mb-6 flex w-full items-start justify-between gap-4">
-    <div class="text-left">
-      <h1 class="m-0 text-[28px] font-[500] leading-none tracking-[-0.045em]">Pomodoro</h1>
-      <p class="mt-2 text-[12px] font-normal text-muted-foreground">{modeMeta.copy}</p>
+  <div class="relative mx-auto mb-7 w-full max-w-[680px] text-center">
+    <h1 class="m-0 text-[28px] font-[500] leading-none tracking-[-0.045em]">Pomodoro</h1>
+    <p class="mt-2 text-[12px] font-normal text-muted-foreground">
+      {activeView === 'timer' ? modeMeta.copy : 'Focus time, goals, and session history.'}
+    </p>
+
+    <div class="mt-4 flex justify-center">
+      <div class="flex items-center gap-1 rounded-[11px] border bg-muted p-1">
+        {#each ['timer', 'activity'] as view}
+          {@const typedView = view as PomodoroView}
+          <button
+            type="button"
+            class={[
+              'h-7 rounded-[7px] px-2.5 text-[11px] font-normal transition',
+              activeView === typedView
+                ? 'bg-card text-foreground shadow-[0_1px_2px_rgba(26,26,23,0.06)]'
+                : 'text-muted-foreground hover:text-foreground'
+            ]}
+            onclick={() => (activeView = typedView)}
+          >
+            {typedView === 'timer' ? 'Timer' : 'Activity'}
+          </button>
+        {/each}
+      </div>
     </div>
 
-    <Button
-      variant="ghost"
-      size="icon-sm"
-      class="rounded-lg text-muted-foreground"
-      aria-label="Pomodoro settings"
-      title="Settings"
-      onclick={() => (settingsOpen = true)}
-    >
-      <Settings2 class="size-4" strokeWidth={1.7} />
-    </Button>
-  </div>
-
-  <div
-    class="mb-6 flex items-center gap-1 rounded-[13px] border bg-muted p-1"
-    role="tablist"
-    aria-label="Timer mode"
-  >
-    {#each ['focus', 'short', 'long'] as mode}
-      {@const typedMode = mode as PomodoroMode}
-      <button
-        type="button"
-        role="tab"
-        aria-selected={timer.mode === typedMode}
-        class={[
-          'h-[31px] rounded-[9px] px-3 text-[12px] font-normal transition',
-          timer.mode === typedMode
-            ? 'bg-card text-foreground shadow-[0_1px_2px_rgba(26,26,23,0.06)]'
-            : 'text-muted-foreground hover:text-foreground'
-        ]}
-        onclick={() => switchPomodoroMode(typedMode)}
+    {#if activeView === 'timer'}
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        class="absolute right-0 top-0 rounded-lg text-muted-foreground max-[520px]:right-1"
+        aria-label="Pomodoro settings"
+        title="Settings"
+        onclick={() => (settingsOpen = true)}
       >
-        {MODE_META[typedMode].shortLabel}
-      </button>
-    {/each}
+        <Settings2 class="size-4" strokeWidth={1.7} />
+      </Button>
+    {/if}
   </div>
 
-  <div class="relative size-[min(70vw,300px)]">
-    <svg class="size-full -rotate-90" viewBox="0 0 120 120" aria-hidden="true">
-      <circle
-        cx="60"
-        cy="60"
-        r={RADIUS}
-        fill="none"
-        stroke="var(--muted)"
-        stroke-opacity="0.12"
-        stroke-width="8"
-      />
-      <circle
-        cx="60"
-        cy="60"
-        r={RADIUS}
-        fill="none"
-        stroke="var(--pomodoro-accent)"
-        stroke-width="8"
-        stroke-linecap="round"
-        stroke-dasharray={CIRCUMFERENCE}
-        stroke-dashoffset={progressOffset}
-        class="transition-[stroke-dashoffset] duration-200"
-      />
-    </svg>
-
-    <div class="absolute inset-0 grid place-content-center">
-      <div class="text-[clamp(56px,8vw,74px)] font-[410] leading-[0.9] tracking-[-0.055em] tabular-nums">
-        {formattedTime}
+  {#if activeView === 'timer'}
+    <div class="mx-auto flex max-w-[680px] flex-col items-center text-center">
+      <div
+        class="mb-6 flex items-center gap-1 rounded-[13px] border bg-muted p-1"
+        role="tablist"
+        aria-label="Timer mode"
+      >
+        {#each ['focus', 'short', 'long'] as mode}
+          {@const typedMode = mode as PomodoroMode}
+          <button
+            type="button"
+            role="tab"
+            aria-selected={timer.mode === typedMode}
+            class={[
+              'h-[31px] rounded-[9px] px-3 text-[12px] font-normal transition',
+              timer.mode === typedMode
+                ? 'bg-card text-foreground shadow-[0_1px_2px_rgba(26,26,23,0.06)]'
+                : 'text-muted-foreground hover:text-foreground'
+            ]}
+            onclick={() => switchPomodoroMode(typedMode)}
+          >
+            {MODE_META[typedMode].shortLabel}
+          </button>
+        {/each}
       </div>
-      <div class="mt-3 text-[12px] font-normal text-muted-foreground">
-        {timer.status === 'running'
-          ? modeMeta.label
-          : timer.status === 'paused'
-            ? 'Paused'
-            : timer.status === 'overtime'
-              ? 'Overtime'
-              : timer.status === 'complete'
-                ? 'Complete'
-                : 'Ready'}
-      </div>
-    </div>
-  </div>
 
-  {#if timer.mode === 'focus'}
-    <div class="mt-3 grid min-h-9 w-full max-w-[360px] place-items-center">
-      {#if focusEditing}
-        <input
-          bind:this={focusInput}
-          class="w-full max-w-[300px] border-0 border-b border-border bg-transparent px-2 py-1.5 text-center text-[13px] font-normal outline-none placeholder:text-muted-foreground/60"
-          type="text"
-          maxlength="80"
-          bind:value={focusDraft}
-          placeholder="What are you focusing on?"
-          aria-label="Focus label"
-          onblur={commitFocusEdit}
-          onkeydown={(event) => {
-            if (event.key === 'Enter') {
-              event.preventDefault();
-              commitFocusEdit();
-            } else if (event.key === 'Escape') {
-              event.preventDefault();
-              cancelFocusEdit();
-            }
-          }}
-        />
-      {:else if focusText}
+      <div class="relative size-[min(70vw,300px)]">
+        <svg class="size-full -rotate-90" viewBox="0 0 120 120" aria-hidden="true">
+          <circle cx="60" cy="60" r={RADIUS} fill="none" stroke="var(--muted)" stroke-opacity="0.12" stroke-width="8" />
+          <circle
+            cx="60"
+            cy="60"
+            r={RADIUS}
+            fill="none"
+            stroke="var(--pomodoro-accent)"
+            stroke-width="8"
+            stroke-linecap="round"
+            stroke-dasharray={CIRCUMFERENCE}
+            stroke-dashoffset={progressOffset}
+            class="transition-[stroke-dashoffset] duration-200"
+          />
+        </svg>
+
+        <div class="absolute inset-0 grid place-content-center">
+          <div class="text-[clamp(56px,8vw,74px)] font-[410] leading-[0.9] tracking-[-0.055em] tabular-nums">
+            {formattedTime}
+          </div>
+          <div class="mt-3 text-[12px] font-normal text-muted-foreground">
+            {timer.status === 'running'
+              ? modeMeta.label
+              : timer.status === 'paused'
+                ? 'Paused'
+                : timer.status === 'overtime'
+                  ? 'Overtime'
+                  : timer.status === 'complete'
+                    ? 'Complete'
+                    : 'Ready'}
+          </div>
+        </div>
+      </div>
+
+      {#if timer.mode === 'focus'}
+        <div class="mt-3 grid min-h-9 w-full max-w-[360px] place-items-center">
+          {#if focusEditing}
+            <input
+              bind:this={focusInput}
+              class="w-full max-w-[300px] border-0 border-b border-border bg-transparent px-2 py-1.5 text-center text-[13px] font-normal outline-none placeholder:text-muted-foreground/60"
+              type="text"
+              maxlength="80"
+              bind:value={focusDraft}
+              placeholder="What are you focusing on?"
+              aria-label="Focus label"
+              onblur={commitFocusEdit}
+              onkeydown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  commitFocusEdit();
+                } else if (event.key === 'Escape') {
+                  event.preventDefault();
+                  cancelFocusEdit();
+                }
+              }}
+            />
+          {:else if focusText}
+            <button
+              type="button"
+              class="group inline-flex max-w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-[13px] font-normal text-foreground transition hover:bg-muted"
+              onclick={beginFocusEdit}
+            >
+              <span class="truncate">{focusText}</span>
+              <Pencil class="size-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" strokeWidth={1.7} />
+            </button>
+          {:else}
+            <button
+              type="button"
+              class="rounded-lg px-2 py-1.5 text-[12px] font-normal text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              onclick={beginFocusEdit}
+            >
+              + Add focus
+            </button>
+          {/if}
+        </div>
+      {/if}
+
+      <div class="mt-4 flex items-center justify-center gap-2.5">
+        <Button variant="ghost" size="icon" class="size-[38px] rounded-[10px] text-muted-foreground" aria-label="Reset timer" title="Reset (R)" onclick={handleReset}>
+          <RotateCcw class="size-4" strokeWidth={1.7} />
+        </Button>
+
+        <Button class="h-[42px] min-w-[132px] rounded-xl px-5 text-[13px] font-medium shadow-none" onclick={handlePrimary}>
+          {primaryLabel}
+        </Button>
+
+        <Button variant="ghost" size="icon" class="size-[38px] rounded-[10px] text-muted-foreground" aria-label="Skip session" title="Skip (S)" onclick={handleSkip}>
+          <SkipForward class="size-4" strokeWidth={1.7} />
+        </Button>
+      </div>
+
+      <div class="mt-5">
+        <div class="flex items-center justify-center gap-2" aria-label="Focus cycle">
+          {#each [0, 1, 2, 3] as index}
+            <span class="size-1.5 rounded-full transition-colors" style={`background: ${index < timer.completedFocus ? modeMeta.accent : '#d7d7d1'};`}></span>
+          {/each}
+        </div>
+
+        <div class="mt-2 text-[11px] font-normal text-muted-foreground">
+          {timer.completedFocus >= 4 ? 'Long break next' : `${Math.min(timer.completedFocus + 1, 4)} of 4`}
+        </div>
+
         <button
           type="button"
-          class="group inline-flex max-w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-[13px] font-normal text-foreground transition hover:bg-muted"
-          onclick={beginFocusEdit}
+          class="mt-2 rounded-lg px-2 py-1 text-[11px] font-normal text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          onclick={() => (activeView = 'activity')}
         >
-          <span class="truncate">{focusText}</span>
-          <Pencil class="size-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" strokeWidth={1.7} />
+          Today · {formatFocusTotal(todayFocusMs)}
         </button>
-      {:else}
-        <button
-          type="button"
-          class="rounded-lg px-2 py-1.5 text-[12px] font-normal text-muted-foreground transition hover:bg-muted hover:text-foreground"
-          onclick={beginFocusEdit}
-        >
-          + Add focus
-        </button>
+      </div>
+
+      {#if timer.status === 'complete' || timer.status === 'overtime'}
+        <p class="mt-4 min-h-5 text-[12px] font-normal text-muted-foreground">
+          <span class="font-medium text-foreground">
+            {timer.status === 'overtime'
+              ? 'Focus target reached.'
+              : timer.mode === 'focus'
+                ? 'Focus complete.'
+                : 'Break complete.'}
+          </span>
+          {timer.status === 'overtime'
+            ? ' Continue while the flow lasts.'
+            : timer.mode === 'focus'
+              ? ' Take a break.'
+              : ' Ready to focus.'}
+        </p>
       {/if}
     </div>
-  {/if}
-
-  <div class="mt-4 flex items-center justify-center gap-2.5">
-    <Button
-      variant="ghost"
-      size="icon"
-      class="size-[38px] rounded-[10px] text-muted-foreground"
-      aria-label="Reset timer"
-      title="Reset (R)"
-      onclick={handleReset}
-    >
-      <RotateCcw class="size-4" strokeWidth={1.7} />
-    </Button>
-
-    <Button
-      class="h-[42px] min-w-[132px] rounded-xl px-5 text-[13px] font-medium shadow-none"
-      onclick={handlePrimary}
-    >
-      {primaryLabel}
-    </Button>
-
-    <Button
-      variant="ghost"
-      size="icon"
-      class="size-[38px] rounded-[10px] text-muted-foreground"
-      aria-label="Skip session"
-      title="Skip (S)"
-      onclick={handleSkip}
-    >
-      <SkipForward class="size-4" strokeWidth={1.7} />
-    </Button>
-  </div>
-
-  <div class="mt-5">
-    <div class="flex items-center justify-center gap-2" aria-label="Focus cycle">
-      {#each [0, 1, 2, 3] as index}
-        <span
-          class="size-1.5 rounded-full transition-colors"
-          style={`background: ${index < timer.completedFocus ? modeMeta.accent : '#d7d7d1'};`}
-        ></span>
-      {/each}
-    </div>
-
-    <div class="mt-2 text-[11px] font-normal text-muted-foreground">
-      {timer.completedFocus >= 4 ? 'Long break next' : `${Math.min(timer.completedFocus + 1, 4)} of 4`}
-    </div>
-
-    <button
-      type="button"
-      class="mt-2 inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-normal text-muted-foreground transition hover:bg-muted hover:text-foreground"
-      onclick={() => (historyOpen = true)}
-    >
-      <History class="size-3" strokeWidth={1.7} />
-      History · {formatFocusTotal(todayFocusMs)}
-    </button>
-  </div>
-
-  {#if timer.status === 'complete' || timer.status === 'overtime'}
-    <p class="mt-4 min-h-5 text-[12px] font-normal text-muted-foreground">
-      <span class="font-medium text-foreground">
-        {timer.status === 'overtime'
-          ? 'Focus target reached.'
-          : timer.mode === 'focus'
-            ? 'Focus complete.'
-            : 'Break complete.'}
-      </span>
-      {timer.status === 'overtime'
-        ? ' Continue while the flow lasts.'
-        : timer.mode === 'focus'
-          ? ' Take a break.'
-          : ' Ready to focus.'}
-    </p>
+  {:else}
+    <ActivityView
+      sessions={activitySessions}
+      goalHours={dailyGoalHours}
+      {goalSchedule}
+      {clockNow}
+      onGoalChange={updateGoal}
+      onClear={clearActivity}
+    />
   {/if}
 
   {#if settingsOpen}
@@ -899,16 +984,8 @@
         aria-labelledby="pomodoro-settings-title"
       >
         <div class="mb-4 flex items-center justify-between">
-          <h2 id="pomodoro-settings-title" class="m-0 text-[14px] font-medium tracking-[-0.02em]">
-            Pomodoro settings
-          </h2>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            class="rounded-lg text-muted-foreground"
-            aria-label="Close settings"
-            onclick={() => (settingsOpen = false)}
-          >
+          <h2 id="pomodoro-settings-title" class="m-0 text-[14px] font-medium tracking-[-0.02em]">Pomodoro settings</h2>
+          <Button variant="ghost" size="icon-sm" class="rounded-lg text-muted-foreground" aria-label="Close settings" onclick={() => (settingsOpen = false)}>
             <X class="size-4" strokeWidth={1.7} />
           </Button>
         </div>
@@ -916,41 +993,24 @@
         <div>
           <div class="mb-2 text-[11px] font-medium text-muted-foreground">Timer</div>
 
-          <label class="grid min-h-10 grid-cols-[1fr_90px] items-center gap-3 text-[12px]">
-            Focus
-            <Input
-              type="number"
-              min="1"
-              max="180"
-              class="h-8 text-right text-[12px]"
-              value={durations.focus}
-              onchange={(event) => updateDuration('focus', event.currentTarget.value)}
-            />
-          </label>
-
-          <label class="grid min-h-10 grid-cols-[1fr_90px] items-center gap-3 text-[12px]">
-            Short
-            <Input
-              type="number"
-              min="1"
-              max="60"
-              class="h-8 text-right text-[12px]"
-              value={durations.short}
-              onchange={(event) => updateDuration('short', event.currentTarget.value)}
-            />
-          </label>
-
-          <label class="grid min-h-10 grid-cols-[1fr_90px] items-center gap-3 text-[12px]">
-            Long
-            <Input
-              type="number"
-              min="1"
-              max="120"
-              class="h-8 text-right text-[12px]"
-              value={durations.long}
-              onchange={(event) => updateDuration('long', event.currentTarget.value)}
-            />
-          </label>
+          {#each [
+            ['focus', 'Focus', 180],
+            ['short', 'Short', 60],
+            ['long', 'Long', 120]
+          ] as row}
+            {@const timerMode = row[0] as PomodoroMode}
+            <label class="grid min-h-10 grid-cols-[1fr_90px] items-center gap-3 text-[12px]">
+              {row[1]}
+              <Input
+                type="number"
+                min="1"
+                max={row[2]}
+                class="h-8 text-right text-[12px]"
+                value={durations[timerMode]}
+                onchange={(event) => updateDuration(timerMode, event.currentTarget.value)}
+              />
+            </label>
+          {/each}
         </div>
 
         <div class="mt-4 border-t pt-4">
@@ -1083,83 +1143,6 @@
             </span>
           </Button>
         </div>
-      </div>
-    </div>
-  {/if}
-
-  {#if historyOpen}
-    <div
-      class="fixed inset-0 z-[100] grid place-items-center bg-foreground/[0.12] p-4 backdrop-blur-[3px]"
-      role="presentation"
-      onclick={(event) => {
-        if (event.target === event.currentTarget) historyOpen = false;
-      }}
-    >
-      <div
-        class="max-h-[min(620px,calc(100vh-32px))] w-full max-w-[410px] overflow-y-auto rounded-[18px] border border-white/[0.65] bg-background/[0.96] p-4 text-left shadow-[0_24px_70px_rgba(28,28,24,0.16)] backdrop-blur-xl"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="pomodoro-history-title"
-      >
-        <div class="mb-4 flex items-center justify-between">
-          <div>
-            <h2 id="pomodoro-history-title" class="m-0 text-[14px] font-medium tracking-[-0.02em]">
-              Focus history
-            </h2>
-            <p class="mt-1 text-[11px] text-muted-foreground">
-              Today · {todaySessions.length} {todaySessions.length === 1 ? 'session' : 'sessions'} · {formatFocusTotal(todayFocusMs)}
-            </p>
-          </div>
-
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            class="rounded-lg text-muted-foreground"
-            aria-label="Close history"
-            onclick={() => (historyOpen = false)}
-          >
-            <X class="size-4" strokeWidth={1.7} />
-          </Button>
-        </div>
-
-        {#if history.length === 0}
-          <div class="rounded-xl border border-dashed px-4 py-8 text-center text-[12px] text-muted-foreground">
-            Completed focus sessions will appear here.
-          </div>
-        {:else}
-          <div class="divide-y">
-            {#each history.slice(0, 20) as session}
-              <div class="flex items-center justify-between gap-4 py-3">
-                <div class="min-w-0">
-                  <div class="truncate text-[12px] font-normal text-foreground">
-                    {session.label || 'Focus session'}
-                  </div>
-                  <div class="mt-1 text-[10px] text-muted-foreground">
-                    {new Date(session.endedAt).toLocaleString([], {
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </div>
-                </div>
-
-                <div class="shrink-0 text-[11px] text-muted-foreground">
-                  {formatFocusTotal(session.durationMs)}
-                </div>
-              </div>
-            {/each}
-          </div>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            class="mt-3 h-8 w-full rounded-lg text-[11px] font-normal text-muted-foreground"
-            onclick={clearHistory}
-          >
-            Clear history
-          </Button>
-        {/if}
       </div>
     </div>
   {/if}
