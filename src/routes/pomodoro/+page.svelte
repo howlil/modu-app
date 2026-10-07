@@ -675,8 +675,7 @@
     if (!wakeLockSupported) preferences = { ...preferences, keepAwake: false };
 
     hydrated = true;
-    persist();
-    void loadActivity();
+    void loadActivity().then(() => persist());
     updateDocumentTitle();
     void syncWakeLock();
 
