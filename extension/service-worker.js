@@ -139,6 +139,52 @@ async function clearModuleSessionRules() {
   });
 }
 
+function matchingBlockedDomain(urlValue, state) {
+  if (!isActiveState(state) || typeof urlValue !== 'string') return null;
+
+  try {
+    const url = new URL(urlValue);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+
+    const hostname = url.hostname.toLowerCase().replace(/^www\./, '').replace(/\.$/, '');
+
+    return (
+      state.blockedDomains.find(
+        (domain) => hostname === domain || hostname.endsWith(`.${domain}`)
+      ) ?? null
+    );
+  } catch {
+    return null;
+  }
+}
+
+function blockedPageUrl(domain) {
+  return `${chrome.runtime.getURL('blocked/index.html')}?domain=${encodeURIComponent(domain)}`;
+}
+
+async function redirectBlockedTab(tabId, urlValue, state) {
+  const domain = matchingBlockedDomain(urlValue, state);
+  if (!domain || typeof tabId !== 'number' || tabId < 0) return;
+
+  await chrome.tabs.update(tabId, {
+    url: blockedPageUrl(domain)
+  });
+}
+
+async function sweepBlockedTabs(state) {
+  if (!isActiveState(state)) return;
+
+  const tabs = await chrome.tabs.query({});
+
+  await Promise.allSettled(
+    tabs.map((tab) =>
+      tab.id !== undefined && tab.url
+        ? redirectBlockedTab(tab.id, tab.url, state)
+        : Promise.resolve()
+    )
+  );
+}
+
 function buildBlockingRules(state) {
   if (!isActiveState(state)) return [];
 
@@ -148,11 +194,11 @@ function buildBlockingRules(state) {
     action: {
       type: 'redirect',
       redirect: {
-        url: `${chrome.runtime.getURL('blocked/index.html')}?domain=${encodeURIComponent(domain)}`
+        url: blockedPageUrl(domain)
       }
     },
     condition: {
-      urlFilter: `||${domain}^`,
+      urlFilter: `||${domain}/`,
       resourceTypes: ['main_frame']
     }
   }));
@@ -231,6 +277,7 @@ async function reconcileState() {
 
   await applyBlockingRules(state);
   await syncEndAlarm(state);
+  await sweepBlockedTabs(state);
   return state;
 }
 
@@ -263,6 +310,7 @@ async function handleMessage(message, sender) {
       await applyBlockingRules(nextState);
       await writeState(nextState);
       await syncEndAlarm(nextState);
+      await sweepBlockedTabs(nextState);
       return statusFromState(nextState);
     }
 
@@ -275,6 +323,7 @@ async function handleMessage(message, sender) {
 
       await applyBlockingRules(nextState);
       await writeState(nextState);
+      await sweepBlockedTabs(nextState);
       return statusFromState(nextState);
     }
 
@@ -316,6 +365,7 @@ async function handleMessage(message, sender) {
       await applyBlockingRules(nextState);
       await writeState(nextState);
       await syncEndAlarm(nextState);
+      await sweepBlockedTabs(nextState);
       return statusFromState(nextState);
     }
 
@@ -351,6 +401,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     );
 
   return true;
+});
+
+async function enforceNavigation(tabId, urlValue) {
+  const state = await readState();
+  await redirectBlockedTab(tabId, urlValue, state);
+}
+
+chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
+  if (details.frameId !== 0) return;
+  void enforceNavigation(details.tabId, details.url);
+});
+
+chrome.webNavigation.onCommitted.addListener((details) => {
+  if (details.frameId !== 0) return;
+  void enforceNavigation(details.tabId, details.url);
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
