@@ -5,6 +5,7 @@ import {
   buildHeatmapDays,
   calculateWeekSummary,
   heatmapLevel,
+  isScheduledGoalDay,
   localDateKey,
   migrateLegacySessions,
   sessionsForDate,
@@ -71,6 +72,15 @@ describe('pomodoro activity', () => {
     expect(days).toHaveLength(14);
     expect(new Date(days[0].timestamp).getDay()).toBe(1);
     expect(days.some((day) => day.future)).toBe(true);
+  });
+
+  it('treats weekends as rest days when the goal schedule is weekdays', () => {
+    const saturday = new Date(2026, 9, 10, 12, 0);
+    const monday = new Date(2026, 9, 12, 12, 0);
+
+    expect(isScheduledGoalDay(saturday, 'weekdays')).toBe(false);
+    expect(isScheduledGoalDay(monday, 'weekdays')).toBe(true);
+    expect(isScheduledGoalDay(saturday, 'every-day')).toBe(true);
   });
 
   it('calculates current-week goal progress for weekdays only', () => {
