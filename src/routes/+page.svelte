@@ -55,8 +55,7 @@
 
 <style>
   .hero-cloud {
-    width: 100vw;
-    margin-left: calc(50% - 50vw);
+    width: 100%;
     background:
       radial-gradient(
         900px 350px at 50% -4%,
