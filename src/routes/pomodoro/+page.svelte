@@ -1071,10 +1071,10 @@
         <button
           type="button"
           class={[
-            'relative h-7 px-0.5 text-[12px] font-normal transition',
+            'relative h-7 rounded-full px-2.5 text-[12px] font-normal transition',
             activeView === typedView
-              ? 'text-foreground after:absolute after:inset-x-0 after:-bottom-0.5 after:h-px after:rounded-full after:bg-foreground'
-              : 'text-muted-foreground hover:text-foreground'
+              ? 'bg-muted text-foreground'
+              : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
           ]}
           onclick={() => (activeView = typedView)}
         >
