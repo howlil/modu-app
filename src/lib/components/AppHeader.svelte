@@ -19,7 +19,7 @@
 <div class="sticky top-0 z-50 h-[68px] pointer-events-none">
   <header
     class={scrolled
-      ? "pointer-events-auto mx-auto mt-2 flex h-12 w-[calc(100%-20px)] max-w-[920px] items-center rounded-2xl border border-white/55 bg-background/72 shadow-[0_10px_35px_rgba(28,28,24,0.08)] backdrop-blur-xl transition-all duration-200"
+      ? "pointer-events-auto mx-auto mt-2 flex h-12 w-[calc(100%-20px)] max-w-[920px] items-center rounded-2xl border border-white/[0.55] bg-background/[0.72] shadow-[0_10px_35px_rgba(28,28,24,0.08)] backdrop-blur-xl transition-all duration-200"
       : "pointer-events-auto flex h-14 w-full items-center border-b border-border bg-background/95 backdrop-blur-md transition-all duration-200"}
   >
     <div
@@ -44,7 +44,7 @@
           rel="noreferrer"
           variant="outline"
           size="sm"
-          class="h-8 rounded-xl border-border/75 bg-white/50 px-2.5 text-xs font-medium shadow-none backdrop-blur-sm hover:bg-white/80 max-[520px]:px-2"
+          class="h-8 rounded-xl border-border/[0.75] bg-white/[0.50] px-2.5 text-xs font-medium shadow-none backdrop-blur-sm hover:bg-white/[0.80] max-[520px]:px-2"
         >
           <svg viewBox="0 0 24 24" class="size-3.5 text-[#BF4B71]" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true">
             <path d="M20.8 4.8a5.4 5.4 0 0 0-7.7 0L12 5.9l-1.1-1.1a5.4 5.4 0 0 0-7.7 7.7L12 21l8.8-8.5a5.4 5.4 0 0 0 0-7.7Z" />
