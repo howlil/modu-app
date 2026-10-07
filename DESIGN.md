@@ -32,6 +32,7 @@ Home tool presentation:
 - tools render as compact square app tiles
 - each tile is 1:1 with a clear icon and short name
 - tiles may use distinct solid pastel surfaces to make each tool feel like an app
+- each tile should have a distinct illustration/composition tied to the tool; do not reuse the same icon-box layout with only a different glyph
 - do not add descriptions inside the launcher grid
 - desktop uses a small 3-column grid; narrow screens use 2 columns
 - the tile itself is the interaction target; avoid extra arrows, badges, or metadata
