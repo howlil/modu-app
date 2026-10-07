@@ -224,8 +224,8 @@ Pomodoro module contract:
 - history stays local and intentionally lightweight rather than becoming a productivity-score dashboard
 - progressive disclosure is mandatory: the primary Timer surface shows mode, timer, primary action, cycle, optional focus label, and quiet Today activity only
 - Pomodoro uses the same top hierarchy as Typing: ToolHeader title, then one compact fully rounded navigation bar
-- Timer / Activity are pill tabs on the left of that bar; Settings stays aligned on the right
-- Activity content may widen for data density without pulling the title/navigation axis off-center
+- Timer / Activity are pill tabs on the left of that bar; Settings stays aligned on the right and opens as a sibling in-page view, not a popup
+- Activity and Settings content may widen for their needs without pulling the title/navigation axis off-center
 - distinguish page-level navigation from timer-mode controls: Timer / Activity is the module navigation bar, while Focus / Short / Long remains a compact mode selector
 - the timer ring is supportive, not the hero: keep it compact with a thin stroke so the time value remains the strongest visual element
 - idle state should not show redundant `Ready` copy; state text appears only when it adds information such as Focus, Paused, Overtime, or Complete
@@ -247,8 +247,9 @@ Pomodoro module contract:
 - Pomodoro data management is centralized in Settings: export produces one full JSON backup of timer state, preferences, goals, blocked-site configuration, and activity history; delete removes all locally stored Pomodoro data
 - Activity is for inspection, not data administration; do not duplicate export/delete controls there
 - destructive data deletion uses inline confirmation inside the existing Settings drill-down rather than opening another modal
-- do not stack dialogs for nested settings; use a single modal with drill-down navigation and an explicit Back action for secondary views such as Blocked websites
-- keep only one modal overlay active for a settings task; Escape returns from a drill-down before closing the parent settings surface
+- Pomodoro Settings is an in-page view; do not open it in a dialog or overlay
+- nested settings such as Blocked websites, Ringtone, and Data use in-page drill-down navigation with an explicit Back action
+- Escape may return from a nested settings drill-down to the main Settings view, but Settings itself behaves like normal page navigation
 - scrollable surfaces may hide the visual scrollbar to preserve the quiet UI, but wheel, trackpad, touch, keyboard, and programmatic scrolling must remain functional
 - the focus label is optional: show `+ Add focus` until the user chooses to add one, then allow lightweight inline editing
 - overtime keeps the progress ring visually complete while elapsed overtime counts upward
