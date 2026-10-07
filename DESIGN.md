@@ -218,7 +218,15 @@ Pomodoro module contract:
 - idle state should not show redundant `Ready` copy; state text appears only when it adds information such as Focus, Paused, Overtime, or Complete
 - cycle copy must be semantically explicit, e.g. `Session 2 of 4`, and match the completed-dot state
 - Reset and Skip use quiet icon controls around the primary Start/Pause/Resume action
-- Sound, notifications, auto-start behavior, overtime, Wake Lock, and custom durations live in Settings rather than the primary timer surface
+- Sound, notifications, auto-start behavior, overtime, Wake Lock, custom durations, and Focus Protection live in Settings rather than the primary timer surface
+- Focus Protection is optional enforcement, not a separate productivity product: the user explicitly chooses blocked domains and the timer remains the core experience
+- Focus Protection is active during Focus running, paused, and overtime states; it is released for idle, short/long breaks, Reset, and Skip
+- website enforcement belongs to the Chromium companion extension; the Svelte app is only the control surface
+- extension state must be explicit in UI: checking, requires extension, connected, active, or unavailable; never imply protection is active when enforcement failed
+- blocked domains are normalized to hostnames, deduplicated, stored locally, and must never include the Module control surface
+- use Manifest V3 declarativeNetRequest session rules for active blocking; the extension must recover an active session after browser restart and discard stale protection safely
+- extension failure must never stop or invalidate the Pomodoro timer
+- the extension must not collect browsing history, page content, page titles, or visited URLs; only the blocklist and focus-session metadata are stored
 - Settings apply immediately; do not require a separate Save action for these local preferences
 - the focus label is optional: show `+ Add focus` until the user chooses to add one, then allow lightweight inline editing
 - overtime keeps the progress ring visually complete while elapsed overtime counts upward
