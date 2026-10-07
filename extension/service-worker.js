@@ -204,9 +204,9 @@ async function endFocus(state, sessionId) {
     activeSession: null
   };
 
-  await writeState(nextState);
-  await chrome.alarms.clear(ALARM_NAME);
   await clearModuleSessionRules();
+  await chrome.alarms.clear(ALARM_NAME);
+  await writeState(nextState);
 
   return nextState;
 }
@@ -246,29 +246,36 @@ async function handleMessage(message, sender) {
       return statusFromState(state);
 
     case 'SET_ENABLED': {
-      state = {
+      const nextState = {
         ...state,
         enabled: message.enabled === true,
         activeSession: message.enabled === true ? state.activeSession : null,
         controlOrigin: origin
       };
 
-      await writeState(state);
-      await applyBlockingRules(state);
-      await syncEndAlarm(state);
-      return statusFromState(state);
+      if (!nextState.enabled) {
+        await clearModuleSessionRules();
+        await chrome.alarms.clear(ALARM_NAME);
+        await writeState(nextState);
+        return statusFromState(nextState);
+      }
+
+      await applyBlockingRules(nextState);
+      await writeState(nextState);
+      await syncEndAlarm(nextState);
+      return statusFromState(nextState);
     }
 
     case 'SET_BLOCKLIST': {
-      state = {
+      const nextState = {
         ...state,
         blockedDomains: normalizeBlocklist(message.blockedDomains),
         controlOrigin: origin
       };
 
-      await writeState(state);
-      await applyBlockingRules(state);
-      return statusFromState(state);
+      await applyBlockingRules(nextState);
+      await writeState(nextState);
+      return statusFromState(nextState);
     }
 
     case 'START_FOCUS': {
@@ -281,7 +288,7 @@ async function handleMessage(message, sender) {
         throw new Error('Invalid focus session.');
       }
 
-      state = {
+      const nextState = {
         ...state,
         controlOrigin: origin,
         activeSession: {
@@ -293,10 +300,10 @@ async function handleMessage(message, sender) {
         }
       };
 
-      await writeState(state);
-      await applyBlockingRules(state);
-      await syncEndAlarm(state);
-      return statusFromState(state);
+      await applyBlockingRules(nextState);
+      await writeState(nextState);
+      await syncEndAlarm(nextState);
+      return statusFromState(nextState);
     }
 
     case 'END_FOCUS':
@@ -311,8 +318,17 @@ async function handleMessage(message, sender) {
   }
 }
 
+let commandQueue = Promise.resolve();
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  handleMessage(message, sender)
+  const task = commandQueue.then(() => handleMessage(message, sender));
+
+  commandQueue = task.then(
+    () => undefined,
+    () => undefined
+  );
+
+  task
     .then((data) => sendResponse({ ok: true, data }))
     .catch((error) =>
       sendResponse({
