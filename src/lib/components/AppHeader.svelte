@@ -20,8 +20,8 @@
 <div class="sticky top-0 z-50 h-[76px] pointer-events-none">
   <header
     class={scrolled
-      ? "pointer-events-auto mx-auto mt-3 flex h-12 w-[calc(100%-20px)] max-w-[920px] items-center rounded-full border border-white/[0.55] bg-background/[0.72] shadow-[0_10px_35px_rgba(28,28,24,0.08)] backdrop-blur-xl transition-all duration-200"
-      : "pointer-events-auto mx-auto mt-1 flex h-14 w-[calc(100%-20px)] max-w-[1180px] items-center rounded-full border border-transparent bg-transparent shadow-none backdrop-blur-0 transition-all duration-200"}
+      ? "pointer-events-auto mx-auto mt-3 flex h-12 w-[calc(100%-20px)] max-w-[1080px] items-center rounded-full border border-white/[0.65] bg-background/[0.82] shadow-[0_10px_35px_rgba(28,28,24,0.08)] backdrop-blur-xl transition-all duration-200"
+      : "pointer-events-auto mx-auto mt-2 flex h-14 w-[calc(100%-20px)] max-w-[1280px] items-center rounded-full border border-white/[0.72] bg-background/[0.90] shadow-[0_8px_28px_rgba(28,28,24,0.07)] backdrop-blur-xl transition-all duration-200"}
   >
     <div
       class={scrolled
