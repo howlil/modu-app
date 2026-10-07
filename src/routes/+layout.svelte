@@ -7,6 +7,6 @@
 
 <AppHeader />
 
-<main class="mx-auto w-full max-w-[1180px] px-4 max-[700px]:px-2.5">
+<main class="w-full">
   {@render children()}
 </main>
