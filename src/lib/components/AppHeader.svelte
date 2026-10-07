@@ -21,7 +21,7 @@
   <header
     class={scrolled
       ? "pointer-events-auto mx-auto mt-2 flex h-12 w-[calc(100%-20px)] max-w-[920px] items-center rounded-2xl border border-white/[0.55] bg-background/[0.72] shadow-[0_10px_35px_rgba(28,28,24,0.08)] backdrop-blur-xl transition-all duration-200"
-      : "pointer-events-auto flex h-14 w-full items-center border-b border-border bg-background/95 backdrop-blur-md transition-all duration-200"}
+      : "pointer-events-auto flex h-14 w-full items-center border border-transparent bg-transparent shadow-none backdrop-blur-0 transition-all duration-200"}
   >
     <div
       class={scrolled
