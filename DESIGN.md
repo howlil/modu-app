@@ -40,6 +40,7 @@ Homepage atmosphere:
 - hero uses the semantic primary cobalt as a restrained top-to-bottom field rather than an unrelated decorative color
 - the blue field dissolves into the warm-white page through large, soft cloud-like white forms; the cloud treatment should feel editorial and atmospheric, not cartoonish
 - the cloud transition must resolve fully into the normal page background before the tool grid
+- decorative hero layers must stay within the hero's layout width; use clipped child positioning rather than widening the document or introducing horizontal page scroll
 - do not add a separate Tools heading/count row when the launcher grid is self-explanatory
 
 Home tool presentation:
