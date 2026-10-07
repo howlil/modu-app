@@ -3,17 +3,22 @@
   import {
     Bell,
     BellOff,
+    History,
+    Monitor,
     RotateCcw,
     Settings2,
     SkipForward,
     Volume2,
-    VolumeX
+    VolumeX,
+    X
   } from 'lucide-svelte';
   import { Button } from "$lib/components/ui/button/index.js";
   import { Input } from "$lib/components/ui/input/index.js";
   import {
+    completeTimer,
     createTimer,
     getNextMode,
+    getOvertimeMs,
     pauseTimer,
     resetTimer,
     startTimer,
@@ -26,6 +31,20 @@
   const STORAGE_KEY = 'module-pomodoro-v2';
   const RADIUS = 52;
   const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+
+  type FocusSession = {
+    id: string;
+    endedAt: number;
+    durationMs: number;
+    label: string;
+  };
+
+  type PomodoroPreferences = {
+    autoStartBreaks: boolean;
+    autoStartFocus: boolean;
+    overtime: boolean;
+    keepAwake: boolean;
+  };
 
   const MODE_META: Record<
     PomodoroMode,
@@ -57,31 +76,58 @@
     long: 15
   };
 
+  const DEFAULT_PREFERENCES: PomodoroPreferences = {
+    autoStartBreaks: false,
+    autoStartFocus: false,
+    overtime: true,
+    keepAwake: false
+  };
+
   let durations = $state<Record<PomodoroMode, number>>({ ...DEFAULT_DURATIONS });
   let draftDurations = $state<Record<PomodoroMode, number>>({ ...DEFAULT_DURATIONS });
+  let preferences = $state<PomodoroPreferences>({ ...DEFAULT_PREFERENCES });
+  let draftPreferences = $state<PomodoroPreferences>({ ...DEFAULT_PREFERENCES });
   let timer = $state<TimerState>(createTimer('focus', DEFAULT_DURATIONS.focus * 60_000));
   let focusText = $state('');
   let soundEnabled = $state(true);
   let notificationsEnabled = $state(false);
+  let history = $state<FocusSession[]>([]);
   let settingsOpen = $state(false);
+  let historyOpen = $state(false);
   let hydrated = $state(false);
+  let wakeLock: { release: () => Promise<void> } | null = null;
 
   const modeMeta = $derived(MODE_META[timer.mode]);
-  const formattedTime = $derived(formatDuration(timer.remainingMs));
+  const overtimeMs = $derived(getOvertimeMs(timer, Date.now()));
+  const formattedTime = $derived(
+    timer.status === 'overtime'
+      ? `+${formatDuration(overtimeMs)}`
+      : formatDuration(timer.remainingMs)
+  );
   const progressRatio = $derived(
-    timer.durationMs > 0 ? Math.max(0, Math.min(1, timer.remainingMs / timer.durationMs)) : 0
+    timer.status === 'overtime'
+      ? 0
+      : timer.durationMs > 0
+        ? Math.max(0, Math.min(1, timer.remainingMs / timer.durationMs))
+        : 0
   );
   const progressOffset = $derived(CIRCUMFERENCE * (1 - progressRatio));
+  const todaySessions = $derived(history.filter((session) => isToday(session.endedAt)));
+  const todayFocusMs = $derived(
+    todaySessions.reduce((total, session) => total + session.durationMs, 0)
+  );
   const primaryLabel = $derived(
     timer.status === 'running'
       ? 'Pause'
       : timer.status === 'paused'
         ? 'Resume'
-        : timer.status === 'complete'
-          ? timer.mode === 'focus'
-            ? 'Start break'
-            : 'Start focus'
-          : 'Start'
+        : timer.status === 'overtime'
+          ? 'Start break'
+          : timer.status === 'complete'
+            ? timer.mode === 'focus'
+              ? 'Start break'
+              : 'Start focus'
+            : 'Start'
   );
 
   function durationMs(mode: PomodoroMode) {
@@ -89,11 +135,32 @@
   }
 
   function formatDuration(ms: number) {
-    const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+    const totalSeconds = Math.max(0, Math.floor(ms / 1000));
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
 
     return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  }
+
+  function formatFocusTotal(ms: number) {
+    const totalMinutes = Math.round(ms / 60_000);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+
+    if (hours === 0) return `${minutes}m`;
+    if (minutes === 0) return `${hours}h`;
+    return `${hours}h ${minutes}m`;
+  }
+
+  function isToday(timestamp: number) {
+    const date = new Date(timestamp);
+    const today = new Date();
+
+    return (
+      date.getFullYear() === today.getFullYear() &&
+      date.getMonth() === today.getMonth() &&
+      date.getDate() === today.getDate()
+    );
   }
 
   function persist() {
@@ -104,9 +171,11 @@
       JSON.stringify({
         timer,
         durations,
+        preferences,
         focusText,
         soundEnabled,
-        notificationsEnabled
+        notificationsEnabled,
+        history
       })
     );
   }
@@ -119,9 +188,11 @@
       const saved = JSON.parse(raw) as {
         timer?: Partial<TimerState>;
         durations?: Partial<Record<PomodoroMode, number>>;
+        preferences?: Partial<PomodoroPreferences>;
         focusText?: string;
         soundEnabled?: boolean;
         notificationsEnabled?: boolean;
+        history?: FocusSession[];
       };
 
       durations = {
@@ -130,6 +201,14 @@
         long: clampMinutes(saved.durations?.long, 15, 120)
       };
       draftDurations = { ...durations };
+
+      preferences = {
+        autoStartBreaks: saved.preferences?.autoStartBreaks === true,
+        autoStartFocus: saved.preferences?.autoStartFocus === true,
+        overtime: saved.preferences?.overtime !== false,
+        keepAwake: saved.preferences?.keepAwake === true
+      };
+      draftPreferences = { ...preferences };
 
       if (saved.timer && isMode(saved.timer.mode)) {
         const fallback = createTimer(saved.timer.mode, durationMs(saved.timer.mode));
@@ -147,6 +226,10 @@
               ? saved.timer.remainingMs
               : fallback.remainingMs,
           endsAt: typeof saved.timer.endsAt === 'number' ? saved.timer.endsAt : null,
+          overtimeStartedAt:
+            typeof saved.timer.overtimeStartedAt === 'number'
+              ? saved.timer.overtimeStartedAt
+              : null,
           completedFocus:
             typeof saved.timer.completedFocus === 'number'
               ? Math.max(0, Math.min(4, saved.timer.completedFocus))
@@ -154,13 +237,22 @@
         } as TimerState;
 
         if (timer.status === 'running') {
-          timer = syncTimer(timer, Date.now());
+          timer = syncTimer(timer, Date.now(), preferences.overtime);
         }
       }
 
       focusText = typeof saved.focusText === 'string' ? saved.focusText.slice(0, 80) : '';
       soundEnabled = saved.soundEnabled !== false;
       notificationsEnabled = saved.notificationsEnabled === true;
+      history = Array.isArray(saved.history)
+        ? saved.history
+            .filter(
+              (session) =>
+                typeof session?.endedAt === 'number' &&
+                typeof session?.durationMs === 'number'
+            )
+            .slice(0, 120)
+        : [];
     } catch {
       localStorage.removeItem(STORAGE_KEY);
     }
@@ -180,6 +272,11 @@
   function updateDocumentTitle() {
     if (typeof document === 'undefined') return;
 
+    if (timer.status === 'overtime') {
+      document.title = `+${formatDuration(getOvertimeMs(timer))} · Overtime — Module`;
+      return;
+    }
+
     if (timer.status === 'running' || timer.status === 'paused') {
       document.title = `${formatDuration(timer.remainingMs)} · ${MODE_META[timer.mode].label} — Module`;
       return;
@@ -191,18 +288,51 @@
         : 'Pomodoro — Module';
   }
 
+  function recordFocusSession(actualDurationMs: number) {
+    const endedAt = Date.now();
+
+    history = [
+      {
+        id: `${endedAt}-${history.length}`,
+        endedAt,
+        durationMs: Math.max(timer.durationMs, actualDurationMs),
+        label: focusText.trim()
+      },
+      ...history
+    ].slice(0, 120);
+
+    persist();
+  }
+
+  function finalizeOvertimeSession() {
+    if (timer.status !== 'overtime') return;
+    recordFocusSession(timer.durationMs + getOvertimeMs(timer));
+  }
+
   function switchPomodoroMode(mode: PomodoroMode) {
+    finalizeOvertimeSession();
     timer = switchMode(timer, mode, durationMs(mode));
+    void syncWakeLock();
     persist();
   }
 
   function start() {
     timer = startTimer(timer, Date.now());
+    void syncWakeLock();
     persist();
   }
 
   function pause() {
     timer = pauseTimer(timer, Date.now());
+    void syncWakeLock();
+    persist();
+  }
+
+  function startNextMode() {
+    const nextMode = getNextMode(timer);
+    timer = switchMode(timer, nextMode, durationMs(nextMode));
+    timer = startTimer(timer, Date.now());
+    void syncWakeLock();
     persist();
   }
 
@@ -212,16 +342,24 @@
       return;
     }
 
+    if (timer.status === 'overtime') {
+      finalizeOvertimeSession();
+      startNextMode();
+      return;
+    }
+
     if (timer.status === 'complete') {
-      const nextMode = getNextMode(timer);
-      timer = switchMode(timer, nextMode, durationMs(nextMode));
+      startNextMode();
+      return;
     }
 
     start();
   }
 
   function handleReset() {
+    finalizeOvertimeSession();
     timer = resetTimer(timer);
+    void syncWakeLock();
     persist();
   }
 
@@ -230,15 +368,41 @@
   }
 
   function handleTick() {
+    if (timer.status === 'overtime') {
+      updateDocumentTitle();
+      return;
+    }
+
     if (timer.status !== 'running') return;
 
-    const previousStatus = timer.status;
-    const nextTimer = syncTimer(timer, Date.now());
+    const previousTimer = timer;
+    const nextTimer = syncTimer(timer, Date.now(), preferences.overtime);
     timer = nextTimer;
 
-    if (previousStatus === 'running' && nextTimer.status === 'complete') {
-      persist();
+    if (previousTimer.status === 'running' && nextTimer.status === 'overtime') {
       announceCompletion();
+      void syncWakeLock();
+      persist();
+      return;
+    }
+
+    if (previousTimer.status === 'running' && nextTimer.status === 'complete') {
+      if (previousTimer.mode === 'focus') {
+        recordFocusSession(previousTimer.durationMs);
+      }
+
+      announceCompletion();
+      void syncWakeLock();
+      persist();
+
+      const shouldAutoStart =
+        previousTimer.mode === 'focus'
+          ? preferences.autoStartBreaks
+          : preferences.autoStartFocus;
+
+      if (shouldAutoStart) {
+        startNextMode();
+      }
     }
   }
 
@@ -253,7 +417,9 @@
       new Notification('Module Pomodoro', {
         body:
           timer.mode === 'focus'
-            ? 'Focus complete. Take a break.'
+            ? preferences.overtime && timer.status === 'overtime'
+              ? 'Focus target reached. Overtime is running.'
+              : 'Focus complete. Take a break.'
             : 'Break complete. Ready to focus.'
       });
     }
@@ -284,7 +450,7 @@
         void context.close();
       }, 180);
     } catch {
-      // Sound is optional. Timer completion must not depend on Web Audio support.
+      // Sound is optional.
     }
   }
 
@@ -314,7 +480,20 @@
 
   function openSettings() {
     draftDurations = { ...durations };
+    draftPreferences = { ...preferences };
     settingsOpen = true;
+  }
+
+  function toggleDraftPreference(key: keyof PomodoroPreferences) {
+    draftPreferences[key] = !draftPreferences[key];
+
+    if (key === 'autoStartBreaks' && draftPreferences.autoStartBreaks) {
+      draftPreferences.overtime = false;
+    }
+
+    if (key === 'overtime' && draftPreferences.overtime) {
+      draftPreferences.autoStartBreaks = false;
+    }
   }
 
   function saveSettings() {
@@ -324,11 +503,14 @@
       long: clampMinutes(draftDurations.long, 15, 120)
     };
 
+    preferences = { ...draftPreferences };
+
     if (timer.status === 'idle') {
       timer = switchMode(timer, timer.mode, durationMs(timer.mode));
     }
 
     settingsOpen = false;
+    void syncWakeLock();
     persist();
   }
 
@@ -337,11 +519,65 @@
     persist();
   }
 
+  async function requestWakeLock() {
+    if (
+      !preferences.keepAwake ||
+      document.visibilityState !== 'visible' ||
+      (timer.status !== 'running' && timer.status !== 'overtime') ||
+      wakeLock
+    ) {
+      return;
+    }
+
+    try {
+      const nav = navigator as Navigator & {
+        wakeLock?: {
+          request: (type: 'screen') => Promise<{ release: () => Promise<void> }>;
+        };
+      };
+
+      if (!nav.wakeLock) return;
+      wakeLock = await nav.wakeLock.request('screen');
+    } catch {
+      wakeLock = null;
+    }
+  }
+
+  async function releaseWakeLock() {
+    if (!wakeLock) return;
+
+    try {
+      await wakeLock.release();
+    } catch {
+      // Wake Lock is progressive enhancement.
+    } finally {
+      wakeLock = null;
+    }
+  }
+
+  async function syncWakeLock() {
+    if (
+      preferences.keepAwake &&
+      (timer.status === 'running' || timer.status === 'overtime')
+    ) {
+      await requestWakeLock();
+      return;
+    }
+
+    await releaseWakeLock();
+  }
+
+  function clearHistory() {
+    history = [];
+    persist();
+  }
+
   onMount(() => {
     restore();
     hydrated = true;
     persist();
     updateDocumentTitle();
+    void syncWakeLock();
 
     const interval = window.setInterval(() => {
       handleTick();
@@ -349,8 +585,11 @@
     }, 250);
 
     const onVisibilityChange = () => {
-      if (document.hidden || timer.status !== 'running') return;
-      handleTick();
+      if (!document.hidden && timer.status === 'running') {
+        handleTick();
+      }
+
+      void syncWakeLock();
       updateDocumentTitle();
     };
 
@@ -361,12 +600,13 @@
         target instanceof HTMLTextAreaElement ||
         target?.isContentEditable;
 
-      if (event.key === 'Escape' && settingsOpen) {
+      if (event.key === 'Escape') {
         settingsOpen = false;
+        historyOpen = false;
         return;
       }
 
-      if (isTyping || settingsOpen) return;
+      if (isTyping || settingsOpen || historyOpen) return;
 
       if (event.code === 'Space') {
         event.preventDefault();
@@ -391,6 +631,7 @@
       window.clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('keydown', onKeyDown);
+      void releaseWakeLock();
       document.title = 'Module — Useful tools. Nothing extra.';
     };
   });
@@ -489,9 +730,11 @@
           ? modeMeta.label
           : timer.status === 'paused'
             ? 'Paused'
-            : timer.status === 'complete'
-              ? 'Complete'
-              : 'Ready'}
+            : timer.status === 'overtime'
+              ? 'Overtime'
+              : timer.status === 'complete'
+                ? 'Complete'
+                : 'Ready'}
       </div>
     </div>
   </div>
@@ -550,14 +793,31 @@
     <div class="mt-2 text-[11px] font-normal text-muted-foreground">
       {timer.completedFocus >= 4 ? 'Long break next' : `Focus ${Math.min(timer.completedFocus + 1, 4)} of 4`}
     </div>
+
+    <button
+      type="button"
+      class="mt-2 inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-normal text-muted-foreground transition hover:bg-muted hover:text-foreground"
+      onclick={() => (historyOpen = true)}
+    >
+      <History class="size-3" strokeWidth={1.7} />
+      Today · {todaySessions.length} {todaySessions.length === 1 ? 'session' : 'sessions'} · {formatFocusTotal(todayFocusMs)}
+    </button>
   </div>
 
-  {#if timer.status === 'complete'}
+  {#if timer.status === 'complete' || timer.status === 'overtime'}
     <p class="mt-4 min-h-5 text-[12px] font-normal text-muted-foreground">
       <span class="font-medium text-foreground">
-        {timer.mode === 'focus' ? 'Focus complete.' : 'Break complete.'}
+        {timer.status === 'overtime'
+          ? 'Focus target reached.'
+          : timer.mode === 'focus'
+            ? 'Focus complete.'
+            : 'Break complete.'}
       </span>
-      {timer.mode === 'focus' ? ' Take a break.' : ' Ready for another focus block.'}
+      {timer.status === 'overtime'
+        ? ' Continue while the flow lasts.'
+        : timer.mode === 'focus'
+          ? ' Take a break.'
+          : ' Ready for another focus block.'}
     </p>
   {/if}
 
@@ -612,70 +872,163 @@
       }}
     >
       <div
-        class="w-full max-w-[390px] rounded-[18px] border border-white/[0.65] bg-background/[0.96] p-4 text-left shadow-[0_24px_70px_rgba(28,28,24,0.16)] backdrop-blur-xl"
+        class="max-h-[min(720px,calc(100vh-32px))] w-full max-w-[410px] overflow-y-auto rounded-[18px] border border-white/[0.65] bg-background/[0.96] p-4 text-left shadow-[0_24px_70px_rgba(28,28,24,0.16)] backdrop-blur-xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="pomodoro-settings-title"
       >
         <div class="mb-4 flex items-center justify-between">
           <h2 id="pomodoro-settings-title" class="m-0 text-[14px] font-medium tracking-[-0.02em]">
-            Timer durations
+            Pomodoro settings
           </h2>
           <Button
             variant="ghost"
-            size="sm"
-            class="h-7 rounded-lg px-2 text-[11px] font-normal text-muted-foreground"
+            size="icon-sm"
+            class="rounded-lg text-muted-foreground"
+            aria-label="Close settings"
             onclick={() => (settingsOpen = false)}
           >
-            Close
+            <X class="size-4" strokeWidth={1.7} />
           </Button>
         </div>
 
-        <div class="grid gap-3">
-          <label class="grid grid-cols-[1fr_90px] items-center gap-3 text-[12px]">
-            Focus
-            <Input
-              type="number"
-              min="1"
-              max="180"
-              class="h-8 text-right text-[12px]"
-              bind:value={draftDurations.focus}
-            />
-          </label>
-
-          <label class="grid grid-cols-[1fr_90px] items-center gap-3 text-[12px]">
-            Short break
-            <Input
-              type="number"
-              min="1"
-              max="60"
-              class="h-8 text-right text-[12px]"
-              bind:value={draftDurations.short}
-            />
-          </label>
-
-          <label class="grid grid-cols-[1fr_90px] items-center gap-3 text-[12px]">
-            Long break
-            <Input
-              type="number"
-              min="1"
-              max="120"
-              class="h-8 text-right text-[12px]"
-              bind:value={draftDurations.long}
-            />
-          </label>
+        <div class="mb-5">
+          <div class="mb-3 text-[11px] font-medium text-muted-foreground">Durations</div>
+          <div class="grid gap-3">
+            <label class="grid grid-cols-[1fr_90px] items-center gap-3 text-[12px]">
+              Focus
+              <Input type="number" min="1" max="180" class="h-8 text-right text-[12px]" bind:value={draftDurations.focus} />
+            </label>
+            <label class="grid grid-cols-[1fr_90px] items-center gap-3 text-[12px]">
+              Short break
+              <Input type="number" min="1" max="60" class="h-8 text-right text-[12px]" bind:value={draftDurations.short} />
+            </label>
+            <label class="grid grid-cols-[1fr_90px] items-center gap-3 text-[12px]">
+              Long break
+              <Input type="number" min="1" max="120" class="h-8 text-right text-[12px]" bind:value={draftDurations.long} />
+            </label>
+          </div>
         </div>
 
-        <p class="mt-3 text-[11px] leading-5 text-muted-foreground">
-          Running and paused sessions keep their current duration.
+        <div class="border-t pt-4">
+          <div class="mb-2 text-[11px] font-medium text-muted-foreground">Session flow</div>
+
+          {#each [
+            ['autoStartBreaks', 'Auto-start breaks'],
+            ['autoStartFocus', 'Auto-start focus'],
+            ['overtime', 'Continue counting overtime'],
+            ['keepAwake', 'Keep screen awake']
+          ] as option}
+            {@const key = option[0] as keyof PomodoroPreferences}
+            <button
+              type="button"
+              class="flex w-full items-center justify-between rounded-lg px-1 py-2 text-left text-[12px]"
+              onclick={() => toggleDraftPreference(key)}
+            >
+              <span class="inline-flex items-center gap-2">
+                {#if key === 'keepAwake'}
+                  <Monitor class="size-3.5 text-muted-foreground" strokeWidth={1.7} />
+                {/if}
+                {option[1]}
+              </span>
+              <span
+                class={[
+                  'relative h-5 w-9 rounded-full transition-colors',
+                  draftPreferences[key] ? 'bg-primary' : 'bg-muted'
+                ]}
+                aria-hidden="true"
+              >
+                <span
+                  class={[
+                    'absolute top-0.5 size-4 rounded-full bg-white shadow-sm transition-transform',
+                    draftPreferences[key] ? 'translate-x-[18px]' : 'translate-x-0.5'
+                  ]}
+                ></span>
+              </span>
+            </button>
+          {/each}
+        </div>
+
+        <p class="mt-3 text-[10px] leading-4 text-muted-foreground">
+          Overtime and auto-start breaks are mutually exclusive. Wake Lock works only in supported browsers.
         </p>
 
-        <Button
-          class="mt-4 h-9 w-full rounded-lg text-[12px] font-medium shadow-none"
-          onclick={saveSettings}
-        >
+        <Button class="mt-4 h-9 w-full rounded-lg text-[12px] font-medium shadow-none" onclick={saveSettings}>
           Save
         </Button>
+      </div>
+    </div>
+  {/if}
+
+  {#if historyOpen}
+    <div
+      class="fixed inset-0 z-[100] grid place-items-center bg-foreground/[0.12] p-4 backdrop-blur-[3px]"
+      role="presentation"
+      onclick={(event) => {
+        if (event.target === event.currentTarget) historyOpen = false;
+      }}
+    >
+      <div
+        class="max-h-[min(620px,calc(100vh-32px))] w-full max-w-[410px] overflow-y-auto rounded-[18px] border border-white/[0.65] bg-background/[0.96] p-4 text-left shadow-[0_24px_70px_rgba(28,28,24,0.16)] backdrop-blur-xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pomodoro-history-title"
+      >
+        <div class="mb-4 flex items-center justify-between">
+          <div>
+            <h2 id="pomodoro-history-title" class="m-0 text-[14px] font-medium tracking-[-0.02em]">Focus history</h2>
+            <p class="mt-1 text-[11px] text-muted-foreground">
+              Today · {todaySessions.length} {todaySessions.length === 1 ? 'session' : 'sessions'} · {formatFocusTotal(todayFocusMs)}
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            class="rounded-lg text-muted-foreground"
+            aria-label="Close history"
+            onclick={() => (historyOpen = false)}
+          >
+            <X class="size-4" strokeWidth={1.7} />
+          </Button>
+        </div>
+
+        {#if history.length === 0}
+          <div class="rounded-xl border border-dashed px-4 py-8 text-center text-[12px] text-muted-foreground">
+            Completed focus sessions will appear here.
+          </div>
+        {:else}
+          <div class="divide-y">
+            {#each history.slice(0, 20) as session}
+              <div class="flex items-center justify-between gap-4 py-3">
+                <div class="min-w-0">
+                  <div class="truncate text-[12px] font-normal text-foreground">
+                    {session.label || 'Focus session'}
+                  </div>
+                  <div class="mt-1 text-[10px] text-muted-foreground">
+                    {new Date(session.endedAt).toLocaleString([], {
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </div>
+                </div>
+                <div class="shrink-0 text-[11px] text-muted-foreground">
+                  {formatFocusTotal(session.durationMs)}
+                </div>
+              </div>
+            {/each}
+          </div>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            class="mt-3 h-8 w-full rounded-lg text-[11px] font-normal text-muted-foreground"
+            onclick={clearHistory}
+          >
+            Clear history
+          </Button>
+        {/if}
       </div>
     </div>
   {/if}
