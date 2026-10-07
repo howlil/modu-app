@@ -3,6 +3,7 @@
   import { Check, ExternalLink, Send, X } from 'lucide-svelte';
   import { Button } from '$lib/components/ui/button/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
+  import { Textarea } from '$lib/components/ui/textarea/index.js';
 
   let open = $state(false);
   let title = $state('');
@@ -154,19 +155,19 @@
               What should it do?
               <span class="font-normal text-muted-foreground">Optional</span>
             </label>
-            <textarea
+            <Textarea
               id="feature-details"
               bind:value={details}
               maxlength={1500}
               rows={5}
               placeholder="A short use case or expected behavior."
-              class="w-full resize-none rounded-xl border border-input bg-transparent px-3 py-2.5 text-[13px] leading-5 outline-none transition placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-            ></textarea>
+              class="w-full resize-none rounded-xl border border-input bg-transparent px-3 py-2.5 text-[13px] leading-5 shadow-none transition focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            />
           </div>
 
           <div class="hidden" aria-hidden="true">
             <label for="feature-website">Website</label>
-            <input
+            <Input
               id="feature-website"
               bind:value={website}
               tabindex="-1"
