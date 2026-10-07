@@ -35,6 +35,13 @@ Homepage typography:
 - navigation, buttons, labels, and tool names should avoid heavy bold weights unless hierarchy truly requires it
 - prefer weight contrast through spacing and scale before using 700–800 weights
 
+Homepage atmosphere:
+
+- hero uses the semantic primary cobalt as a restrained top-to-bottom field rather than an unrelated decorative color
+- the blue field dissolves into the warm-white page through large, soft cloud-like white forms; the cloud treatment should feel editorial and atmospheric, not cartoonish
+- the cloud transition must resolve fully into the normal page background before the tool grid
+- do not add a separate Tools heading/count row when the launcher grid is self-explanatory
+
 Home tool presentation:
 
 - tools render as compact square app tiles
@@ -48,7 +55,8 @@ Home tool presentation:
 
 Scrolled navigation:
 
-- at the top of the page, navigation spans the normal content width
+- at the top of the page, navigation spans the normal content width and stays transparent so it visually merges with the hero
+- do not show a default navbar border, fill, or blur before scrolling
 - after scrolling, it contracts into a rounded floating capsule
 - use restrained glassmorphism: translucent background, subtle border, backdrop blur, soft shadow
 - GitHub Sponsor and Star are real actions, not decorative badges
