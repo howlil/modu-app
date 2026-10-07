@@ -246,7 +246,8 @@
 
     if (preferences.keyboardSound) {
       playTypingKeySound(
-        correct ? (expected === ' ' ? 'space' : 'correct') : 'error'
+        correct ? (expected === ' ' ? 'space' : 'correct') : 'error',
+        expected
       );
     }
 
@@ -808,7 +809,7 @@
           <div class="flex items-center justify-between gap-5 py-4">
             <div class="min-w-0">
               <strong class="block text-[12px] font-medium">Keyboard sound</strong>
-              <span class="mt-0.5 block text-[10px] text-muted-foreground">Quiet local key clicks.</span>
+              <span class="mt-0.5 block text-[10px] text-muted-foreground">Mechanical key clicks.</span>
             </div>
             <Switch
               checked={preferences.keyboardSound}
