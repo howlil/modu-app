@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Button } from "$lib/components/ui/button/index.js";
   import ToolCard from '#lib/components/ToolCard.svelte';
   import { modules } from '#lib/platform/registry/modules.ts';
 </script>
@@ -8,21 +9,57 @@
   <meta name="description" content="Small browser utilities that run locally." />
 </svelte:head>
 
-<section class="py-8 max-[700px]:py-6">
-  <div class="mb-7 max-w-[640px]">
-    <h1 class="m-0 text-[clamp(38px,5.5vw,54px)] font-[760] leading-[0.98] tracking-[-0.055em]">
+<section class="grid min-h-[520px] place-items-center py-12 text-center max-[700px]:min-h-[460px] max-[700px]:py-9">
+  <div class="mx-auto w-full max-w-[820px]">
+    <div
+      class="mx-auto mb-6 grid size-11 grid-cols-2 gap-[4px] rounded-[13px] bg-primary p-[10px] shadow-[0_10px_26px_rgba(36,104,242,0.14)]"
+      aria-hidden="true"
+    >
+      <span class="rounded-[2px] bg-primary-foreground"></span>
+      <span class="rounded-[2px] bg-primary-foreground"></span>
+      <span class="rounded-[2px] bg-primary-foreground"></span>
+      <span class="rounded-[2px] bg-primary-foreground"></span>
+    </div>
+
+    <h1 class="m-0 text-[clamp(42px,6vw,64px)] font-[520] leading-[0.98] tracking-[-0.055em]">
       Useful tools.<br />Nothing extra.
     </h1>
-    <p class="mt-3 text-sm text-muted-foreground">Runs locally. No account required.</p>
+
+    <p class="mx-auto mt-5 max-w-[540px] text-[15px] font-normal leading-[1.55] tracking-[-0.01em] text-muted-foreground">
+      Small utilities for files, focus, and everyday work — designed to get out of the way.
+    </p>
+
+    <div class="mt-7 flex flex-wrap justify-center gap-2">
+      <Button href="#tools" class="h-10 rounded-xl px-4 text-[13px] font-medium shadow-none">
+        Explore tools
+        <span aria-hidden="true">↓</span>
+      </Button>
+
+      <Button
+        href="https://github.com/howlil/modu-app"
+        target="_blank"
+        rel="noreferrer"
+        variant="outline"
+        class="h-10 rounded-xl px-4 text-[13px] font-normal shadow-none"
+      >
+        View source
+        <span aria-hidden="true">↗</span>
+      </Button>
+    </div>
+
+    <p class="mt-5 text-[12px] font-normal text-muted-foreground">Runs locally · No account required</p>
+  </div>
+</section>
+
+<section id="tools" class="border-t border-border/[0.70] py-10 max-[700px]:py-8" aria-labelledby="tools-title">
+  <div class="mb-4 flex max-w-[860px] items-end justify-between gap-4">
+    <h2 id="tools-title" class="m-0 text-[14px] font-medium tracking-[-0.015em]">Tools</h2>
+    <span class="text-[12px] font-normal text-muted-foreground">{modules.length} available</span>
   </div>
 
-  <section class="max-w-[760px]" aria-labelledby="tools-title">
-    <h2 id="tools-title" class="m-0 mb-3 text-xs font-medium text-muted-foreground">Tools</h2>
-
-    <div class="grid grid-cols-3 gap-3 max-[560px]:grid-cols-2">
-      {#each modules as module}
-        <ToolCard {module} />
-      {/each}
-    </div>
-  </section>
+  <div class="grid max-w-[860px] grid-cols-3 gap-3 max-[560px]:grid-cols-2">
+    {#each modules as module}
+      <ToolCard {module} />
+    {/each}
+  </div>
 </section>
