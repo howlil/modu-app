@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Download, Target, X } from 'lucide-svelte';
+  import { Target, X } from 'lucide-svelte';
   import { Button } from "$lib/components/ui/button/index.js";
   import { Input } from "$lib/components/ui/input/index.js";
   import {
@@ -9,7 +9,6 @@
     isScheduledGoalDay,
     localDateKey,
     sessionsForDate,
-    sessionsToCsv,
     type FocusActivitySession,
     type GoalSchedule,
     type HeatmapDay
@@ -21,7 +20,6 @@
     goalSchedule: GoalSchedule;
     clockNow: number;
     onGoalChange: (hours: number, schedule: GoalSchedule) => void;
-    onClear: () => void | Promise<void>;
   };
 
   let {
@@ -29,8 +27,7 @@
     goalHours,
     goalSchedule,
     clockNow,
-    onGoalChange,
-    onClear
+    onGoalChange
   }: Props = $props();
 
   let goalOpen = $state(false);
@@ -38,7 +35,6 @@
   let goalDraftSchedule = $state<GoalSchedule>(goalSchedule);
   let selectedDayKey = $state<string | null>(null);
   let dayOpen = $state(false);
-  let exportOpen = $state(false);
 
   const goalMs = $derived(goalHours * 3_600_000);
   const rawDaily = $derived(aggregateDailyActivity(sessions, goalMs));
@@ -162,48 +158,6 @@
     dayOpen = true;
   }
 
-  function downloadFile(filename: string, content: string, type: string) {
-    const blob = new Blob([content], { type });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-
-    anchor.href = url;
-    anchor.download = filename;
-    anchor.click();
-    URL.revokeObjectURL(url);
-  }
-
-  function exportJson() {
-    downloadFile(
-      'module-pomodoro-activity.json',
-      JSON.stringify(
-        {
-          exportedAt: new Date().toISOString(),
-          goal: { hours: goalHours, schedule: goalSchedule },
-          sessions
-        },
-        null,
-        2
-      ),
-      'application/json'
-    );
-    exportOpen = false;
-  }
-
-  function exportCsv() {
-    downloadFile(
-      'module-pomodoro-activity.csv',
-      sessionsToCsv(sessions),
-      'text/csv;charset=utf-8'
-    );
-    exportOpen = false;
-  }
-
-  async function clearActivity() {
-    await onClear();
-    exportOpen = false;
-    dayOpen = false;
-  }
 </script>
 
 <div>
@@ -343,16 +297,6 @@
   <div class="mt-9">
     <div class="mb-2 flex items-center justify-between gap-4">
       <h3 class="m-0 text-[14px] font-medium">Recent activity</h3>
-
-      <Button
-        variant="ghost"
-        size="sm"
-        class="h-8 rounded-lg px-2.5 text-[11px] font-normal text-muted-foreground"
-        onclick={() => (exportOpen = true)}
-      >
-        <Download class="size-3.5" strokeWidth={1.7} />
-        Export data
-      </Button>
     </div>
 
     {#if sessions.length === 0}
@@ -507,46 +451,4 @@
     </div>
   {/if}
 
-  {#if exportOpen}
-    <div
-      class="fixed inset-0 z-[110] grid place-items-center bg-foreground/[0.12] p-4 backdrop-blur-[3px]"
-      role="presentation"
-      onclick={(event) => {
-        if (event.target === event.currentTarget) exportOpen = false;
-      }}
-    >
-      <div
-        class="w-full max-w-[360px] rounded-[18px] border border-white/[0.65] bg-background/[0.96] p-4 text-left shadow-[0_24px_70px_rgba(28,28,24,0.16)] backdrop-blur-xl"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="export-title"
-      >
-        <div class="mb-4 flex items-center justify-between">
-          <h3 id="export-title" class="m-0 text-[14px] font-medium">Activity data</h3>
-          <Button variant="ghost" size="icon-sm" class="rounded-lg text-muted-foreground" aria-label="Close export" onclick={() => (exportOpen = false)}>
-            <X class="size-4" strokeWidth={1.7} />
-          </Button>
-        </div>
-
-        <div class="grid gap-2">
-          <Button variant="outline" class="h-9 justify-start rounded-lg text-[12px] font-normal shadow-none" onclick={exportJson}>
-            Export JSON backup
-          </Button>
-          <Button variant="outline" class="h-9 justify-start rounded-lg text-[12px] font-normal shadow-none" onclick={exportCsv}>
-            Export CSV
-          </Button>
-        </div>
-
-        {#if sessions.length > 0}
-          <Button
-            variant="ghost"
-            class="mt-4 h-9 w-full rounded-lg text-[11px] font-normal text-destructive"
-            onclick={clearActivity}
-          >
-            Clear activity history
-          </Button>
-        {/if}
-      </div>
-    </div>
-  {/if}
 </div>
