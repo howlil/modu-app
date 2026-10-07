@@ -587,7 +587,12 @@
     }, 250);
 
     const onVisibilityChange = () => {
-      if (!document.hidden && timer.status === 'running') {
+      if (document.hidden) {
+        void releaseWakeLock();
+        return;
+      }
+
+      if (timer.status === 'running') {
         handleTick();
       }
 
