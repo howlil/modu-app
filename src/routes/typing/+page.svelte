@@ -32,12 +32,6 @@
   type TypingView = 'train' | 'progress' | 'settings';
   type TrainMode = 'adaptive' | 'lessons' | 'test';
 
-  const TRAIN_MODE_OPTIONS: Array<{ id: TrainMode; label: string }> = [
-    { id: 'adaptive', label: 'Adaptive' },
-    { id: 'lessons', label: 'Lessons' },
-    { id: 'test', label: 'Test' }
-  ];
-
   const STATE_KEY = 'module-typing-state-v1';
   const PREFERENCES_KEY = 'module-typing-preferences-v1';
   const BLOCK_KEY = 'module-typing-block-v1';
@@ -407,195 +401,135 @@
 </script>
 
 <svelte:head>
-  <title>Typing Trainer — Module</title>
+  <title>Typing — Module</title>
 </svelte:head>
 
-<section class="mx-auto w-full max-w-[1080px] px-4 pb-16 pt-8 max-[700px]:px-2.5 max-[700px]:pt-5">
-  <div class="flex items-end justify-between gap-4 border-b pb-0 max-[760px]:items-start max-[760px]:flex-col">
-    <ToolHeader
-      title="Typing"
-      description="Adaptive practice for accuracy, weak keys, and slow transitions."
-    />
+<section class="mx-auto w-full max-w-[980px] px-4 pb-20 pt-8 max-[700px]:px-3 max-[700px]:pt-5">
+  <div class="border-b border-border">
+    <ToolHeader title="Typing" />
 
-    <div class="flex items-center gap-1 max-[760px]:w-full">
-      <Button
-        variant={activeView === 'train' ? 'ghost' : 'ghost'}
-        size="sm"
-        class={activeView === 'train'
-          ? "h-9 rounded-none border-b-2 border-foreground px-3 text-foreground"
-          : "h-9 rounded-none border-b-2 border-transparent px-3 text-muted-foreground"}
-        onclick={() => (activeView = 'train')}
+    <div class="-mt-2 flex items-center gap-5 overflow-x-auto">
+      <button
+        class={activeView === 'train' && trainMode === 'adaptive'
+          ? "border-b-2 border-foreground pb-3 text-[13px] font-medium text-foreground"
+          : "border-b-2 border-transparent pb-3 text-[13px] text-muted-foreground hover:text-foreground"}
+        onclick={() => setTrainMode('adaptive')}
       >
         Train
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
+      </button>
+      <button
+        class={activeView === 'train' && trainMode === 'lessons'
+          ? "border-b-2 border-foreground pb-3 text-[13px] font-medium text-foreground"
+          : "border-b-2 border-transparent pb-3 text-[13px] text-muted-foreground hover:text-foreground"}
+        onclick={() => setTrainMode('lessons')}
+      >
+        Lessons
+      </button>
+      <button
+        class={activeView === 'train' && trainMode === 'test'
+          ? "border-b-2 border-foreground pb-3 text-[13px] font-medium text-foreground"
+          : "border-b-2 border-transparent pb-3 text-[13px] text-muted-foreground hover:text-foreground"}
+        onclick={() => setTrainMode('test')}
+      >
+        Test
+      </button>
+      <button
         class={activeView === 'progress'
-          ? "h-9 rounded-none border-b-2 border-foreground px-3 text-foreground"
-          : "h-9 rounded-none border-b-2 border-transparent px-3 text-muted-foreground"}
+          ? "border-b-2 border-foreground pb-3 text-[13px] font-medium text-foreground"
+          : "border-b-2 border-transparent pb-3 text-[13px] text-muted-foreground hover:text-foreground"}
         onclick={() => (activeView = 'progress')}
       >
         Progress
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon"
+      </button>
+
+      <button
         class={activeView === 'settings'
-          ? "ml-auto size-9 bg-muted text-foreground"
-          : "ml-auto size-9 text-muted-foreground"}
+          ? "ml-auto mb-2 grid size-8 shrink-0 place-items-center rounded-lg bg-muted text-foreground"
+          : "ml-auto mb-2 grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"}
         aria-label="Typing settings"
         onclick={() => (activeView = 'settings')}
       >
         <Settings2 class="size-4" strokeWidth={1.8} />
-      </Button>
+      </button>
     </div>
   </div>
 
-  {#if activeView === 'train'}
-    <div class="mt-5 flex items-center justify-between gap-3 max-[640px]:items-start max-[640px]:flex-col">
-      <div class="inline-flex rounded-xl border bg-muted p-1">
-        {#each TRAIN_MODE_OPTIONS as option}
-          <Button
-            variant={trainMode === option.id ? 'secondary' : 'ghost'}
-            size="sm"
-            class="h-8 rounded-lg px-3 text-xs font-normal shadow-none"
-            onclick={() => setTrainMode(option.id)}
-          >
-            {option.label}
-          </Button>
-        {/each}
+  {#if activeView === 'train' && trainMode === 'adaptive'}
+    <main class="mx-auto max-w-[840px] pt-10 max-[640px]:pt-7">
+      <div class="flex items-start justify-between gap-6">
+        <div>
+          <h2 class="m-0 text-[15px] font-medium tracking-[-0.015em]">
+            {currentBlock.name}
+          </h2>
+          <p class="mt-1 font-mono text-[12px] text-muted-foreground">
+            {target}
+          </p>
+        </div>
+
+        <div class="shrink-0 text-right text-[11px] leading-5 text-muted-foreground">
+          <div>{blockIndex + 1} / {TRAINING_BLOCKS.length}</div>
+          {#if minutesLeft > 0}
+            <div>~{minutesLeft} min left</div>
+          {/if}
+        </div>
       </div>
 
-      {#if trainMode === 'adaptive'}
-        <span class="text-xs text-muted-foreground">
-          Today · {blockIndex + 1} of {TRAINING_BLOCKS.length}
-          {#if minutesLeft > 0}
-            · ~{minutesLeft} min left
+      <div
+        class="mt-12 min-h-[220px] outline-none ring-ring focus-visible:ring-2 max-[640px]:mt-9"
+        role="textbox"
+        aria-label="Typing practice"
+        aria-multiline="true"
+        tabindex="0"
+      >
+        <div class="font-mono text-[clamp(24px,3.5vw,34px)] leading-[1.72] tracking-[-0.025em] text-[#a6a6a0]">
+          {#each [...drillText] as character, characterIndex}
+            <span class={characterClass(characterIndex)}>{character === ' ' ? ' ' : character}</span>
+          {/each}
+        </div>
+      </div>
+
+      <div class="mt-7 flex min-h-8 items-center justify-between gap-5 border-b border-border pb-5 text-[12px] max-[620px]:items-start max-[620px]:flex-col">
+        <div class="text-muted-foreground">
+          {#if runComplete}
+            <strong class="font-medium text-foreground">Complete</strong>
+            <span class="mx-1.5">·</span>
+            {accuracy}% accuracy
+            <span class="mx-1.5">·</span>
+            {wpm} wpm
+          {:else if currentCharacter}
+            <strong class="font-medium text-foreground">{fingerFor(currentCharacter)}</strong>
+            <span class="mx-1.5">·</span>
+            {currentCharacter === ' ' ? 'Space' : currentCharacter}
+          {:else}
+            Start typing
           {/if}
-        </span>
-      {/if}
-    </div>
-
-    {#if trainMode === 'adaptive'}
-      <section class="mt-4 rounded-[20px] border bg-card p-5 shadow-[0_10px_30px_rgba(24,30,50,0.045)] max-[640px]:p-4">
-        <div class="flex items-start justify-between gap-4">
-          <div>
-            <p class="m-0 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-              Current focus
-            </p>
-            <h2 class="mb-1 mt-1 text-base font-semibold tracking-[-0.02em]">
-              {currentBlock.name}
-            </h2>
-            <p class="m-0 text-xs leading-5 text-muted-foreground">
-              {currentBlock.description}
-            </p>
-          </div>
-
-          <span class="shrink-0 rounded-full bg-secondary px-2.5 py-1.5 text-[11px] text-secondary-foreground">
-            Block {blockIndex + 1} of {TRAINING_BLOCKS.length}
-          </span>
         </div>
 
-        <div class="mt-5 grid grid-cols-3 gap-2 max-[560px]:grid-cols-2">
-          <div class="rounded-xl bg-muted px-3 py-2.5">
-            <span class="text-[10px] uppercase tracking-[0.06em] text-muted-foreground">Accuracy</span>
-            <strong class="mt-1 block text-lg font-semibold">{accuracy}%</strong>
-          </div>
-          <div class="rounded-xl bg-muted px-3 py-2.5">
-            <span class="text-[10px] uppercase tracking-[0.06em] text-muted-foreground">Target</span>
-            <strong class="mt-1 block truncate text-xs font-medium text-foreground">{target}</strong>
-          </div>
-          <div class="rounded-xl bg-muted px-3 py-2.5 max-[560px]:col-span-2">
-            <span class="text-[10px] uppercase tracking-[0.06em] text-muted-foreground">Speed</span>
-            <strong class="mt-1 block text-lg font-semibold">
-              {wpm}
-              <span class="text-[10px] font-normal text-muted-foreground">WPM</span>
-            </strong>
-          </div>
+        <div class="flex shrink-0 items-center gap-5 text-muted-foreground">
+          <span>{accuracy}% accuracy</span>
+          <span>{wpm} wpm</span>
         </div>
-
-        <div
-          class="mt-5 min-h-[184px] rounded-2xl border bg-background p-5 outline-none ring-ring focus-visible:ring-2 max-[640px]:p-4"
-          role="textbox"
-          aria-label="Typing practice"
-          aria-multiline="true"
-          tabindex="0"
-        >
-          <div class="font-mono text-[clamp(18px,2.4vw,25px)] leading-[1.75] tracking-[0.01em] text-muted-foreground">
-            {#each [...drillText] as character, characterIndex}
-              <span class={characterClass(characterIndex)}>{character === ' ' ? ' ' : character}</span>
-            {/each}
-          </div>
-
-          <div class="mt-5 flex items-center justify-between gap-4 border-t pt-3 text-xs text-muted-foreground max-[620px]:items-start max-[620px]:flex-col">
-            {#if runComplete}
-              <span>
-                <strong class="font-medium text-foreground">Complete.</strong>
-                {accuracy}% accuracy · {wpm} WPM.
-              </span>
-            {:else if currentCharacter}
-              <span>
-                <strong class="font-medium text-foreground">{fingerFor(currentCharacter)}</strong>
-                · press “{currentCharacter === ' ' ? 'Space' : currentCharacter}”
-                {currentCharacter === ' ' ? '' : ', then return home.'}
-              </span>
-            {:else}
-              <span>Start typing to begin.</span>
-            {/if}
-
-            <span class="shrink-0">Accuracy first. Speed follows.</span>
-          </div>
-        </div>
-
-        <div class="mt-3 flex items-center justify-between gap-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            class="text-muted-foreground"
-            onclick={() => startAdaptiveBlock()}
-          >
-            <RotateCcw class="size-3.5" strokeWidth={1.8} />
-            Restart
-          </Button>
-
-          <div class="flex items-center gap-2">
-            <Button variant="outline" size="sm" onclick={cycleGuide}>
-              {guideLevel === 0 ? 'Reduce guide' : guideLevel === 1 ? 'Hide guide' : 'Show guide'}
-            </Button>
-            <Button size="sm" disabled={!runComplete} onclick={nextBlock}>
-              Next block
-            </Button>
-          </div>
-        </div>
-      </section>
+      </div>
 
       {#if guideLevel < 2}
-        <section class="mt-3 rounded-2xl border bg-card p-4">
-          <div class="flex items-center justify-between gap-3">
-            <strong class="text-xs font-medium">Keyboard guide</strong>
-            <span class="text-[11px] text-muted-foreground">
-              blue next · red weak · green mastered
-            </span>
-          </div>
-
-          <div class="mt-4 grid gap-1.5 overflow-x-auto">
+        <div class="mt-7 overflow-x-auto">
+          <div class="grid min-w-[650px] gap-1.5 opacity-75">
             {#each KEY_ROWS as row}
-              <div class="flex min-w-[660px] justify-center gap-1.5">
+              <div class="flex justify-center gap-1.5">
                 {#each row as key}
                   <div
                     class={[
-                      'relative grid h-10 place-items-center rounded-lg border bg-muted text-[11px] font-medium transition-colors',
-                      key === ' ' ? 'w-[260px]' : 'w-12',
+                      'relative grid h-9 place-items-center rounded-md border border-border/70 bg-transparent text-[10px] font-medium text-muted-foreground transition-colors',
+                      key === ' ' ? 'w-[245px]' : 'w-11',
                       keyStateClass(key),
                       currentCharacter && key === currentCharacter.toLowerCase()
-                        ? 'border-primary bg-secondary text-secondary-foreground'
+                        ? 'border-primary bg-secondary text-secondary-foreground opacity-100'
                         : ''
                     ].join(' ')}
                   >
                     <span>{formatKey(key)}</span>
                     {#if guideLevel === 0 && key !== ' '}
-                      <small class="absolute right-1 top-0.5 text-[7px] font-normal text-muted-foreground">
+                      <small class="absolute right-1 top-0.5 text-[7px] font-normal opacity-55">
                         {shortFinger(key)}
                       </small>
                     {/if}
@@ -604,171 +538,190 @@
               </div>
             {/each}
           </div>
-        </section>
+        </div>
       {/if}
 
-      <section class="mt-3 rounded-2xl border bg-card p-4">
-        <div class="flex items-center justify-between gap-3">
-          <strong class="text-xs font-medium">Today’s session</strong>
-          <span class="text-[11px] text-muted-foreground">12 min target</span>
-        </div>
-
-        <div class="mt-3 grid grid-cols-5 gap-2 max-[760px]:grid-cols-1">
+      <div class="mt-8">
+        <div class="flex items-center">
           {#each TRAINING_BLOCKS as block, index}
-            <div
-              class={[
-                'min-h-[74px] rounded-xl border p-2.5',
-                index === blockIndex
-                  ? 'border-primary/25 bg-secondary'
-                  : index < blockIndex
-                    ? 'border-transparent bg-muted opacity-55'
-                    : 'border-transparent bg-muted'
-              ].join(' ')}
-            >
-              <span
-                class={[
-                  'mb-2 block size-1.5 rounded-full',
-                  index === blockIndex
-                    ? 'bg-primary'
-                    : index < blockIndex
-                      ? 'bg-success'
-                      : 'bg-border'
-                ].join(' ')}
-              ></span>
-              <strong class="block text-[11px] font-medium">{block.shortName}</strong>
-              <span class="mt-1 block text-[10px] text-muted-foreground">
-                {block.minutes} min
-              </span>
-            </div>
-          {/each}
-        </div>
-      </section>
-    {:else if trainMode === 'lessons'}
-      <section class="mt-4 rounded-[20px] border bg-card p-5">
-        <h2 class="m-0 text-base font-semibold tracking-[-0.02em]">Lessons</h2>
-        <p class="mt-1 text-xs text-muted-foreground">
-          Learn movements first. Adaptive practice reinforces them later.
-        </p>
-
-        <div class="mt-5 grid gap-2">
-          {#each LESSONS as lesson, index}
-            <div class="grid grid-cols-[36px_1fr_auto] items-center gap-3 rounded-xl border p-3 max-[560px]:grid-cols-[36px_1fr]">
-              <div class="grid size-9 place-items-center rounded-lg bg-muted text-[11px] text-muted-foreground">
-                {String(index + 1).padStart(2, '0')}
-              </div>
-              <div>
-                <h3 class="m-0 text-xs font-medium">{lesson[0]}</h3>
-                <p class="mt-1 text-[11px] text-muted-foreground">{lesson[1]}</p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                class="max-[560px]:col-start-2 max-[560px]:w-fit"
-                onclick={() => setTrainMode('adaptive')}
-              >
-                {index < 2 ? 'Review' : 'Practice'}
-              </Button>
-            </div>
-          {/each}
-        </div>
-      </section>
-    {:else}
-      <section class="mt-4 rounded-[20px] border bg-card p-5">
-        <div>
-          <h2 class="m-0 text-base font-semibold tracking-[-0.02em]">Typing test</h2>
-          <p class="mt-1 text-xs text-muted-foreground">
-            Measure performance without changing your mastery model.
-          </p>
-        </div>
-
-        <div class="mt-4 flex flex-wrap gap-1.5">
-          {#each ['Time', 'Words', 'Paragraph', 'Custom'] as mode, index}
-            <Button
-              variant={index === 0 ? 'secondary' : 'ghost'}
-              size="sm"
-              class="h-8 rounded-full px-3 text-xs font-normal"
-            >
-              {mode}
-            </Button>
-          {/each}
-        </div>
-
-        <div
-          class="mt-5 min-h-[190px] rounded-2xl border bg-background p-5 outline-none ring-ring focus-visible:ring-2"
-          role="textbox"
-          aria-label="Typing test"
-          tabindex="0"
-        >
-          <div class="mb-4 flex items-end justify-between gap-4 border-b pb-3">
-            <div>
-              <strong class="text-3xl font-semibold tracking-[-0.04em]">{wpm}</strong>
-              <span class="ml-1 text-xs text-muted-foreground">WPM</span>
-            </div>
-            <span class="text-xs text-muted-foreground">{accuracy}% accuracy</span>
-          </div>
-
-          <div class="font-mono text-[clamp(18px,2.4vw,25px)] leading-[1.75] text-muted-foreground">
-            {#each [...drillText] as character, characterIndex}
-              <span class={characterClass(characterIndex)}>{character === ' ' ? ' ' : character}</span>
-            {/each}
-          </div>
-        </div>
-
-        <div class="mt-3 flex justify-end">
-          <Button variant="outline" size="sm" onclick={startTest}>
-            <RotateCcw class="size-3.5" strokeWidth={1.8} />
-            Restart test
-          </Button>
-        </div>
-      </section>
-    {/if}
-  {:else if activeView === 'progress'}
-    <section class="mt-5 rounded-[20px] border bg-card p-5">
-      <h2 class="m-0 text-base font-semibold tracking-[-0.02em]">Progress</h2>
-      <p class="mt-1 text-xs text-muted-foreground">
-        Only signals that change what you should practice next.
-      </p>
-
-      <div class="mt-5 grid grid-cols-[1.1fr_0.9fr] gap-3 max-[760px]:grid-cols-1">
-        <div class="rounded-2xl bg-muted p-4">
-          <p class="m-0 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-            Last 7 training sessions
-          </p>
-
-          {#if recentTrainingSessions.length > 0}
-            <div class="mt-6 flex h-[150px] items-end gap-2">
-              {#each recentTrainingSessions as session}
-                <div
-                  class="relative min-w-2 flex-1 rounded-t-md bg-secondary"
-                  style:height={trendHeight(session.wpm)}
-                  title={`${session.wpm} WPM · ${session.accuracy}%`}
+            <div class="flex flex-1 items-center last:flex-none">
+              <div class="group relative flex flex-col items-center">
+                <span
+                  class={[
+                    'block size-2 rounded-full border',
+                    index < blockIndex
+                      ? 'border-success bg-success'
+                      : index === blockIndex
+                        ? 'border-primary bg-primary'
+                        : 'border-border bg-background'
+                  ].join(' ')}
+                  title={block.name}
+                ></span>
+                <span
+                  class={index === blockIndex
+                    ? "absolute top-4 whitespace-nowrap text-[9px] text-foreground"
+                    : "absolute top-4 whitespace-nowrap text-[9px] text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"}
                 >
-                  <span class="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] text-muted-foreground">
-                    {session.wpm}
-                  </span>
-                </div>
-              {/each}
+                  {block.shortName}
+                </span>
+              </div>
+              {#if index < TRAINING_BLOCKS.length - 1}
+                <span
+                  class={index < blockIndex
+                    ? "mx-2 h-px flex-1 bg-success/45"
+                    : "mx-2 h-px flex-1 bg-border"}
+                ></span>
+              {/if}
             </div>
-          {:else}
-            <div class="mt-4 rounded-xl border border-dashed bg-card p-5 text-xs text-muted-foreground">
-              Finish a training block to start the trend.
-            </div>
+          {/each}
+        </div>
+      </div>
+
+      <div class="mt-9 flex items-center justify-between gap-3 border-t border-border pt-4">
+        <button
+          class="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-foreground"
+          onclick={() => startAdaptiveBlock()}
+        >
+          <RotateCcw class="size-3.5" strokeWidth={1.8} />
+          Restart
+        </button>
+
+        <div class="flex items-center gap-4">
+          <button
+            class="text-[12px] text-muted-foreground hover:text-foreground"
+            onclick={cycleGuide}
+          >
+            {guideLevel === 0 ? 'Less guide' : guideLevel === 1 ? 'Hide guide' : 'Show guide'}
+          </button>
+
+          {#if runComplete}
+            <button
+              class="text-[12px] font-medium text-primary hover:text-primary/80"
+              onclick={nextBlock}
+            >
+              Next →
+            </button>
           {/if}
         </div>
+      </div>
+    </main>
+  {:else if activeView === 'train' && trainMode === 'lessons'}
+    <main class="mx-auto max-w-[820px] pt-9">
+      <div class="mb-6">
+        <h2 class="m-0 text-[20px] font-semibold tracking-[-0.03em]">Lessons</h2>
+        <p class="mt-1 text-[12px] text-muted-foreground">Learn the movement, then let Train reinforce it.</p>
+      </div>
 
-        <div class="rounded-2xl bg-muted p-4">
-          <p class="m-0 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-            Needs work
-          </p>
+      <div class="border-y border-border">
+        {#each LESSONS as lesson, index}
+          <button
+            class="grid w-full grid-cols-[42px_1fr_auto] items-center gap-3 border-b border-border py-4 text-left last:border-b-0 hover:bg-muted/50 max-[560px]:grid-cols-[34px_1fr]"
+            onclick={() => setTrainMode('adaptive')}
+          >
+            <span class="font-mono text-[11px] text-muted-foreground">
+              {String(index + 1).padStart(2, '0')}
+            </span>
 
-          <div class="mt-3 grid gap-2">
+            <span>
+              <strong class="block text-[13px] font-medium">{lesson[0]}</strong>
+              <span class="mt-1 block text-[11px] text-muted-foreground">{lesson[1]}</span>
+            </span>
+
+            <span class="text-[11px] text-muted-foreground max-[560px]:col-start-2">
+              {index < 2 ? 'Review →' : index === 2 ? 'Continue →' : 'Practice →'}
+            </span>
+          </button>
+        {/each}
+      </div>
+    </main>
+  {:else if activeView === 'train' && trainMode === 'test'}
+    <main class="mx-auto max-w-[840px] pt-9">
+      <div class="flex items-end justify-between gap-4 border-b border-border pb-4">
+        <div class="flex items-center gap-5 text-[12px]">
+          <button class="font-medium text-foreground">Time</button>
+          <button class="text-muted-foreground">Words</button>
+          <button class="text-muted-foreground">Paragraph</button>
+          <button class="text-muted-foreground">Custom</button>
+        </div>
+
+        <div class="flex items-baseline gap-5">
+          <span><strong class="text-[20px] font-semibold">{wpm}</strong> <small class="text-[10px] text-muted-foreground">wpm</small></span>
+          <span class="text-[11px] text-muted-foreground">{accuracy}% acc</span>
+        </div>
+      </div>
+
+      <div
+        class="mt-12 min-h-[230px] outline-none ring-ring focus-visible:ring-2"
+        role="textbox"
+        aria-label="Typing test"
+        tabindex="0"
+      >
+        <div class="font-mono text-[clamp(24px,3.5vw,34px)] leading-[1.72] tracking-[-0.025em] text-[#a6a6a0]">
+          {#each [...drillText] as character, characterIndex}
+            <span class={characterClass(characterIndex)}>{character === ' ' ? ' ' : character}</span>
+          {/each}
+        </div>
+      </div>
+
+      <div class="mt-6 flex justify-end border-t border-border pt-4">
+        <button
+          class="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-foreground"
+          onclick={startTest}
+        >
+          <RotateCcw class="size-3.5" strokeWidth={1.8} />
+          Restart
+        </button>
+      </div>
+    </main>
+  {:else if activeView === 'progress'}
+    <main class="mx-auto max-w-[820px] pt-9">
+      <div>
+        <h2 class="m-0 text-[20px] font-semibold tracking-[-0.03em]">Progress</h2>
+        <p class="mt-1 text-[12px] text-muted-foreground">What changed, and what still needs work.</p>
+      </div>
+
+      <section class="mt-10 border-b border-border pb-9">
+        <div class="flex items-end justify-between gap-4">
+          <div>
+            <span class="text-[11px] text-muted-foreground">Recent speed</span>
+            <div class="mt-1 text-[28px] font-semibold tracking-[-0.04em]">
+              {recentTrainingSessions.at(-1)?.wpm ?? 0}
+              <span class="text-[11px] font-normal tracking-normal text-muted-foreground">wpm</span>
+            </div>
+          </div>
+          <span class="text-[11px] text-muted-foreground">last {recentTrainingSessions.length || 0} sessions</span>
+        </div>
+
+        {#if recentTrainingSessions.length > 0}
+          <div class="mt-7 flex h-[110px] items-end gap-2">
+            {#each recentTrainingSessions as session}
+              <div
+                class="relative min-w-2 flex-1 border-t border-primary bg-secondary/55"
+                style:height={trendHeight(session.wpm)}
+                title={`${session.wpm} WPM · ${session.accuracy}%`}
+              >
+                <span class="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] text-muted-foreground">
+                  {session.wpm}
+                </span>
+              </div>
+            {/each}
+          </div>
+        {:else}
+          <p class="mt-6 text-[12px] text-muted-foreground">Finish a training block to start the trend.</p>
+        {/if}
+      </section>
+
+      <div class="grid grid-cols-2 gap-12 py-9 max-[680px]:grid-cols-1 max-[680px]:gap-8">
+        <section>
+          <h3 class="m-0 text-[13px] font-medium">Needs work</h3>
+          <div class="mt-4 divide-y divide-border">
             {#if weakKeyMetrics.length > 0}
               {#each weakKeyMetrics as metric}
-                <div class="grid grid-cols-[34px_1fr_auto] items-center gap-2 text-[11px]">
-                  <strong>{formatKey(metric.key)}</strong>
-                  <div class="h-1.5 overflow-hidden rounded-full bg-border">
+                <div class="grid grid-cols-[42px_1fr_auto] items-center gap-3 py-3 text-[12px]">
+                  <strong class="font-mono font-medium">{formatKey(metric.key)}</strong>
+                  <div class="h-px bg-border">
                     <div
-                      class="h-full rounded-full bg-primary/35"
+                      class="h-px bg-primary"
                       style:width={`${Math.max(8, Math.round((1 - metric.weakness) * 100))}%`}
                     ></div>
                   </div>
@@ -778,17 +731,15 @@
                 </div>
               {/each}
             {:else}
-              <span class="text-xs text-muted-foreground">
-                Keep training. Reliable weak-key data needs a few samples.
-              </span>
+              <p class="py-3 text-[12px] text-muted-foreground">More samples needed.</p>
             {/if}
 
             {#each weakTransitionMetrics.slice(0, 2) as metric}
-              <div class="grid grid-cols-[34px_1fr_auto] items-center gap-2 text-[11px]">
-                <strong>{metric.pair.toUpperCase()}</strong>
-                <div class="h-1.5 overflow-hidden rounded-full bg-border">
+              <div class="grid grid-cols-[42px_1fr_auto] items-center gap-3 py-3 text-[12px]">
+                <strong class="font-mono font-medium">{metric.pair.toUpperCase()}</strong>
+                <div class="h-px bg-border">
                   <div
-                    class="h-full rounded-full bg-primary/35"
+                    class="h-px bg-primary"
                     style:width={`${Math.max(8, Math.round((1 - metric.weakness) * 100))}%`}
                   ></div>
                 </div>
@@ -798,101 +749,87 @@
               </div>
             {/each}
           </div>
+        </section>
 
-          <p class="mb-0 mt-6 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-            Due review
-          </p>
-          <div class="mt-2 flex flex-wrap gap-1.5">
+        <section>
+          <h3 class="m-0 text-[13px] font-medium">Review today</h3>
+          <div class="mt-4 flex flex-wrap gap-x-5 gap-y-3 font-mono text-[13px]">
             {#if dueReviewKeys.length > 0}
               {#each dueReviewKeys as key}
-                <span class="rounded-lg border bg-card px-2 py-1 font-mono text-[11px]">
-                  {formatKey(key)}
-                </span>
+                <span>{formatKey(key)}</span>
               {/each}
             {:else}
-              <span class="text-xs text-muted-foreground">Nothing due yet.</span>
+              <span class="font-sans text-[12px] text-muted-foreground">Nothing due.</span>
             {/if}
           </div>
-        </div>
+        </section>
       </div>
-    </section>
+    </main>
   {:else}
-    <section class="mt-5 rounded-[20px] border bg-card p-5">
-      <h2 class="m-0 text-base font-semibold tracking-[-0.02em]">Settings</h2>
-      <p class="mt-1 text-xs text-muted-foreground">
-        Training preferences apply immediately and stay in this browser.
-      </p>
+    <main class="mx-auto max-w-[760px] pt-9">
+      <div class="border-b border-border pb-5">
+        <h2 class="m-0 text-[20px] font-semibold tracking-[-0.03em]">Settings</h2>
+      </div>
 
-      <div class="mt-4 divide-y">
-        <div class="flex items-center justify-between gap-5 py-4">
+      <div class="divide-y divide-border">
+        <div class="flex items-center justify-between gap-5 py-5">
           <div>
-            <strong class="block text-xs font-medium">Keyboard sound</strong>
-            <span class="mt-1 block text-[11px] text-muted-foreground">
-              Quiet procedural key clicks. No audio files are downloaded.
-            </span>
+            <strong class="block text-[13px] font-medium">Keyboard sound</strong>
+            <span class="mt-1 block text-[11px] text-muted-foreground">Quiet local key clicks.</span>
           </div>
-          <Button
-            variant={preferences.keyboardSound ? 'secondary' : 'outline'}
-            size="sm"
+          <button
+            class={preferences.keyboardSound
+              ? "inline-flex min-w-14 items-center justify-center gap-1.5 text-[12px] font-medium text-foreground"
+              : "inline-flex min-w-14 items-center justify-center gap-1.5 text-[12px] text-muted-foreground"}
             aria-pressed={preferences.keyboardSound}
             onclick={() => togglePreference('keyboardSound')}
           >
             {#if preferences.keyboardSound}
-              <Volume2 class="size-3.5" strokeWidth={1.8} />
-              On
+              <Volume2 class="size-3.5" strokeWidth={1.8} /> On
             {:else}
-              <VolumeX class="size-3.5" strokeWidth={1.8} />
-              Off
+              <VolumeX class="size-3.5" strokeWidth={1.8} /> Off
             {/if}
-          </Button>
+          </button>
         </div>
 
-        <div class="flex items-center justify-between gap-5 py-4">
+        <div class="flex items-center justify-between gap-5 py-5">
           <div>
-            <strong class="block text-xs font-medium">Strict correction</strong>
-            <span class="mt-1 block text-[11px] text-muted-foreground">
-              Wrong keys do not advance the cursor.
-            </span>
+            <strong class="block text-[13px] font-medium">Strict correction</strong>
+            <span class="mt-1 block text-[11px] text-muted-foreground">Wrong keys stay on the current character.</span>
           </div>
-          <Button
-            variant={preferences.strictCorrection ? 'secondary' : 'outline'}
-            size="sm"
+          <button
+            class={preferences.strictCorrection ? "text-[12px] font-medium" : "text-[12px] text-muted-foreground"}
             aria-pressed={preferences.strictCorrection}
             onclick={() => togglePreference('strictCorrection')}
           >
             {preferences.strictCorrection ? 'On' : 'Off'}
-          </Button>
+          </button>
         </div>
 
-        <div class="flex items-center justify-between gap-5 py-4">
+        <div class="flex items-center justify-between gap-5 py-5">
           <div>
-            <strong class="block text-xs font-medium">Automatic guide fading</strong>
-            <span class="mt-1 block text-[11px] text-muted-foreground">
-              Reduce keyboard help as the practiced keys stabilize.
-            </span>
+            <strong class="block text-[13px] font-medium">Guide fading</strong>
+            <span class="mt-1 block text-[11px] text-muted-foreground">Hide keyboard help as keys stabilize.</span>
           </div>
-          <Button
-            variant={preferences.automaticGuideFading ? 'secondary' : 'outline'}
-            size="sm"
+          <button
+            class={preferences.automaticGuideFading ? "text-[12px] font-medium" : "text-[12px] text-muted-foreground"}
             aria-pressed={preferences.automaticGuideFading}
             onclick={() => togglePreference('automaticGuideFading')}
           >
             {preferences.automaticGuideFading ? 'On' : 'Off'}
-          </Button>
+          </button>
         </div>
 
-        <div class="flex items-center justify-between gap-5 py-4">
+        <div class="flex items-center justify-between gap-5 py-5">
           <div>
-            <strong class="block text-xs font-medium">Mastery threshold</strong>
+            <strong class="block text-[13px] font-medium">Mastery</strong>
             <span class="mt-1 block text-[11px] text-muted-foreground">
-              {preferences.minSamples}+ samples · ≤ {preferences.masteryLatency}ms average latency.
+              {preferences.minSamples}+ samples · ≤ {preferences.masteryLatency}ms
             </span>
           </div>
-          <span class="rounded-lg border bg-muted px-2.5 py-1.5 text-xs">
-            {preferences.masteryAccuracy}%
-          </span>
+          <span class="text-[12px]">{preferences.masteryAccuracy}%</span>
         </div>
       </div>
-    </section>
+    </main>
   {/if}
 </section>
