@@ -27,6 +27,14 @@ Do not add JSON, UUID, image tools, category pages, PWA layers, storage abstract
 
 Home directly exposes the three modules.
 
+Homepage typography:
+
+- keep the hero compact rather than billboard-sized
+- hero title should usually stay around 42–64px, using medium/regular weight rather than bold display weight
+- supporting copy stays around 14–16px with normal weight
+- navigation, buttons, labels, and tool names should avoid heavy bold weights unless hierarchy truly requires it
+- prefer weight contrast through spacing and scale before using 700–800 weights
+
 Home tool presentation:
 
 - tools render as compact square app tiles
