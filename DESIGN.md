@@ -242,7 +242,45 @@ Pomodoro module contract:
 - keyboard shortcuts remain functional but should not be permanently explained on the primary surface
 - keep the interface single-column, light-weight, and free of task-management or heavy analytics scope
 
-## 7. Local-first contract
+## 7. Typing module contract
+
+Typing is an adaptive muscle-memory trainer, not only a WPM test.
+
+Core training loop:
+
+```text
+warm-up / retention
+→ weak keys
+→ weak transitions
+→ mixed transfer
+→ benchmark
+→ learner model
+→ next session adapts
+```
+
+Typing module contract:
+
+- Train is the default surface; Lessons teaches movements and Test measures performance separately
+- adaptive sessions use five compact blocks: 2m retention, 3m weak keys, 3m weak transitions, 3m mixed transfer, 1m benchmark
+- training prioritizes accuracy before speed; WPM is supportive rather than the dominant live metric
+- wrong keys do not advance by default so the practiced movement must be corrected before continuing
+- the learner model stores aggregate per-key and per-transition attempts, accuracy, recent performance, and latency; do not persist raw keystroke event streams
+- weak-key selection uses both error rate and latency rather than error count alone
+- transition/bigram statistics identify slow sequences even when their individual keys are already stable
+- mastery requires repeated evidence: default 98% accuracy, 20 samples, and ≤420ms average correct-key latency
+- mastered keys enter a local retention queue with increasing review intervals; failed review returns the item to a near-term interval
+- keyboard/finger guidance fades as practiced keys stabilize and can be manually reduced or hidden
+- keyboard sound is optional, local, and procedural through Web Audio; no remote audio asset or license dependency is required
+- the typing sound engine reuses one AudioContext instead of creating a new context for every keystroke
+- correct keys use a short quiet click; Space uses a slightly lower click; incorrect keys use a distinct dull click
+- Test mode records performance history but must not update key mastery or adaptive weakness
+- custom/test text must never influence the adaptive learner model
+- Progress shows only actionable signals: recent performance, weak keys/transitions, and due review
+- all learning state and preferences stay local to the browser; no account is required
+- keep the primary training surface focused: current block, text, accuracy, target, restrained WPM, keyboard guide, and session progress
+- do not turn Typing into an XP, streak, achievement, or analytics dashboard
+
+## 8. Local-first contract
 
 ```text
 user input/file
@@ -256,7 +294,7 @@ Do not send user content to APIs, analytics, logs, or third parties unless the p
 
 Do not claim offline support until it is implemented and tested.
 
-## 8. Engineering boundary
+## 9. Engineering boundary
 
 ```text
 routes/UI
@@ -270,7 +308,7 @@ Do not create platform abstractions before a concrete requirement needs them.
 
 The small Module Registry remains because Home already consumes shared metadata.
 
-## 9. Deployment
+## 10. Deployment
 
 ```text
 GitHub
@@ -292,13 +330,13 @@ Cloudflare runs `bun run build`, then `npx wrangler deploy`. `wrangler.jsonc` po
 
 Workers Builds is the intended deployment model for this repository.
 
-## 10. Definition of done
+## 11. Definition of done
 
 A module is done when its core job works, privacy copy matches reality, errors are recoverable, mobile/keyboard basics work, relevant deterministic logic is tested, and build/check passes.
 
 UI work is complete only when generic controls use shadcn-svelte instead of unnecessary bespoke primitives.
 
-## 11. Decision rule
+## 12. Decision rule
 
 ```text
 What current user-visible requirement needs this?
