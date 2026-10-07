@@ -4,7 +4,8 @@ Chromium Manifest V3 companion extension for the Module Pomodoro timer.
 
 ## What it does
 
-- Blocks only websites the user explicitly adds.
+- Blocks every route under websites the user explicitly adds, including SPA route changes such as `x.com/home`.
+- Immediately redirects already-open blocked tabs when Focus Protection starts.
 - Activates during Focus sessions.
 - Stays active while Focus is paused or in overtime.
 - Releases blocking on Break, Reset, or Skip.
@@ -19,8 +20,9 @@ It does not collect visited URLs, page content, page titles, or browsing history
 2. Enable **Developer mode**.
 3. Choose **Load unpacked**.
 4. Select this `extension/` directory.
-5. Open Module at `https://modu.howlil.site/pomodoro` or the local dev server.
-6. Open Pomodoro settings. **Module extension** should show **Connected**.
+5. After pulling extension changes, press **Reload** on the extension card so manifest/service-worker changes take effect.
+6. Open Module at `https://modu.howlil.site/pomodoro` or the local dev server.
+7. Open Pomodoro settings. **Module extension** should show **Connected**.
 
 The extension requests host access because user-defined blocklists can contain arbitrary websites.
 
