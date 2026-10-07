@@ -3,6 +3,7 @@
   import { ArrowLeft, Check, ChevronRight, Download, Pencil, RotateCcw, Settings2, SkipForward, Trash2, X } from 'lucide-svelte';
   import { Button } from "$lib/components/ui/button/index.js";
   import { Input } from "$lib/components/ui/input/index.js";
+  import { Switch } from "$lib/components/ui/switch/index.js";
   import * as Tabs from '$lib/components/ui/tabs/index.js';
   import ToolHeader from '#lib/components/ToolHeader.svelte';
   import ActivityView from '#lib/components/pomodoro/ActivityView.svelte';
@@ -1105,20 +1106,16 @@
       >
         {#each ['focus', 'short', 'long'] as mode}
           {@const typedMode = mode as PomodoroMode}
-          <button
-            type="button"
+          <Button
+            variant={timer.mode === typedMode ? 'secondary' : 'ghost'}
+            size="sm"
             role="tab"
             aria-selected={timer.mode === typedMode}
-            class={[
-              'h-[31px] rounded-full px-3 text-[12px] font-normal transition',
-              timer.mode === typedMode
-                ? 'bg-card text-foreground shadow-[0_1px_2px_rgba(26,26,23,0.06)]'
-                : 'text-muted-foreground hover:text-foreground'
-            ]}
+            class="h-[31px] rounded-full px-3 text-[12px] font-normal shadow-none"
             onclick={() => switchPomodoroMode(typedMode)}
           >
             {MODE_META[typedMode].shortLabel}
-          </button>
+          </Button>
         {/each}
       </div>
 
@@ -1165,9 +1162,9 @@
       {#if timer.mode === 'focus'}
         <div class="mt-3.5 grid min-h-9 w-full max-w-[330px] place-items-center">
           {#if focusEditing}
-            <input
+            <Input
               bind:this={focusInput}
-              class="w-full max-w-[300px] border-0 border-b border-border bg-transparent px-2 py-1.5 text-center text-[13px] font-normal outline-none placeholder:text-muted-foreground/60"
+              class="w-full max-w-[300px] rounded-none border-0 border-b border-border bg-transparent px-2 py-1.5 text-center text-[13px] font-normal shadow-none placeholder:text-muted-foreground/60 focus-visible:ring-0"
               type="text"
               maxlength="80"
               bind:value={focusDraft}
@@ -1185,22 +1182,24 @@
               }}
             />
           {:else if focusText}
-            <button
-              type="button"
-              class="group inline-flex max-w-full items-center gap-1.5 rounded-full px-2 py-1.5 text-[13px] font-normal text-foreground transition hover:bg-muted"
+            <Button
+              variant="ghost"
+              size="sm"
+              class="group h-auto max-w-full rounded-full px-2 py-1.5 text-[13px] font-normal text-foreground shadow-none"
               onclick={beginFocusEdit}
             >
               <span class="truncate">{focusText}</span>
               <Pencil class="size-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" strokeWidth={1.7} />
-            </button>
+            </Button>
           {:else}
-            <button
-              type="button"
-              class="rounded-full px-2 py-1.5 text-[12px] font-normal text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            <Button
+              variant="ghost"
+              size="sm"
+              class="h-auto rounded-full px-2 py-1.5 text-[12px] font-normal text-muted-foreground shadow-none"
               onclick={beginFocusEdit}
             >
               + Add focus
-            </button>
+            </Button>
           {/if}
         </div>
       {/if}
@@ -1230,13 +1229,14 @@
           {timer.completedFocus >= 4 ? 'Long break next' : `Session ${Math.min(timer.completedFocus + 1, 4)} of 4`}
         </div>
 
-        <button
-          type="button"
-          class="mt-2 rounded-full px-2 py-1 text-[11px] font-normal text-muted-foreground transition hover:bg-muted hover:text-foreground"
+        <Button
+          variant="ghost"
+          size="xs"
+          class="mt-2 h-auto rounded-full px-2 py-1 text-[11px] font-normal text-muted-foreground shadow-none"
           onclick={() => (activeView = 'activity')}
         >
           {formatFocusTotal(todayFocusMs)} today
-        </button>
+        </Button>
       </div>
 
       {#if timer.status === 'complete' || timer.status === 'overtime'}
@@ -1349,31 +1349,14 @@
             ['overtime', 'Count overtime']
           ] as option}
             {@const key = option[0] as keyof PomodoroPreferences}
-            <Button
-              variant="ghost"
-              class="flex h-10 w-full items-center justify-between rounded-full px-1 text-[12px] font-normal"
-              role="switch"
-              aria-checked={preferences[key]}
-              onclick={() => togglePreference(key)}
-            >
+            <div class="flex h-10 w-full items-center justify-between gap-4 px-1 text-[12px]">
               <span>{option[1]}</span>
-              <span
-                class={[
-                  'relative h-[18px] w-8 shrink-0 rounded-full border transition-all duration-150',
-                  preferences[key]
-                    ? 'border-primary bg-primary shadow-[0_1px_2px_rgba(36,104,242,0.18)]'
-                    : 'border-border/80 bg-foreground/[0.07]'
-                ]}
-                aria-hidden="true"
-              >
-                <span
-                  class={[
-                    'absolute left-0.5 top-0.5 size-3.5 rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.18)] transition-transform duration-150',
-                    preferences[key] ? 'translate-x-3.5' : 'translate-x-0'
-                  ]}
-                ></span>
-              </span>
-            </Button>
+              <Switch
+                checked={preferences[key]}
+                aria-label={option[1]}
+                onclick={() => togglePreference(key)}
+              />
+            </div>
           {/each}
         </div>
 
@@ -1390,63 +1373,29 @@
         <div class="mt-4 border-t pt-4">
           <div class="mb-1 text-[11px] font-medium text-muted-foreground">System</div>
 
-          <Button
-            variant="ghost"
-            class="flex h-10 w-full items-center justify-between rounded-full px-1 text-[12px] font-normal"
-            role="switch"
-            aria-checked={notificationsEnabled}
-            disabled={!notificationsSupported}
-            onclick={toggleNotifications}
-          >
+          <div class="flex h-10 w-full items-center justify-between gap-4 px-1 text-[12px]">
             <span>
               Notifications
               {#if !notificationsSupported}
                 <span class="ml-1 text-[10px] text-muted-foreground">Unavailable</span>
               {/if}
             </span>
-            <span
-              class={[
-                'relative h-[18px] w-8 shrink-0 rounded-full border transition-all duration-150',
-                notificationsEnabled
-                  ? 'border-primary bg-primary shadow-[0_1px_2px_rgba(36,104,242,0.18)]'
-                  : 'border-border/80 bg-foreground/[0.07]'
-              ]}
-              aria-hidden="true"
-            >
-              <span
-                class={[
-                  'absolute left-0.5 top-0.5 size-3.5 rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.18)] transition-transform duration-150',
-                  notificationsEnabled ? 'translate-x-3.5' : 'translate-x-0'
-                ]}
-              ></span>
-            </span>
-          </Button>
+            <Switch
+              checked={notificationsEnabled}
+              aria-label="Notifications"
+              disabled={!notificationsSupported}
+              onclick={toggleNotifications}
+            />
+          </div>
 
-          <Button
-            variant="ghost"
-            class="flex h-10 w-full items-center justify-between rounded-full px-1 text-[12px] font-normal"
-            role="switch"
-            aria-checked={soundEnabled}
-            onclick={toggleSound}
-          >
+          <div class="flex h-10 w-full items-center justify-between gap-4 px-1 text-[12px]">
             <span>Sound</span>
-            <span
-              class={[
-                'relative h-[18px] w-8 shrink-0 rounded-full border transition-all duration-150',
-                soundEnabled
-                  ? 'border-primary bg-primary shadow-[0_1px_2px_rgba(36,104,242,0.18)]'
-                  : 'border-border/80 bg-foreground/[0.07]'
-              ]}
-              aria-hidden="true"
-            >
-              <span
-                class={[
-                  'absolute left-0.5 top-0.5 size-3.5 rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.18)] transition-transform duration-150',
-                  soundEnabled ? 'translate-x-3.5' : 'translate-x-0'
-                ]}
-              ></span>
-            </span>
-          </Button>
+            <Switch
+              checked={soundEnabled}
+              aria-label="Sound"
+              onclick={toggleSound}
+            />
+          </div>
 
           <Button
             variant="ghost"
@@ -1460,37 +1409,20 @@
             </span>
           </Button>
 
-          <Button
-            variant="ghost"
-            class="flex h-10 w-full items-center justify-between rounded-full px-1 text-[12px] font-normal"
-            role="switch"
-            aria-checked={preferences.keepAwake}
-            disabled={!wakeLockSupported}
-            onclick={() => togglePreference('keepAwake')}
-          >
+          <div class="flex h-10 w-full items-center justify-between gap-4 px-1 text-[12px]">
             <span>
               Keep screen awake
               {#if !wakeLockSupported}
                 <span class="ml-1 text-[10px] text-muted-foreground">Unavailable</span>
               {/if}
             </span>
-            <span
-              class={[
-                'relative h-[18px] w-8 shrink-0 rounded-full border transition-all duration-150',
-                preferences.keepAwake
-                  ? 'border-primary bg-primary shadow-[0_1px_2px_rgba(36,104,242,0.18)]'
-                  : 'border-border/80 bg-foreground/[0.07]'
-              ]}
-              aria-hidden="true"
-            >
-              <span
-                class={[
-                  'absolute left-0.5 top-0.5 size-3.5 rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.18)] transition-transform duration-150',
-                  preferences.keepAwake ? 'translate-x-3.5' : 'translate-x-0'
-                ]}
-              ></span>
-            </span>
-          </Button>
+            <Switch
+              checked={preferences.keepAwake}
+              aria-label="Keep screen awake"
+              disabled={!wakeLockSupported}
+              onclick={() => togglePreference('keepAwake')}
+            />
+          </div>
         </div>
 
         <div class="mt-4 border-t pt-4">
@@ -1522,9 +1454,9 @@
 
             <div class="divide-y">
               {#each RINGTONE_OPTIONS as option}
-                <button
-                  type="button"
-                  class="flex min-h-12 w-full items-center justify-between gap-4 rounded-full px-2 py-2 text-left transition hover:bg-muted/60"
+                <Button
+                  variant="ghost"
+                  class="flex h-auto min-h-12 w-full items-center justify-between gap-4 rounded-full px-2 py-2 text-left font-normal whitespace-normal shadow-none"
                   onclick={() => selectRingtone(option.id)}
                 >
                   <span class="min-w-0">
@@ -1534,7 +1466,7 @@
                   {#if ringtone === option.id}
                     <Check class="size-4 shrink-0 text-primary" strokeWidth={1.8} />
                   {/if}
-                </button>
+                </Button>
               {/each}
             </div>
           </div>
