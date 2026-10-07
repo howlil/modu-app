@@ -27,6 +27,14 @@ Do not add JSON, UUID, image tools, category pages, PWA layers, storage abstract
 
 Home directly exposes the three modules.
 
+Home tool presentation:
+
+- tools render as compact square app tiles
+- each tile is 1:1 with a clear icon and short name
+- do not add descriptions inside the launcher grid
+- desktop uses a small 3-column grid; narrow screens use 2 columns
+- the tile itself is the interaction target; avoid extra arrows, badges, or metadata
+
 Do not build search, categories, pinned tools, recent tools, or contextual sidebars before tool count/user behavior makes them necessary.
 
 ## 4. Module registry
@@ -37,7 +45,6 @@ Keep only metadata consumed today:
 type ModuleDefinition = {
   id: string;
   name: string;
-  description: string;
   route: string;
   layout: 'file-transform' | 'focus';
 };
