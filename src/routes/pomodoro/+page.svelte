@@ -897,11 +897,6 @@
     persist();
   }
 
-  async function clearActivity() {
-    await clearFocusSessions();
-    activitySessions = [];
-  }
-
   async function requestWakeLock() {
     if (
       !preferences.keepAwake ||
