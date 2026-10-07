@@ -2,6 +2,7 @@
   import { ChevronRight, Plus, X } from 'lucide-svelte';
   import { Button } from "$lib/components/ui/button/index.js";
   import { Input } from "$lib/components/ui/input/index.js";
+  import { Switch } from "$lib/components/ui/switch/index.js";
   import {
     normalizeBlockedDomain,
     type FocusProtectionConnection
@@ -79,32 +80,15 @@
   <div class="mt-4 border-t pt-4">
     <div class="mb-1 text-[11px] font-medium text-muted-foreground">Focus protection</div>
 
-    <Button
-      variant="ghost"
-      class="flex h-10 w-full items-center justify-between rounded-full px-1 text-[12px] font-normal"
-      role="switch"
-      aria-checked={enabled}
-      disabled={toggleDisabled}
-      onclick={onToggle}
-    >
+    <div class="flex h-10 w-full items-center justify-between gap-4 px-1 text-[12px]">
       <span>Block distracting websites</span>
-      <span
-        class={[
-          'relative h-[18px] w-8 shrink-0 rounded-full border transition-all duration-150',
-          enabled
-            ? 'border-primary bg-primary shadow-[0_1px_2px_rgba(36,104,242,0.18)]'
-            : 'border-border/80 bg-foreground/[0.07]'
-        ]}
-        aria-hidden="true"
-      >
-        <span
-          class={[
-            'absolute left-0.5 top-0.5 size-3.5 rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.18)] transition-transform duration-150',
-            enabled ? 'translate-x-3.5' : 'translate-x-0'
-          ]}
-        ></span>
-      </span>
-    </Button>
+      <Switch
+        checked={enabled}
+        aria-label="Block distracting websites"
+        disabled={toggleDisabled}
+        onclick={onToggle}
+      />
+    </div>
 
     <Button
       variant="ghost"
@@ -202,9 +186,9 @@
       <div class="mb-2 text-[11px] font-medium text-muted-foreground">Suggested</div>
       <div class="grid gap-1">
         {#each suggestions.filter((domain) => !blockedDomains.includes(domain)) as domain}
-          <button
-            type="button"
-            class="flex h-9 items-center justify-between rounded-full px-2 text-[12px] transition hover:bg-muted"
+          <Button
+            variant="ghost"
+            class="flex h-9 w-full items-center justify-between rounded-full px-2 text-[12px] font-normal shadow-none"
             onclick={() => addDomain(domain)}
           >
             <span>{domain}</span>
@@ -212,7 +196,7 @@
               <Plus class="size-3" strokeWidth={1.7} />
               Add
             </span>
-          </button>
+          </Button>
         {/each}
       </div>
     </div>
