@@ -153,6 +153,19 @@
       .filter((session) => localDateKey(session.endedAt) === todayKey)
       .reduce((total, session) => total + session.actualDurationMs, 0)
   );
+  const protectionTimerLabel = $derived(
+    !focusProtectionEnabled ||
+      timer.mode !== 'focus' ||
+      !['running', 'paused', 'overtime'].includes(timer.status)
+      ? ''
+      : blockedDomains.length === 0
+        ? 'No blocked sites'
+        : focusProtectionConnection === 'active'
+          ? 'Protected'
+          : focusProtectionConnection === 'checking' || focusProtectionConnection === 'ready'
+            ? 'Protection starting…'
+            : 'Protection unavailable'
+  );
 
   function durationMs(mode: PomodoroMode) {
     return durations[mode] * 60_000;
@@ -1027,15 +1040,20 @@
             {formattedTime}
           </div>
           <div class="mt-2.5 min-h-[15px] text-[11px] font-normal text-muted-foreground">
-            {timer.status === 'running'
-              ? modeMeta.label
-              : timer.status === 'paused'
-                ? 'Paused'
-                : timer.status === 'overtime'
-                  ? 'Overtime'
-                  : timer.status === 'complete'
-                    ? 'Complete'
-                    : ''}
+            <span>
+              {timer.status === 'running'
+                ? modeMeta.label
+                : timer.status === 'paused'
+                  ? 'Paused'
+                  : timer.status === 'overtime'
+                    ? 'Overtime'
+                    : timer.status === 'complete'
+                      ? 'Complete'
+                      : ''}
+            </span>
+            {#if protectionTimerLabel}
+              <span> · {protectionTimerLabel}</span>
+            {/if}
           </div>
         </div>
       </div>
