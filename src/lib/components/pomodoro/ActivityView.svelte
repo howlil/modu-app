@@ -311,7 +311,7 @@
         <div class="border-t py-3">
           <button
             type="button"
-            class="mb-1 flex w-full items-center justify-between gap-4 rounded-lg py-1 text-left"
+            class="mb-1 flex w-full items-center justify-between gap-4 rounded-full py-1 text-left"
             onclick={() => openHistoryDay(dateKey)}
           >
             <strong class="text-[12px] font-medium">{formatDayLabel(dateKey)}</strong>
