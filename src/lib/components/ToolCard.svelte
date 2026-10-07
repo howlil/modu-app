@@ -15,7 +15,7 @@
   href={module.route}
   aria-label={module.name}
 >
-  <div class="relative z-20 text-[14px] font-[700] leading-tight tracking-[-0.025em]">
+  <div class="relative z-20 text-[14px] font-[600] leading-tight tracking-[-0.02em]">
     {module.name}
   </div>
 
@@ -36,7 +36,7 @@
           <rect x="20" y="14" width="86" height="112" rx="14" fill="white" />
           <path d="M76 14h30v30" fill="white" />
           <path d="M76 14l30 30H76V14Z" fill="currentColor" opacity="0.18" />
-          <text x="63" y="78" text-anchor="middle" fill="currentColor" font-size="20" font-weight="800" font-family="system-ui, sans-serif">PDF</text>
+          <text x="63" y="78" text-anchor="middle" fill="currentColor" font-size="20" font-weight="650" font-family="system-ui, sans-serif">PDF</text>
         </g>
 
         <g transform="translate(66 112)">
@@ -68,7 +68,7 @@
         <path d="M100 100V67" stroke="currentColor" stroke-width="7" stroke-linecap="round" opacity="0.65" />
         <path d="M100 100l24 16" stroke="currentColor" stroke-width="7" stroke-linecap="round" opacity="0.65" />
 
-        <text x="100" y="119" text-anchor="middle" fill="currentColor" font-size="31" font-weight="800" font-family="system-ui, sans-serif" opacity="0.84">25</text>
+        <text x="100" y="119" text-anchor="middle" fill="currentColor" font-size="31" font-weight="650" font-family="system-ui, sans-serif" opacity="0.84">25</text>
       </svg>
     </div>
 
@@ -101,12 +101,12 @@
 
         <g transform="translate(141 12) rotate(8)">
           <rect width="48" height="48" rx="14" fill="white" opacity="0.26" />
-          <text x="24" y="31" text-anchor="middle" fill="currentColor" font-size="22" font-weight="800" font-family="system-ui, sans-serif">A</text>
+          <text x="24" y="31" text-anchor="middle" fill="currentColor" font-size="22" font-weight="650" font-family="system-ui, sans-serif">A</text>
         </g>
 
         <g transform="translate(24 18) rotate(-10)">
           <rect width="42" height="42" rx="13" fill="white" opacity="0.18" />
-          <text x="21" y="28" text-anchor="middle" fill="currentColor" font-size="17" font-weight="800" font-family="system-ui, sans-serif">↵</text>
+          <text x="21" y="28" text-anchor="middle" fill="currentColor" font-size="17" font-weight="650" font-family="system-ui, sans-serif">↵</text>
         </g>
       </svg>
     </div>
