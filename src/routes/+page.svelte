@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ArrowDown, ArrowUpRight } from 'lucide-svelte';
   import { Button } from "$lib/components/ui/button/index.js";
   import ToolCard from '#lib/components/ToolCard.svelte';
   import { modules } from '#lib/platform/registry/modules.ts';
@@ -32,7 +33,7 @@
     <div class="mt-7 flex flex-wrap justify-center gap-2">
       <Button href="#tools" class="h-10 rounded-xl px-4 text-[13px] font-medium shadow-none">
         Explore tools
-        <span aria-hidden="true">↓</span>
+        <ArrowDown class="size-3.5" strokeWidth={1.8} />
       </Button>
 
       <Button
@@ -43,11 +44,9 @@
         class="h-10 rounded-xl px-4 text-[13px] font-normal shadow-none"
       >
         View source
-        <span aria-hidden="true">↗</span>
+        <ArrowUpRight class="size-3.5" strokeWidth={1.8} />
       </Button>
     </div>
-
-    <p class="mt-5 text-[12px] font-normal text-muted-foreground">Runs locally · No account required</p>
   </div>
 </section>
 
