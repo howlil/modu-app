@@ -6,6 +6,7 @@
     aggregateDailyActivity,
     buildHeatmapDays,
     calculateWeekSummary,
+    isScheduledGoalDay,
     localDateKey,
     sessionsForDate,
     sessionsToCsv,
@@ -57,7 +58,8 @@
       firstStartedAt: null
     }
   );
-  const todayProgress = $derived(goalMs > 0 ? today.focusedMs / goalMs : 0);
+  const todayHasGoal = $derived(isScheduledGoalDay(new Date(clockNow), goalSchedule));
+  const todayProgress = $derived(todayHasGoal && goalMs > 0 ? today.focusedMs / goalMs : 0);
   const todayAverageMs = $derived(
     today.sessionCount > 0 ? today.focusedMs / today.sessionCount : 0
   );
@@ -227,24 +229,30 @@
       <div class="mb-2 text-[11px] text-muted-foreground">Today</div>
       <div class="text-[40px] font-[450] leading-none tracking-[-0.05em]">
         {formatFocusTotal(today.focusedMs)}
-        <span class="text-[14px] font-normal tracking-normal text-muted-foreground">/ {goalHours}h</span>
+        {#if todayHasGoal}
+          <span class="text-[14px] font-normal tracking-normal text-muted-foreground">/ {goalHours}h</span>
+        {/if}
       </div>
 
-      <div class="mt-4 h-2 overflow-hidden rounded-full bg-muted">
-        <div
-          class="h-full rounded-full bg-primary transition-[width]"
-          style={`width: ${Math.min(100, todayProgress * 100)}%`}
-        ></div>
-      </div>
+      {#if todayHasGoal}
+        <div class="mt-4 h-2 overflow-hidden rounded-full bg-muted">
+          <div
+            class="h-full rounded-full bg-primary transition-[width]"
+            style={`width: ${Math.min(100, todayProgress * 100)}%`}
+          ></div>
+        </div>
 
-      <div class="mt-2 flex justify-between gap-4 text-[11px] text-muted-foreground">
-        <span>{Math.round(todayProgress * 100)}% of goal</span>
-        <span>
-          {today.focusedMs >= goalMs
-            ? 'Goal reached'
-            : `${formatFocusTotal(goalMs - today.focusedMs)} remaining`}
-        </span>
-      </div>
+        <div class="mt-2 flex justify-between gap-4 text-[11px] text-muted-foreground">
+          <span>{Math.round(todayProgress * 100)}% of goal</span>
+          <span>
+            {today.focusedMs >= goalMs
+              ? 'Goal reached'
+              : `${formatFocusTotal(goalMs - today.focusedMs)} remaining`}
+          </span>
+        </div>
+      {:else}
+        <div class="mt-3 text-[11px] text-muted-foreground">No goal scheduled today</div>
+      {/if}
     </div>
 
     <div class="border-t pt-4">
