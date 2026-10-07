@@ -8,18 +8,18 @@
   <meta name="description" content="Small browser utilities that run locally." />
 </svelte:head>
 
-<section class="py-10 max-[700px]:py-7">
-  <div class="mb-10 max-w-[680px]">
-    <h1 class="m-0 text-[clamp(40px,6vw,56px)] font-[760] leading-[0.98] tracking-[-0.055em]">
+<section class="py-9 max-[700px]:py-7">
+  <div class="mb-8 max-w-[640px]">
+    <h1 class="m-0 text-[clamp(38px,5.5vw,54px)] font-[760] leading-[0.98] tracking-[-0.055em]">
       Useful tools.<br />Nothing extra.
     </h1>
     <p class="mt-3 text-sm text-muted-foreground">Runs locally. No account required.</p>
   </div>
 
-  <section aria-labelledby="tools-title">
-    <h2 id="tools-title" class="m-0 text-sm font-semibold tracking-[-0.01em]">Tools</h2>
+  <section class="max-w-[560px]" aria-labelledby="tools-title">
+    <h2 id="tools-title" class="m-0 mb-3 text-xs font-medium text-muted-foreground">Tools</h2>
 
-    <div class="mt-3 divide-y overflow-hidden rounded-lg border bg-card">
+    <div class="grid grid-cols-3 gap-3 max-[560px]:grid-cols-2">
       {#each modules as module}
         <ToolCard {module} />
       {/each}
