@@ -32,6 +32,12 @@
   type TypingView = 'train' | 'progress' | 'settings';
   type TrainMode = 'adaptive' | 'lessons' | 'test';
 
+  const TRAIN_MODE_OPTIONS: Array<{ id: TrainMode; label: string }> = [
+    { id: 'adaptive', label: 'Adaptive' },
+    { id: 'lessons', label: 'Lessons' },
+    { id: 'test', label: 'Test' }
+  ];
+
   const STATE_KEY = 'module-typing-state-v1';
   const PREFERENCES_KEY = 'module-typing-preferences-v1';
   const BLOCK_KEY = 'module-typing-block-v1';
@@ -172,8 +178,11 @@
   });
 
   onDestroy(() => {
-    if (clockTimer !== null) window.clearInterval(clockTimer);
-    if (persistTimer !== null) window.clearTimeout(persistTimer);
+    if (typeof window !== 'undefined') {
+      if (clockTimer !== null) window.clearInterval(clockTimer);
+      if (persistTimer !== null) window.clearTimeout(persistTimer);
+    }
+
     persistNow();
     disposeTypingAudio();
   });
@@ -370,6 +379,22 @@
     return '';
   }
 
+  function characterClass(characterIndex: number) {
+    const isCurrent = characterIndex === typedIndex;
+
+    return [
+      characterIndex < typedIndex ? 'text-foreground' : '',
+      isCurrent && !wrongAtCursor
+        ? 'rounded-sm border-b-2 border-primary bg-secondary text-secondary-foreground'
+        : '',
+      isCurrent && wrongAtCursor
+        ? 'rounded-sm border-b-2 border-destructive bg-destructive/10 text-destructive'
+        : ''
+    ]
+      .filter(Boolean)
+      .join(' ');
+  }
+
   function trendHeight(wpmValue: number) {
     const values = recentTrainingSessions.map((session) => session.wpm);
     const max = Math.max(20, ...values);
@@ -430,18 +455,14 @@
   {#if activeView === 'train'}
     <div class="mt-5 flex items-center justify-between gap-3 max-[640px]:items-start max-[640px]:flex-col">
       <div class="inline-flex rounded-xl border bg-muted p-1">
-        {#each [
-          ['adaptive', 'Adaptive'],
-          ['lessons', 'Lessons'],
-          ['test', 'Test']
-        ] as option}
+        {#each TRAIN_MODE_OPTIONS as option}
           <Button
-            variant={trainMode === option[0] ? 'secondary' : 'ghost'}
+            variant={trainMode === option.id ? 'secondary' : 'ghost'}
             size="sm"
             class="h-8 rounded-lg px-3 text-xs font-normal shadow-none"
-            onclick={() => setTrainMode(option[0] as TrainMode)}
+            onclick={() => setTrainMode(option.id)}
           >
-            {option[1]}
+            {option.label}
           </Button>
         {/each}
       </div>
@@ -503,17 +524,7 @@
         >
           <div class="font-mono text-[clamp(18px,2.4vw,25px)] leading-[1.75] tracking-[0.01em] text-muted-foreground">
             {#each [...drillText] as character, characterIndex}
-              <span
-                class:text-foreground={characterIndex < typedIndex}
-                class:bg-secondary={characterIndex === typedIndex && !wrongAtCursor}
-                class:text-secondary-foreground={characterIndex === typedIndex && !wrongAtCursor}
-                class:bg-destructive/10={characterIndex === typedIndex && wrongAtCursor}
-                class:text-destructive={characterIndex === typedIndex && wrongAtCursor}
-                class:border-b-2={characterIndex === typedIndex}
-                class:border-primary={characterIndex === typedIndex && !wrongAtCursor}
-                class:border-destructive={characterIndex === typedIndex && wrongAtCursor}
-                class:rounded-sm={characterIndex === typedIndex}
-              >{character === ' ' ? ' ' : character}</span>
+              <span class={characterClass(characterIndex)}>{character === ' ' ? ' ' : character}</span>
             {/each}
           </div>
 
@@ -698,16 +709,7 @@
 
           <div class="font-mono text-[clamp(18px,2.4vw,25px)] leading-[1.75] text-muted-foreground">
             {#each [...drillText] as character, characterIndex}
-              <span
-                class:text-foreground={characterIndex < typedIndex}
-                class:bg-secondary={characterIndex === typedIndex && !wrongAtCursor}
-                class:text-secondary-foreground={characterIndex === typedIndex && !wrongAtCursor}
-                class:bg-destructive/10={characterIndex === typedIndex && wrongAtCursor}
-                class:text-destructive={characterIndex === typedIndex && wrongAtCursor}
-                class:border-b-2={characterIndex === typedIndex}
-                class:border-primary={characterIndex === typedIndex && !wrongAtCursor}
-                class:border-destructive={characterIndex === typedIndex && wrongAtCursor}
-              >{character === ' ' ? ' ' : character}</span>
+              <span class={characterClass(characterIndex)}>{character === ' ' ? ' ' : character}</span>
             {/each}
           </div>
         </div>
