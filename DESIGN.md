@@ -247,10 +247,10 @@ Pomodoro module contract:
 - Timer / Activity are pill tabs on the left of that bar; Settings stays aligned on the right and opens as a sibling in-page view, not a popup
 - Activity and Settings content may widen for their needs without pulling the title/navigation axis off-center
 - distinguish page-level navigation from timer-mode controls: Timer / Activity is the module navigation bar, while Focus / Short / Long remains a compact mode selector
-- the timer ring is supportive, not the hero: keep it compact with a thin stroke so the time value remains the strongest visual element
+- Timer follows the chosen minimal A design: frameless focus surface with only quiet top/bottom dividers, compact mode pills, oversized numeric countdown, subtle state text, cycle dots, and a small session/today summary; do not render a timer ring
 - idle state should not show redundant `Ready` copy; state text appears only when it adds information such as Focus, Paused, Overtime, or Complete
 - cycle copy must be semantically explicit, e.g. `Session 2 of 4`, and match the completed-dot state
-- Reset and Skip use quiet icon controls around the primary Start/Pause/Resume action
+- Reset and Skip are quiet icon-only shadcn Buttons with accessible labels, arranged in the same horizontal row immediately to the left and right of the primary Start/Pause/Resume action
 - Sound, ringtone choice, notifications, auto-start behavior, overtime, Wake Lock, custom durations, Focus Protection, and data controls live in Settings rather than the primary timer surface
 - Focus Protection is optional enforcement, not a separate productivity product: the user explicitly chooses blocked domains and the timer remains the core experience
 - Focus Protection is active during Focus running, paused, and overtime states; it is released for idle, short/long breaks, Reset, and Skip
@@ -272,7 +272,7 @@ Pomodoro module contract:
 - Escape may return from a nested settings drill-down to the main Settings view, but Settings itself behaves like normal page navigation
 - scrollable surfaces may hide the visual scrollbar to preserve the quiet UI, but wheel, trackpad, touch, keyboard, and programmatic scrolling must remain functional
 - the focus label is optional: show `+ Add focus` until the user chooses to add one, then allow lightweight inline editing
-- overtime keeps the progress ring visually complete while elapsed overtime counts upward
+- overtime shows the elapsed extra time with a leading plus sign; do not reintroduce a circular progress ring
 - keyboard shortcuts remain functional but should not be permanently explained on the primary surface
 - keep the interface single-column, light-weight, and free of task-management or heavy analytics scope
 
