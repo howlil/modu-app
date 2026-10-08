@@ -42,7 +42,8 @@ function getNoiseBuffer(audioContext: AudioContext) {
 
   for (let index = 0; index < data.length; index += 1) {
     const white = Math.random() * 2 - 1;
-    previous = previous * 0.2 + white * 0.8;
+    // Brighter broadband attack than the previous softened noise buffer.
+    previous = previous * 0.08 + white * 0.92;
     data[index] = previous;
   }
 
@@ -71,7 +72,7 @@ function shapeGain(
   duration: number
 ) {
   gain.gain.setValueAtTime(0.0001, startAt);
-  gain.gain.exponentialRampToValueAtTime(peak, startAt + 0.0015);
+  gain.gain.exponentialRampToValueAtTime(peak, startAt + 0.0006);
   gain.gain.exponentialRampToValueAtTime(0.0001, startAt + duration);
 }
 
@@ -81,14 +82,15 @@ function playNoiseLayer(
   frequency: number,
   q: number,
   peak: number,
-  duration: number
+  duration: number,
+  filterType: BiquadFilterType = 'bandpass'
 ) {
   const source = audioContext.createBufferSource();
   const filter = audioContext.createBiquadFilter();
   const gain = audioContext.createGain();
 
   source.buffer = getNoiseBuffer(audioContext);
-  filter.type = 'bandpass';
+  filter.type = filterType;
   filter.frequency.setValueAtTime(frequency, startAt);
   filter.Q.setValueAtTime(q, startAt);
   shapeGain(gain, startAt, peak, duration);
@@ -111,8 +113,9 @@ function playBody(
   const filter = audioContext.createBiquadFilter();
   const gain = audioContext.createGain();
 
-  const base = kind === 'space' ? 116 : kind === 'error' ? 174 : 154;
-  const duration = kind === 'space' ? 0.055 : 0.038;
+  // Short keycap impact, not a sustained low-frequency synth note.
+  const base = kind === 'space' ? 150 : kind === 'error' ? 240 : 205;
+  const duration = kind === 'space' ? 0.032 : 0.019;
 
   oscillator.type = kind === 'space' ? 'sine' : 'triangle';
   oscillator.frequency.setValueAtTime(base * variation, startAt);
@@ -122,10 +125,10 @@ function playBody(
   );
 
   filter.type = 'lowpass';
-  filter.frequency.setValueAtTime(kind === 'space' ? 760 : 1120, startAt);
+  filter.frequency.setValueAtTime(kind === 'space' ? 950 : 1500, startAt);
   filter.Q.setValueAtTime(0.65, startAt);
 
-  shapeGain(gain, startAt, kind === 'space' ? 0.095 : 0.075, duration);
+  shapeGain(gain, startAt, kind === 'space' ? 0.047 : 0.028, duration);
 
   oscillator.connect(filter);
   filter.connect(gain);
@@ -146,37 +149,50 @@ function scheduleStrike(
     const startAt = audioContext.currentTime + 0.002;
     const variation = variationFor(key);
 
-    // The initial contact click makes the stroke audible on laptop speakers.
+    // 1. Very fast broadband top attack: the crisp keycap click.
+    // The high-pass preserves treble that the previous 2.5 kHz band-pass hid.
     playNoiseLayer(
       audioContext,
       startAt,
-      (kind === 'space' ? 1800 : kind === 'error' ? 3150 : 2550) * variation,
-      kind === 'space' ? 0.75 : 1.15,
-      kind === 'space' ? 0.085 : kind === 'error' ? 0.095 : 0.09,
-      kind === 'space' ? 0.018 : 0.013
+      (kind === 'space' ? 3600 : kind === 'error' ? 5100 : 4600) * variation,
+      0.75,
+      kind === 'space' ? 0.11 : kind === 'error' ? 0.19 : 0.17,
+      kind === 'space' ? 0.011 : 0.008,
+      'highpass'
     );
 
-    // Low-mid switch body (thock), slightly heavier for Space.
-    playBody(audioContext, startAt, variation, kind);
-
-    // A short case resonance, not a long electronic beep.
+    // 2. Keycap bottom-out snap: slightly lower than the sharp top click.
     playNoiseLayer(
       audioContext,
-      startAt + 0.001,
-      (kind === 'space' ? 620 : 920) * variation,
-      kind === 'space' ? 1.0 : 1.5,
-      kind === 'space' ? 0.065 : 0.05,
-      kind === 'space' ? 0.05 : 0.032
+      startAt + 0.0008,
+      (kind === 'space' ? 1600 : kind === 'error' ? 3100 : 2450) * variation,
+      kind === 'space' ? 0.85 : 1.0,
+      kind === 'space' ? 0.12 : kind === 'error' ? 0.13 : 0.14,
+      kind === 'space' ? 0.025 : 0.016
     );
 
-    // The switch release is quieter than the impact.
+    // 3. Short mechanical body, with a heavier spacebar.
+    playBody(audioContext, startAt + 0.001, variation, kind);
+
+    // 4. Brief plastic case resonance; avoid the lingering thock tail.
     playNoiseLayer(
       audioContext,
-      startAt + (kind === 'space' ? 0.036 : 0.025),
-      (kind === 'space' ? 1450 : 2200) * variation,
-      1.25,
-      kind === 'space' ? 0.024 : 0.02,
-      0.008
+      startAt + 0.002,
+      (kind === 'space' ? 950 : 1250) * variation,
+      1.2,
+      kind === 'space' ? 0.052 : 0.038,
+      kind === 'space' ? 0.029 : 0.019
+    );
+
+    // 5. Small top-out click after the bottom-out, with no long decay.
+    playNoiseLayer(
+      audioContext,
+      startAt + (kind === 'space' ? 0.028 : 0.020),
+      (kind === 'space' ? 2800 : 3700) * variation,
+      0.85,
+      kind === 'space' ? 0.031 : 0.035,
+      0.006,
+      'highpass'
     );
 
     return true;
