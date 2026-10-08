@@ -10,6 +10,22 @@ Local-first browser utilities built with SvelteKit, Tailwind CSS, shadcn-svelte,
 
 Do not expand the tool catalog until one current module is implemented end-to-end.
 
+## Architecture
+
+```text
+src/routes/                   route composition and API entry points
+src/lib/components/ui/        shared shadcn-svelte primitives
+src/lib/modules/pomodoro/     timer rules, activity, persistence, browser adapters, feature views
+src/lib/modules/typing/       adaptive learner, typing session, persistence, feature views
+src/lib/platform/registry/    tool metadata and availability
+extension/                    independent Chromium permission/enforcement boundary
+test/unit/                    deterministic behavior and storage regression tests
+```
+
+Keep routes as composition points, feature-specific UI in its owning module,
+pure logic separate from browser APIs, and localStorage keys backward compatible.
+Do not create a generic feature plugin or state framework until a real requirement needs it.
+
 ## UI system
 
 Generic UI primitives come from **shadcn-svelte** and live under:
@@ -18,7 +34,10 @@ Generic UI primitives come from **shadcn-svelte** and live under:
 src/lib/components/ui/
 ├── button/
 ├── card/
-└── input/
+├── input/
+├── dialog/
+├── tabs/
+└── ...
 ```
 
 Add another official component with:
@@ -46,7 +65,7 @@ bun run test
 bun run build
 ```
 
-Commit `bun.lock` after the first successful `bun install`.
+The committed `bun.lock` is the dependency source of truth; CI uses `bun install --frozen-lockfile`.
 
 ## Cloudflare Workers
 

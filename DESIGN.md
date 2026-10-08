@@ -81,8 +81,13 @@ type ModuleDefinition = {
   name: string;
   route: string;
   layout: 'file-transform' | 'focus';
+  status: 'available' | 'coming-soon';
 };
 ```
+
+The registry is the single owner of tool availability, including noninteractive
+coming-soon tiles. Tool artwork stays inside ToolCard; do not create a dynamic
+plugin framework for the current fixed catalog.
 
 ## 5. UI system
 

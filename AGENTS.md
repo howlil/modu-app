@@ -70,14 +70,18 @@ Prefer deleting dead scaffold over preserving hypothetical architecture.
 ## Architecture
 
 ```text
-route/UI
+routes (entry + composition)
   ↓
-module logic
+feature-local components / controller orchestration
   ↓
-browser APIs / required libraries
+pure module logic   +   feature-owned browser adapters
 ```
 
-Extract shared ownership only when it is real.
+- Keep module-specific UI inside `src/lib/modules/<feature>/components/`.
+- Keep reusable primitives inside `src/lib/components/ui/` and shared site shell in `src/lib/components/`.
+- Keep availability metadata in `src/lib/platform/registry/`; no route-local preview definitions.
+- Preserve current storage keys, timer behavior, and extension protocol during refactors.
+- Extract shared ownership only when it is real; no speculative frameworks.
 
 ## Local-first
 
