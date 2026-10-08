@@ -1054,10 +1054,10 @@
 </svelte:head>
 
 <section
-  class="mx-auto min-h-[calc(100vh-76px)] w-full max-w-[1180px] px-4 pb-14 pt-10 max-[760px]:px-2.5 max-[760px]:pt-7"
+  class="mx-auto min-h-[calc(100vh-76px)] w-full max-w-[1180px] px-4 pb-8 pt-8 max-[760px]:px-2.5 max-[760px]:pt-6"
   style={`--pomodoro-accent: ${modeMeta.accent}; --pomodoro-soft: ${modeMeta.soft};`}
 >
-  <div class="mx-auto mb-7 w-full max-w-[860px] min-w-0">
+  <div class="mx-auto mb-6 w-full max-w-[860px] min-w-0">
     <ToolHeader title="Pomodoro" />
 
     <Tabs.Root bind:value={activeView} class="gap-0">
@@ -1093,8 +1093,8 @@
 
   <div class="mx-auto w-full max-w-[860px] min-w-0">
   {#if activeView === 'timer'}
-    <div class="mx-auto flex min-h-[500px] w-full min-w-0 flex-col items-center justify-center border-y border-border px-3 py-11 text-center max-[760px]:min-h-[460px] max-[760px]:px-2">
-      <div class="mb-9 flex items-center gap-1" role="tablist" aria-label="Timer mode">
+    <div class="mx-auto flex min-h-[500px] w-full min-w-0 flex-col items-center justify-center border-y border-border px-3 py-8 text-center max-[760px]:min-h-[460px] max-[760px]:px-2">
+      <div class="mb-8 flex items-center gap-1" role="tablist" aria-label="Timer mode">
         {#each ['focus', 'short', 'long'] as mode}
           {@const typedMode = mode as PomodoroMode}
           <Button
@@ -1136,7 +1136,7 @@
           {#if focusEditing}
             <Input
               bind:this={focusInput}
-              class="w-full max-w-[300px] rounded-none border-0 border-b border-border bg-transparent px-2 py-1.5 text-center text-ui font-normal shadow-none placeholder:text-muted-foreground/60 focus-visible:ring-0"
+              class="w-full max-w-[300px] rounded-none border-0 border-b border-border bg-transparent px-2 py-2 text-center text-ui font-normal shadow-none placeholder:text-muted-foreground/60 focus-visible:ring-0"
               type="text"
               maxlength="80"
               bind:value={focusDraft}
@@ -1157,7 +1157,7 @@
             <Button
               variant="ghost"
               size="sm"
-              class="group h-auto max-w-full rounded-full px-2 py-1.5 text-ui font-normal text-foreground shadow-none"
+              class="group h-auto max-w-full rounded-full px-2 py-2 text-ui font-normal text-foreground shadow-none"
               onclick={beginFocusEdit}
             >
               <span class="truncate">{focusText}</span>
@@ -1167,7 +1167,7 @@
             <Button
               variant="ghost"
               size="sm"
-              class="h-auto rounded-full px-2 py-1.5 text-meta font-normal text-muted-foreground shadow-none"
+              class="h-auto rounded-full px-2 py-2 text-meta font-normal text-muted-foreground shadow-none"
               onclick={beginFocusEdit}
             >
               + Add focus
@@ -1188,7 +1188,7 @@
         {/each}
       </div>
 
-      <div class="mt-7 flex items-center justify-center gap-3">
+      <div class="mt-6 flex items-center justify-center gap-3">
         <Button
           variant="ghost"
           size="icon-lg"
@@ -1229,7 +1229,7 @@
         <Button
           variant="ghost"
           size="xs"
-          class="h-auto rounded-full px-0.5 py-0 text-meta font-normal text-muted-foreground shadow-none hover:text-foreground"
+          class="h-auto rounded-full px-1 py-0 text-meta font-normal text-muted-foreground shadow-none hover:text-foreground"
           onclick={() => (activeView = 'activity')}
         >
           {formatFocusTotal(todayFocusMs)} today
