@@ -1067,13 +1067,13 @@
       >
         <Tabs.Trigger
           value="timer"
-          class="h-7 flex-none rounded-full px-3 py-0 text-[12px] font-normal data-[state=active]:font-medium data-[state=active]:shadow-none"
+          class="h-7 flex-none rounded-full px-3 py-0 text-meta font-normal data-[state=active]:font-medium data-[state=active]:shadow-none"
         >
           Timer
         </Tabs.Trigger>
         <Tabs.Trigger
           value="activity"
-          class="h-7 flex-none rounded-full px-3 py-0 text-[12px] font-normal data-[state=active]:font-medium data-[state=active]:shadow-none"
+          class="h-7 flex-none rounded-full px-3 py-0 text-meta font-normal data-[state=active]:font-medium data-[state=active]:shadow-none"
         >
           Activity
         </Tabs.Trigger>
@@ -1103,8 +1103,8 @@
             role="tab"
             aria-selected={timer.mode === typedMode}
             class={timer.mode === typedMode
-              ? 'h-[30px] rounded-full bg-[var(--pomodoro-soft)] px-3.5 text-[11px] font-normal text-[var(--pomodoro-accent)] shadow-none hover:bg-[var(--pomodoro-soft)] hover:text-[var(--pomodoro-accent)]'
-              : 'h-[30px] rounded-full px-3.5 text-[11px] font-normal text-muted-foreground shadow-none'}
+              ? 'h-[30px] rounded-full bg-[var(--pomodoro-soft)] px-3.5 text-meta font-normal text-[var(--pomodoro-accent)] shadow-none hover:bg-[var(--pomodoro-soft)] hover:text-[var(--pomodoro-accent)]'
+              : 'h-[30px] rounded-full px-3.5 text-meta font-normal text-muted-foreground shadow-none'}
             onclick={() => switchPomodoroMode(typedMode)}
           >
             {MODE_META[typedMode].shortLabel}
@@ -1116,7 +1116,7 @@
         {formattedTime}
       </div>
 
-      <div class="mt-5 flex min-h-5 items-center justify-center gap-1 text-[11px] text-muted-foreground">
+      <div class="mt-5 flex min-h-5 items-center justify-center gap-1 text-meta text-muted-foreground">
         <span>
           {timer.status === 'paused'
             ? 'Paused'
@@ -1136,7 +1136,7 @@
           {#if focusEditing}
             <Input
               bind:this={focusInput}
-              class="w-full max-w-[300px] rounded-none border-0 border-b border-border bg-transparent px-2 py-1.5 text-center text-[13px] font-normal shadow-none placeholder:text-muted-foreground/60 focus-visible:ring-0"
+              class="w-full max-w-[300px] rounded-none border-0 border-b border-border bg-transparent px-2 py-1.5 text-center text-ui font-normal shadow-none placeholder:text-muted-foreground/60 focus-visible:ring-0"
               type="text"
               maxlength="80"
               bind:value={focusDraft}
@@ -1157,7 +1157,7 @@
             <Button
               variant="ghost"
               size="sm"
-              class="group h-auto max-w-full rounded-full px-2 py-1.5 text-[13px] font-normal text-foreground shadow-none"
+              class="group h-auto max-w-full rounded-full px-2 py-1.5 text-ui font-normal text-foreground shadow-none"
               onclick={beginFocusEdit}
             >
               <span class="truncate">{focusText}</span>
@@ -1167,7 +1167,7 @@
             <Button
               variant="ghost"
               size="sm"
-              class="h-auto rounded-full px-2 py-1.5 text-[12px] font-normal text-muted-foreground shadow-none"
+              class="h-auto rounded-full px-2 py-1.5 text-meta font-normal text-muted-foreground shadow-none"
               onclick={beginFocusEdit}
             >
               + Add focus
@@ -1201,7 +1201,7 @@
         </Button>
 
         <Button
-          class="h-11 min-w-[146px] rounded-full px-6 text-[13px] font-semibold shadow-[0_8px_20px_rgba(36,104,242,0.12)]"
+          class="h-11 min-w-[146px] rounded-full px-6 text-ui font-semibold shadow-[0_8px_20px_rgba(36,104,242,0.12)]"
           onclick={handlePrimary}
         >
           {primaryLabel}
@@ -1219,7 +1219,7 @@
         </Button>
       </div>
 
-      <div class="mt-4 flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
+      <div class="mt-4 flex items-center justify-center gap-1.5 text-meta text-muted-foreground">
         <span>
           {timer.completedFocus >= 4
             ? 'Long break next'
@@ -1229,7 +1229,7 @@
         <Button
           variant="ghost"
           size="xs"
-          class="h-auto rounded-full px-0.5 py-0 text-[11px] font-normal text-muted-foreground shadow-none hover:text-foreground"
+          class="h-auto rounded-full px-0.5 py-0 text-meta font-normal text-muted-foreground shadow-none hover:text-foreground"
           onclick={() => (activeView = 'activity')}
         >
           {formatFocusTotal(todayFocusMs)} today
@@ -1237,7 +1237,7 @@
       </div>
 
       {#if timer.status === 'complete' || timer.status === 'overtime'}
-        <p class="mt-4 min-h-5 text-[12px] font-normal text-muted-foreground">
+        <p class="mt-4 min-h-5 text-meta font-normal text-muted-foreground">
           <span class="font-medium text-foreground">
             {timer.status === 'overtime'
               ? 'Focus target reached.'
@@ -1276,7 +1276,7 @@
           </Button>
         {/if}
 
-        <h2 class="m-0 truncate text-[18px] font-semibold tracking-[-0.03em]">
+        <h2 class="m-0 truncate text-title font-semibold tracking-[-0.03em]">
           {settingsPanel === 'main'
             ? 'Settings'
             : settingsPanel === 'blocked-sites'
@@ -1289,7 +1289,7 @@
 
         {#if settingsPanel === 'main'}
           <div>
-          <div class="mb-2 text-[11px] font-medium text-muted-foreground">Timer</div>
+          <div class="mb-2 text-meta font-medium text-muted-foreground">Timer</div>
 
           {#each [
             ['focus', 'Focus', 180],
@@ -1297,13 +1297,13 @@
             ['long', 'Long', 120]
           ] as row}
             {@const timerMode = row[0] as PomodoroMode}
-            <label class="grid min-h-10 grid-cols-[1fr_90px] items-center gap-3 text-[12px]">
+            <label class="grid min-h-10 grid-cols-[1fr_90px] items-center gap-3 text-meta">
               {row[1]}
               <Input
                 type="number"
                 min="1"
                 max={row[2]}
-                class="h-8 text-right text-[12px]"
+                class="h-8 text-right text-meta"
                 value={durations[timerMode]}
                 onchange={(event) => updateDuration(timerMode, event.currentTarget.value)}
               />
@@ -1312,7 +1312,7 @@
         </div>
 
         <div class="mt-4 border-t pt-4">
-          <div class="mb-1 text-[11px] font-medium text-muted-foreground">Automation</div>
+          <div class="mb-1 text-meta font-medium text-muted-foreground">Automation</div>
 
           {#each [
             ['autoStartBreaks', 'Auto-start breaks'],
@@ -1320,7 +1320,7 @@
             ['overtime', 'Count overtime']
           ] as option}
             {@const key = option[0] as keyof PomodoroPreferences}
-            <div class="flex h-10 w-full items-center justify-between gap-4 px-1 text-[12px]">
+            <div class="flex h-10 w-full items-center justify-between gap-4 px-1 text-meta">
               <span>{option[1]}</span>
               <Switch
                 checked={preferences[key]}
@@ -1342,13 +1342,13 @@
         />
 
         <div class="mt-4 border-t pt-4">
-          <div class="mb-1 text-[11px] font-medium text-muted-foreground">System</div>
+          <div class="mb-1 text-meta font-medium text-muted-foreground">System</div>
 
-          <div class="flex h-10 w-full items-center justify-between gap-4 px-1 text-[12px]">
+          <div class="flex h-10 w-full items-center justify-between gap-4 px-1 text-meta">
             <span>
               Notifications
               {#if !notificationsSupported}
-                <span class="ml-1 text-[10px] text-muted-foreground">Unavailable</span>
+                <span class="ml-1 text-meta text-muted-foreground">Unavailable</span>
               {/if}
             </span>
             <Switch
@@ -1359,7 +1359,7 @@
             />
           </div>
 
-          <div class="flex h-10 w-full items-center justify-between gap-4 px-1 text-[12px]">
+          <div class="flex h-10 w-full items-center justify-between gap-4 px-1 text-meta">
             <span>Sound</span>
             <Switch
               checked={soundEnabled}
@@ -1370,21 +1370,21 @@
 
           <Button
             variant="ghost"
-            class="flex h-10 w-full items-center justify-between rounded-full px-1 text-[12px] font-normal"
+            class="flex h-10 w-full items-center justify-between rounded-full px-1 text-meta font-normal"
             onclick={() => openSettingsPanel('ringtone')}
           >
             <span>Ringtone</span>
-            <span class="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <span class="inline-flex items-center gap-1.5 text-meta text-muted-foreground">
               {RINGTONE_OPTIONS.find((option) => option.id === ringtone)?.label ?? 'Soft chime'}
               <ChevronRight class="size-3.5" strokeWidth={1.7} />
             </span>
           </Button>
 
-          <div class="flex h-10 w-full items-center justify-between gap-4 px-1 text-[12px]">
+          <div class="flex h-10 w-full items-center justify-between gap-4 px-1 text-meta">
             <span>
               Keep screen awake
               {#if !wakeLockSupported}
-                <span class="ml-1 text-[10px] text-muted-foreground">Unavailable</span>
+                <span class="ml-1 text-meta text-muted-foreground">Unavailable</span>
               {/if}
             </span>
             <Switch
@@ -1397,10 +1397,10 @@
         </div>
 
         <div class="mt-4 border-t pt-4">
-          <div class="mb-1 text-[11px] font-medium text-muted-foreground">Data</div>
+          <div class="mb-1 text-meta font-medium text-muted-foreground">Data</div>
           <Button
             variant="ghost"
-            class="flex h-10 w-full items-center justify-between rounded-full px-1 text-[12px] font-normal"
+            class="flex h-10 w-full items-center justify-between rounded-full px-1 text-meta font-normal"
             onclick={() => openSettingsPanel('data')}
           >
             <span>Export & delete data</span>
@@ -1419,7 +1419,7 @@
           />
         {:else if settingsPanel === 'ringtone'}
           <div>
-            <p class="mb-3 mt-0 text-[11px] leading-[1.55] text-muted-foreground">
+            <p class="mb-3 mt-0 text-meta  text-muted-foreground">
               Pick a short local tone for session completion. Selecting one also previews it.
             </p>
 
@@ -1431,8 +1431,8 @@
                   onclick={() => selectRingtone(option.id)}
                 >
                   <span class="min-w-0">
-                    <span class="block text-[12px]">{option.label}</span>
-                    <span class="mt-0.5 block text-[10px] text-muted-foreground">{option.description}</span>
+                    <span class="block text-meta">{option.label}</span>
+                    <span class="mt-0.5 block text-meta text-muted-foreground">{option.description}</span>
                   </span>
                   {#if ringtone === option.id}
                     <Check class="size-4 shrink-0 text-primary" strokeWidth={1.8} />
@@ -1443,13 +1443,13 @@
           </div>
         {:else}
           <div>
-            <p class="mb-4 mt-0 text-[11px] leading-[1.55] text-muted-foreground">
+            <p class="mb-4 mt-0 text-meta  text-muted-foreground">
               Export or remove all Pomodoro data stored in this browser, including settings, blocked sites, goals, and activity history.
             </p>
 
             <Button
               variant="outline"
-              class="h-10 w-full justify-start rounded-full text-[12px] font-normal shadow-none"
+              class="h-10 w-full justify-start rounded-full text-meta font-normal shadow-none"
               onclick={exportAllPomodoroData}
             >
               <Download class="size-3.5" strokeWidth={1.7} />
@@ -1457,14 +1457,14 @@
             </Button>
 
             {#if dataMessage}
-              <p class="mb-0 mt-2 text-[10px] text-muted-foreground">{dataMessage}</p>
+              <p class="mb-0 mt-2 text-meta text-muted-foreground">{dataMessage}</p>
             {/if}
 
             <div class="mt-5 border-t pt-4">
               {#if !deleteConfirm}
                 <Button
                   variant="ghost"
-                  class="h-10 w-full justify-start rounded-full px-2 text-[12px] font-normal text-destructive"
+                  class="h-10 w-full justify-start rounded-full px-2 text-meta font-normal text-destructive"
                   onclick={() => {
                     deleteConfirm = true;
                     dataMessage = '';
@@ -1475,16 +1475,16 @@
                 </Button>
               {:else}
                 <div class="rounded-xl border border-destructive/20 bg-destructive/[0.035] p-3">
-                  <p class="m-0 text-[11px] leading-[1.5]">
+                  <p class="m-0 text-meta ">
                     Delete timer settings, Focus Protection data, goals, and all activity history?
                   </p>
-                  <p class="mb-0 mt-1 text-[10px] text-muted-foreground">This cannot be undone.</p>
+                  <p class="mb-0 mt-1 text-meta text-muted-foreground">This cannot be undone.</p>
 
                   <div class="mt-3 flex justify-end gap-2">
                     <Button
                       variant="ghost"
                       size="sm"
-                      class="h-8 rounded-full text-[11px] font-normal"
+                      class="h-8 rounded-full text-meta font-normal"
                       onclick={() => (deleteConfirm = false)}
                     >
                       Cancel
@@ -1492,7 +1492,7 @@
                     <Button
                       variant="destructive"
                       size="sm"
-                      class="h-8 rounded-full text-[11px] font-medium shadow-none"
+                      class="h-8 rounded-full text-meta font-medium shadow-none"
                       onclick={deleteAllPomodoroData}
                     >
                       Delete all
