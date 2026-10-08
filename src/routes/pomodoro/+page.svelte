@@ -6,6 +6,7 @@
   import { Switch } from "$lib/components/ui/switch/index.js";
   import * as Tabs from '$lib/components/ui/tabs/index.js';
   import ToolHeader from '#lib/components/ToolHeader.svelte';
+  import { createWakeLockController } from '#lib/modules/pomodoro/wake-lock.ts';
   import ActivityView from '#lib/modules/pomodoro/components/ActivityView.svelte';
   import FocusProtectionSettings from '#lib/modules/pomodoro/components/FocusProtectionSettings.svelte';
   import {
@@ -135,7 +136,11 @@
   let dataMessage = $state('');
   let hydrated = $state(false);
   let clockNow = $state(Date.now());
-  let wakeLock: { release: () => Promise<void> } | null = null;
+  const { sync: syncWakeLock, release: releaseWakeLock } = createWakeLockController(
+    () => preferences.keepAwake,
+    () => wakeLockSupported,
+    () => timer.status
+  );
 
   $effect(() => {
     if (activeView !== 'settings') {
@@ -806,56 +811,6 @@
     dailyGoalHours = clampGoalHours(hours);
     goalSchedule = schedule;
     persist();
-  }
-
-  async function requestWakeLock() {
-    if (
-      !preferences.keepAwake ||
-      !wakeLockSupported ||
-      document.visibilityState !== 'visible' ||
-      (timer.status !== 'running' && timer.status !== 'overtime') ||
-      wakeLock
-    ) {
-      return;
-    }
-
-    try {
-      const nav = navigator as Navigator & {
-        wakeLock?: {
-          request: (type: 'screen') => Promise<{ release: () => Promise<void> }>;
-        };
-      };
-
-      if (!nav.wakeLock) return;
-      wakeLock = await nav.wakeLock.request('screen');
-    } catch {
-      wakeLock = null;
-    }
-  }
-
-  async function releaseWakeLock() {
-    if (!wakeLock) return;
-
-    try {
-      await wakeLock.release();
-    } catch {
-      // Wake Lock is progressive enhancement.
-    } finally {
-      wakeLock = null;
-    }
-  }
-
-  async function syncWakeLock() {
-    if (
-      preferences.keepAwake &&
-      wakeLockSupported &&
-      (timer.status === 'running' || timer.status === 'overtime')
-    ) {
-      await requestWakeLock();
-      return;
-    }
-
-    await releaseWakeLock();
   }
 
   onMount(() => {
