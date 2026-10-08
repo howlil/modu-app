@@ -25,7 +25,7 @@
     </svg>
 
     <div class="float-card card-file">
-      <span class="card-icon icon-file"><File size={25} strokeWidth={1.8} /></span>
+      <span class="card-icon icon-file"><File size={22} strokeWidth={1.8} /></span>
       <span class="card-details">
         <span class="card-title">File tools</span>
         <span class="card-description">Convert, rename, organize<br />in seconds.</span>
@@ -34,7 +34,7 @@
     </div>
 
     <div class="float-card card-focus">
-      <span class="card-icon icon-focus"><Leaf size={25} strokeWidth={1.9} /></span>
+      <span class="card-icon icon-focus"><Leaf size={22} strokeWidth={1.9} /></span>
       <span class="card-details">
         <span class="card-title">Focus utilities</span>
         <span class="card-description">Simple tools for<br />a calmer day.</span>
@@ -43,7 +43,7 @@
     </div>
 
     <div class="float-card card-everyday">
-      <span class="card-icon icon-everyday"><Zap size={26} strokeWidth={1.9} fill="currentColor" /></span>
+      <span class="card-icon icon-everyday"><Zap size={22} strokeWidth={1.9} fill="currentColor" /></span>
       <span class="card-details">
         <span class="card-title">Everyday tools</span>
         <span class="card-description">Do more with less<br />friction.</span>
@@ -52,7 +52,7 @@
     </div>
 
     <div class="float-card card-source">
-      <span class="card-icon icon-source"><Settings2 size={26} strokeWidth={1.9} /></span>
+      <span class="card-icon icon-source"><Settings2 size={22} strokeWidth={1.9} /></span>
       <span class="card-details">
         <span class="card-title">Open source</span>
         <span class="card-description">Built with care,<br />for everyone.</span>
