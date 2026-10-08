@@ -1,0 +1,23 @@
+name: Verify
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.2.15'
+      - name: Install dependencies
+        run: bun install
+      - name: Typecheck
+        run: bun run check
+      - name: Unit tests
+        run: bun run test
+      - name: Build Cloudflare bundle
+        run: bun run build
