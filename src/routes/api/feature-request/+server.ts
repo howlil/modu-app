@@ -34,7 +34,7 @@ function githubIssueUrl(title: string, body: string) {
 }
 
 export const GET: RequestHandler = async () => {
-  const settings = env as FeatureRequestEnv;
+  const settings = env as unknown as FeatureRequestEnv;
   const siteKey =
     settings.TURNSTILE_SITE_KEY && settings.TURNSTILE_SECRET_KEY && settings.GITHUB_TOKEN
       ? settings.TURNSTILE_SITE_KEY
@@ -48,7 +48,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
     return json({ error: 'Invalid request origin.' }, { status: 403 });
   }
 
-  const settings = env as FeatureRequestEnv;
+  const settings = env as unknown as FeatureRequestEnv;
   const ipLimiter = settings.FEATURE_REQUEST_IP_LIMITER;
   const globalLimiter = settings.FEATURE_REQUEST_GLOBAL_LIMITER;
 
