@@ -15,7 +15,7 @@
   bind:this={ref}
   data-slot={dataSlot}
   class={cn(
-    "cn-textarea flex field-sizing-content min-h-16 w-full outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
+    "cn-textarea flex field-sizing-content min-h-16 w-full text-ui outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
     className
   )}
   bind:value
