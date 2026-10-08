@@ -306,7 +306,7 @@ Typing module contract:
 - keyboard/finger guidance fades as practiced keys stabilize and can be manually reduced or hidden
 - keyboard sound is optional, local, and procedural through Web Audio; no remote audio asset or license dependency is required
 - the typing sound engine reuses one AudioContext instead of creating a new context for every keystroke
-- typing sound uses an audible but restrained mechanical-keyboard character: switch click, low-mid body/thock, subtle case resonance, and quiet release clack; Space is lower/heavier and incorrect input remains audibly distinct
+- typing sound favors a crisp, dry clacky keyboard profile: fast high-frequency contact tick, short keycap bottom-out snap, restrained low body, and quieter top-out release; Space stays lower/heavier and wrong keys retain a subtly brighter impact
 - key sounds must resume suspended browser AudioContexts from a real user gesture, play the pending first strike only after resume succeeds, and avoid unhandled resume rejections or delayed bursts
 - Typing Settings includes a small Preview action to verify sound output without starting a training run
 - Test mode records performance history but must not update key mastery or adaptive weakness
