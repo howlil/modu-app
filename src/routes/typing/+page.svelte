@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy, onMount } from 'svelte';
+  import { onDestroy, onMount, tick } from 'svelte';
   import { RotateCcw, Settings2 } from 'lucide-svelte';
   import { Button } from '$lib/components/ui/button/index.js';
   import * as Tabs from '$lib/components/ui/tabs/index.js';
@@ -10,6 +10,7 @@
     DEFAULT_TYPING_PREFERENCES,
     KEY_ROWS,
     LESSONS,
+    LESSON_DRILLS,
     TEST_TEXT,
     TRAINING_BLOCKS,
     createInitialTypingState,
@@ -39,6 +40,8 @@
   const BLOCK_KEY = 'module-typing-block-v1';
 
   let primaryTab = $state<PrimaryTab>('train');
+  let selectedLessonIndex = $state<number | null>(null);
+  let trainingSurface: HTMLDivElement | undefined;
   let testMode = $state('time');
   let learningState = $state<TypingLearningState>(createInitialTypingState());
   let preferences = $state<TypingPreferences>({ ...DEFAULT_TYPING_PREFERENCES });
@@ -75,7 +78,9 @@
   );
   const guideLevel = $derived(manualGuideLevel ?? adaptiveGuideLevel);
   const target = $derived(
-    targetLabel(currentBlock.kind, learningState, preferences)
+    selectedLessonIndex === null
+      ? targetLabel(currentBlock.kind, learningState, preferences)
+      : LESSONS[selectedLessonIndex][1]
   );
   const weakKeyMetrics = $derived(weakKeys(learningState, preferences, 4));
   const weakTransitionMetrics = $derived(weakTransitions(learningState, 4));
@@ -216,6 +221,7 @@
   }
 
   function startAdaptiveBlock(persist = true) {
+    selectedLessonIndex = null;
     resetRun(
       generateBlockText(currentBlock.kind, learningState, preferences)
     );
@@ -224,7 +230,16 @@
   }
 
   function startTest() {
+    selectedLessonIndex = null;
     resetRun(TEST_TEXT);
+  }
+
+  async function startLesson(index: number) {
+    selectedLessonIndex = index;
+    primaryTab = 'train';
+    resetRun(LESSON_DRILLS[index] ?? LESSON_DRILLS[0]);
+    await tick();
+    trainingSurface?.focus();
   }
 
   function handleCharacter(typed: string) {
@@ -289,11 +304,13 @@
 
     if (primaryTab === 'train') {
       const reviewedKeys =
-        currentBlock.kind === 'warmup' ? dueKeys(learningState) : [];
+        selectedLessonIndex === null && currentBlock.kind === 'warmup'
+          ? dueKeys(learningState)
+          : [];
 
       learningState.sessions.push({
         at: Date.now(),
-        kind: currentBlock.kind,
+        kind: selectedLessonIndex === null ? currentBlock.kind : 'transfer',
         wpm: finalWpm,
         accuracy: finalAccuracy,
         errors,
@@ -421,12 +438,12 @@
 </script>
 
 <svelte:head>
-  <title>Typing — Module</title>
+  <title>Typing Practice — Module</title>
 </svelte:head>
 
 <section class="mx-auto w-full max-w-[1180px] px-4 py-8 max-[760px]:px-2.5 max-[760px]:py-6">
   <div class="mx-auto w-full max-w-[860px] min-w-0">
-    <ToolHeader title="Typing" />
+    <ToolHeader title="Typing Practice" />
 
     <Tabs.Root bind:value={primaryTab} class="gap-0">
       <Tabs.List
@@ -475,7 +492,7 @@
         <div class="flex min-w-0 items-start justify-between gap-5">
           <div class="min-w-0">
             <h2 class="m-0 truncate text-ui font-medium tracking-[-0.015em]">
-              {currentBlock.name}
+              {selectedLessonIndex === null ? currentBlock.name : LESSONS[selectedLessonIndex][0]}
             </h2>
             <p class="mt-1 truncate font-mono text-meta text-muted-foreground">
               {target}
@@ -483,15 +500,20 @@
           </div>
 
           <span class="shrink-0 text-meta tabular-nums text-muted-foreground">
-            {blockIndex + 1} / {TRAINING_BLOCKS.length}
-            {#if minutesLeft > 0}
-              <span class="ml-2">~{minutesLeft}m</span>
+            {#if selectedLessonIndex !== null}
+              Lesson {selectedLessonIndex + 1} / {LESSONS.length}
+            {:else}
+              {blockIndex + 1} / {TRAINING_BLOCKS.length}
+              {#if minutesLeft > 0}
+                <span class="ml-2">~{minutesLeft}m</span>
+              {/if}
             {/if}
           </span>
         </div>
 
         <div
           class="mt-8 min-h-[168px] w-full min-w-0 max-w-full overflow-x-clip outline-none ring-ring focus-visible:ring-2 max-[640px]:mt-6 max-[640px]:min-h-[150px]"
+          bind:this={trainingSurface}
           role="textbox"
           aria-label="Typing practice"
           aria-multiline="true"
@@ -563,6 +585,7 @@
           </div>
         {/if}
 
+        {#if selectedLessonIndex === null}
         <div class="mt-6 px-1">
           <div class="flex items-center" aria-label={`Session block ${blockIndex + 1} of ${TRAINING_BLOCKS.length}`}>
             {#each TRAINING_BLOCKS as block, index}
@@ -594,13 +617,14 @@
             {currentBlock.shortName}
           </div>
         </div>
+        {/if}
 
         <div class="mt-6 flex items-center justify-between gap-3 border-t border-border pt-3">
           <Button
             variant="ghost"
             size="sm"
             class="h-8 px-2 text-meta font-normal text-muted-foreground shadow-none"
-            onclick={() => startAdaptiveBlock()}
+            onclick={() => selectedLessonIndex === null ? startAdaptiveBlock() : startLesson(selectedLessonIndex)}
           >
             <RotateCcw class="size-3.5" strokeWidth={1.8} />
             Restart
@@ -621,9 +645,9 @@
                 variant="ghost"
                 size="sm"
                 class="h-8 px-2 text-meta font-medium text-primary shadow-none"
-                onclick={nextBlock}
+                onclick={selectedLessonIndex === null ? nextBlock : () => setPrimaryTab('lessons')}
               >
-                Next →
+                {selectedLessonIndex === null ? 'Next →' : 'Lessons →'}
               </Button>
             {/if}
           </div>
@@ -641,7 +665,7 @@
             <Button
               variant="ghost"
               class="grid h-auto w-full grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-3 rounded-full border-b border-border px-1 py-4 text-left font-normal whitespace-normal shadow-none last:border-b-0 hover:bg-muted/50 max-[560px]:grid-cols-[28px_minmax(0,1fr)]"
-              onclick={() => setPrimaryTab('train')}
+              onclick={() => startLesson(index)}
             >
               <span class="font-mono text-meta text-muted-foreground">
                 {String(index + 1).padStart(2, '0')}
@@ -653,7 +677,7 @@
               </span>
 
               <span class="text-meta text-muted-foreground max-[560px]:col-start-2">
-                {index < 2 ? 'Review →' : index === 2 ? 'Continue →' : 'Practice →'}
+                Practice →
               </span>
             </Button>
           {/each}
