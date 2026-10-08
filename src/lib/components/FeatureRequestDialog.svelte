@@ -78,7 +78,7 @@
 </script>
 
 <Button
-  class="h-10 rounded-full px-4 text-[13px] font-medium shadow-none"
+  class="h-10 rounded-full px-4 text-ui font-medium shadow-none"
   onclick={openDialog}
 >
   Request feature
@@ -95,10 +95,10 @@
     >
       <div class="flex items-start justify-between gap-4">
         <div>
-          <Dialog.Title class="text-[18px] font-[600] tracking-[-0.025em]">
+          <Dialog.Title class="text-title font-semibold tracking-[-0.025em]">
             Request a feature
           </Dialog.Title>
-          <Dialog.Description class="mt-1 text-[13px] leading-5 text-muted-foreground">
+          <Dialog.Description class="mt-1 text-ui leading-5 text-muted-foreground">
             Send an idea directly to the Modu GitHub issues.
           </Dialog.Description>
         </div>
@@ -113,14 +113,14 @@
 
       {#if issueUrl}
         <div class="mt-6 rounded-2xl border border-border bg-muted/45 p-4">
-          <div class="flex items-center gap-2 text-[14px] font-medium">
+          <div class="flex items-center gap-2 text-ui font-medium">
             <span class="grid size-7 place-items-center rounded-full bg-success-muted text-success">
               <Check class="size-4" strokeWidth={2} />
             </span>
             Request sent
           </div>
 
-          <p class="mt-2 text-[13px] leading-5 text-muted-foreground">
+          <p class="mt-2 text-ui leading-5 text-muted-foreground">
             The GitHub issue was created successfully.
           </p>
 
@@ -129,7 +129,7 @@
             target="_blank"
             rel="noreferrer"
             variant="outline"
-            class="mt-4 h-9 rounded-full px-3 text-[12px] font-medium shadow-none"
+            class="mt-4 h-9 rounded-full px-3 text-meta font-medium shadow-none"
           >
             View issue
             <ExternalLink class="size-3.5" strokeWidth={1.8} />
@@ -138,7 +138,7 @@
       {:else}
         <form class="mt-6 space-y-4" onsubmit={submitRequest}>
           <div class="space-y-1.5">
-            <label for="feature-title" class="text-[12px] font-medium">Feature</label>
+            <label for="feature-title" class="text-meta font-medium">Feature</label>
             <Input
               id="feature-title"
               bind:value={title}
@@ -151,7 +151,7 @@
           </div>
 
           <div class="space-y-1.5">
-            <label for="feature-details" class="text-[12px] font-medium">
+            <label for="feature-details" class="text-meta font-medium">
               What should it do?
               <span class="font-normal text-muted-foreground">Optional</span>
             </label>
@@ -161,7 +161,7 @@
               maxlength={1500}
               rows={5}
               placeholder="A short use case or expected behavior."
-              class="w-full resize-none rounded-xl border border-input bg-transparent px-3 py-2.5 text-[13px] leading-5 shadow-none transition focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              class="w-full resize-none rounded-xl border border-input bg-transparent px-3 py-2.5 text-ui leading-5 shadow-none transition focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
             />
           </div>
 
@@ -176,7 +176,7 @@
           </div>
 
           {#if error}
-            <div class="rounded-xl bg-destructive/8 px-3 py-2.5 text-[12px] leading-5 text-destructive">
+            <div class="rounded-xl bg-destructive/8 px-3 py-2.5 text-meta leading-5 text-destructive">
               {error}
               {#if fallbackUrl}
                 <a
@@ -193,7 +193,7 @@
 
           <div class="flex justify-end gap-2 pt-1">
             <Dialog.Close
-              class="inline-flex h-9 items-center justify-center rounded-full border border-border bg-background px-3 text-[12px] font-medium transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+              class="inline-flex h-9 items-center justify-center rounded-full border border-border bg-background px-3 text-meta font-medium transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
             >
               Cancel
             </Dialog.Close>
@@ -201,7 +201,7 @@
             <Button
               type="submit"
               disabled={submitting}
-              class="h-9 rounded-full px-3 text-[12px] font-medium shadow-none"
+              class="h-9 rounded-full px-3 text-meta font-medium shadow-none"
             >
               {submitting ? 'Sending…' : 'Send request'}
               <Send class="size-3.5" strokeWidth={1.8} />
