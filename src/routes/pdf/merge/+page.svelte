@@ -18,21 +18,21 @@
     <Card.Root class="min-h-56 justify-center gap-0 border-dashed py-0 shadow-none">
       <Card.Content class="grid place-items-center p-6 text-center">
         <div>
-          <div class="mx-auto mb-3 grid size-10 place-items-center rounded-lg bg-secondary text-base text-secondary-foreground">↑</div>
-          <Card.Title class="text-sm">Drop PDF files</Card.Title>
+          <div class="mx-auto mb-3 grid size-10 place-items-center rounded-lg bg-secondary text-body text-secondary-foreground">↑</div>
+          <Card.Title class="text-ui">Drop PDF files</Card.Title>
           <Button variant="outline" size="sm" class="mt-4">Choose files</Button>
-          <p class="mt-2 text-xs text-muted-foreground">Processed locally.</p>
+          <p class="mt-2 text-meta text-muted-foreground">Processed locally.</p>
         </div>
       </Card.Content>
     </Card.Root>
 
     <Card.Root class="gap-0 py-0 shadow-none">
       <Card.Header class="border-b px-4 py-3">
-        <Card.Title class="text-[13px]">Output</Card.Title>
+        <Card.Title class="text-ui">Output</Card.Title>
       </Card.Header>
 
       <Card.Content class="grid gap-3 p-4">
-        <label class="grid gap-2 text-xs font-medium" for="output-name">
+        <label class="grid gap-2 text-ui font-medium" for="output-name">
           File name
           <Input id="output-name" value="merged.pdf" />
         </label>
