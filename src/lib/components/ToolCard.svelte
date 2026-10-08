@@ -30,13 +30,13 @@
     aria-hidden="true"
   ></div>
 
-  <div class="relative z-20 flex items-start justify-between gap-2">
-    <div class="text-ui font-semibold tracking-[-0.02em]">
+  <div class="relative z-20">
+    <div class="text-ui font-semibold tracking-[-0.02em] max-[400px]:text-meta">
       {module.name}
     </div>
 
     {#if preview}
-      <span class="shrink-0 rounded-full border border-white/30 bg-white/45 px-2 py-1 text-meta font-medium tracking-[-0.01em] backdrop-blur-sm">
+      <span class="absolute right-0 top-0 shrink-0 rounded-full border border-white/30 bg-white/45 px-2 py-1 text-meta font-medium tracking-[-0.01em] backdrop-blur-sm max-[820px]:left-0 max-[820px]:right-auto max-[820px]:top-6">
         Coming soon
       </span>
     {/if}
