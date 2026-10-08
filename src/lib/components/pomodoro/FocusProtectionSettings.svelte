@@ -159,7 +159,7 @@
 
     <div class="mt-4">
       {#if blockedDomains.length === 0}
-        <div class="rounded-xl border border-dashed px-4 py-7 text-center text-meta text-muted-foreground">
+        <div class="rounded-xl border border-dashed px-4 py-6 text-center text-meta text-muted-foreground">
           No websites blocked yet.
         </div>
       {:else}
