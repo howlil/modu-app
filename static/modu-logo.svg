@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-labelledby="title">
+  <title id="title">Modu Interlock</title>
+  <rect width="120" height="120" rx="29" fill="#2468F2"/>
+  <g fill="#FFFFFF">
+    <path d="M35 17H71C78 17 83 22 83 29V41H49C45 41 43 43 43 47V79H17V35C17 24 24 17 35 17Z"/>
+    <path d="M85 103H49C42 103 37 98 37 91V79H71C75 79 77 77 77 73V41H103V85C103 96 96 103 85 103Z"/>
+  </g>
+</svg>
