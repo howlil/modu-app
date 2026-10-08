@@ -41,6 +41,7 @@
           rel="noreferrer"
           variant="outline"
           size="sm"
+          aria-label="Sponsor Module on GitHub"
           class="h-8 rounded-full border-border/[0.75] bg-white/[0.50] px-3 text-meta font-normal shadow-none backdrop-blur-sm hover:bg-white/[0.80] max-[520px]:px-2"
         >
           <Heart class="size-3.5 text-[#BF4B71]" strokeWidth={1.8} />
