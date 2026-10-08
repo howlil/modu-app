@@ -38,6 +38,8 @@ Homepage atmosphere:
 
 - hero uses a pale cobalt-to-warm-white atmosphere, soft blue glows, faint dot fields, and orbital curves inspired by the approved visual reference
 - four translucent tool-themed panels and two icon chips are visual ornaments, not controls; the actual tool launcher remains the grid below
+- desktop ornaments use the approved Organic arrangement: asymmetric offsets and mixed rotations, never mirrored card columns
+- subtle independent vertical drift is enabled by default for floating cards and chips; disable animation for reduced-motion preferences
 - an understated white curved wave transitions the hero into the warm-white tool grid without a harsh section boundary
 - keep the centered title, supporting copy, and Request feature dialog functional and legible above all decorative layers
 - ornamental cards disappear on tablet/mobile widths; clip every decorative layer to prevent horizontal scrolling
