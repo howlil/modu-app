@@ -1112,10 +1112,10 @@
         <div class="mt-3 grid min-h-8 w-full max-w-[330px] place-items-center">
           {#if focusEditing}
             <Input
-              bind:this={focusInput}
+              bind:ref={focusInput}
               class="w-full max-w-[300px] rounded-none border-0 border-b border-border bg-transparent px-2 py-2 text-center text-ui font-normal shadow-none placeholder:text-muted-foreground/60 focus-visible:ring-0"
               type="text"
-              maxlength="80"
+              maxlength={80}
               bind:value={focusDraft}
               placeholder="What are you focusing on?"
               aria-label="Focus label"

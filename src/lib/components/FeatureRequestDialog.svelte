@@ -179,7 +179,7 @@
             <Input
               id="feature-website"
               bind:value={website}
-              tabindex="-1"
+              tabindex={-1}
               autocomplete="off"
             />
           </div>
