@@ -96,7 +96,7 @@
       onclick={onManage}
     >
       <span>Blocked websites</span>
-      <span class="inline-flex items-center gap-1.5 text-meta text-muted-foreground">
+      <span class="inline-flex items-center gap-2 text-meta text-muted-foreground">
         {blockedDomains.length}
         <ChevronRight class="size-3.5" strokeWidth={1.7} />
       </span>
