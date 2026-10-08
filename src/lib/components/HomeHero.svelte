@@ -148,12 +148,12 @@
     position: absolute;
     display: flex;
     align-items: center;
-    width: 268px;
-    min-height: 108px;
-    padding: 16px;
-    gap: 12px;
+    width: 232px;
+    min-height: 88px;
+    padding: 12px;
+    gap: 8px;
     border: 1px solid rgb(255 255 255 / 0.88);
-    border-radius: 22px;
+    border-radius: 16px;
     background: linear-gradient(145deg, rgb(255 255 255 / 0.77), rgb(255 255 255 / 0.51));
     box-shadow: 0 16px 45px rgb(59 110 192 / 0.085), 0 2px 8px rgb(255 255 255 / 0.50);
     backdrop-filter: blur(18px);
@@ -200,11 +200,11 @@
 
   .card-icon {
     display: grid;
-    width: 56px;
-    height: 56px;
+    width: 44px;
+    height: 44px;
     flex: 0 0 auto;
     place-items: center;
-    border-radius: 15px;
+    border-radius: 12px;
   }
   .icon-file { color: #2384f8; background: #e1efff; }
   .icon-focus { color: #19b879; background: #dff8ed; }
@@ -234,8 +234,8 @@
   }
   .card-more {
     position: absolute;
-    top: 13px;
-    right: 15px;
+    top: 8px;
+    right: 12px;
     color: #9baed0;
     font-size: 18px;
     letter-spacing: 1px;
@@ -319,8 +319,8 @@
   }
 
   @media (max-width: 1100px) {
-    .float-card { width: 238px; min-height: 100px; padding: 13px; gap: 10px; }
-    .card-icon { width: 48px; height: 48px; }
+    .float-card { width: 216px; min-height: 80px; padding: 12px; gap: 8px; }
+    .card-icon { width: 40px; height: 40px; }
     .card-file { left: 3%; }
     .card-focus { left: 1%; }
     .card-everyday { right: 3%; }
