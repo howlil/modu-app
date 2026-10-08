@@ -182,7 +182,7 @@
   <div class="grid grid-cols-[1.2fr_0.8fr] gap-6 max-[700px]:grid-cols-1">
     <div class="border-t pt-4">
       <div class="mb-2 text-meta text-muted-foreground">Today</div>
-      <div class="text-display font-normal leading-none tracking-[-0.05em]">
+      <div class="text-display font-normal tracking-[-0.05em]">
         {formatFocusTotal(today.focusedMs)}
         {#if todayHasGoal}
           <span class="text-ui font-normal tracking-normal text-muted-foreground">/ {goalHours}h</span>
