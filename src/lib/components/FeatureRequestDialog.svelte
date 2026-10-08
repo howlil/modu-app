@@ -300,7 +300,7 @@
               {error}
               {#if fallbackUrl}
                 <a
-                  href={fallbackUrl}
+                  href={githubFallbackUrl()}
                   target="_blank"
                   rel="noreferrer"
                   class="ml-1 font-medium underline underline-offset-2"
