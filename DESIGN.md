@@ -150,7 +150,7 @@ Semantic text tokens are registered in `src/app.css` via Tailwind v4 `@theme inl
 | Page Title | `text-page-title` | 28 / 34px |
 | Display | `text-display` | 36 / 40px |
 
-- Only `font-normal` (400), `font-medium` (500), and `font-semibold` (600) for application typography.
+- `src/app.css` explicitly registers `--font-weight-normal: 400`, `--font-weight-medium: 500`, and `--font-weight-semibold: 600` in Tailwind `@theme`; these are the only supported application font weights.
 - Default page text is Body. Control labels generally use UI, secondary metadata uses Meta, view titles use Title or Title LG, module headings use Page Title, and hero heading uses Display.
 - Never introduce arbitrary 9/10/11/13/15px text or 450/520/750 font weights as new application typography.
 - Exceptions are functional visualization/data glyphs such as the oversized Pomodoro countdown, typing drill glyphs, and extremely dense keyboard diagram legends—not new general type styles.
@@ -169,8 +169,8 @@ Spacing derives from a 4px Tailwind base (`--spacing: 4px`). Approved applicatio
 ```
 
 - Combine these intervals rather than inventing 10/11/18/22px rhythm values for standard padding, gaps, and margins.
-- Viewport geometry, control hit targets, page gutters, hairline details, and the fixed navigation height may use intentional exceptions.
-- Use the Tailwind semantic utilities in route/components so typography stays centralized and can change without searching arbitrary pixels.
+- Viewport geometry, control hit targets, page gutters, hairline details, the full-bleed homepage hero, and the fixed navigation height may use intentional exceptions (e.g. 10px mobile gutter, large countdown, tiny keyboard legends).
+- Keep ordinary margins/paddings/gaps at 1/2/3/4/5/6/8 units and use the Tailwind semantic text utilities in route/components so typography stays centralized and can change without searching arbitrary pixels.
 
 ### Layout width
 
