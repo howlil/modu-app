@@ -78,7 +78,7 @@
 </script>
 
 <Button
-  class="h-10 rounded-full px-4 text-ui font-medium shadow-none"
+  class="h-10 rounded-full px-4 text-ui font-medium !text-white shadow-none"
   onclick={openDialog}
 >
   Request feature
@@ -201,7 +201,7 @@
             <Button
               type="submit"
               disabled={submitting}
-              class="h-9 rounded-full px-3 text-meta font-medium shadow-none"
+              class="h-9 rounded-full px-3 text-meta font-medium !text-white shadow-none"
             >
               {submitting ? 'Sending…' : 'Send request'}
               <Send class="size-3.5" strokeWidth={1.8} />
