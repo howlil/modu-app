@@ -48,6 +48,8 @@ Homepage atmosphere:
 
 Home tool presentation:
 
+- Merge PDF remains unavailable until a tested local PDF merge engine is implemented. Its launcher tile must be visibly noninteractive with a Coming soon status, and the route must not expose dead file controls.
+
 - tools render as compact square app tiles
 - each tile is 1:1 with a clear icon and short name
 - tiles may use distinct solid pastel surfaces to make each tool feel like an app
