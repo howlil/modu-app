@@ -137,7 +137,7 @@
         </div>
       {:else}
         <form class="mt-6 space-y-4" onsubmit={submitRequest}>
-          <div class="space-y-1.5">
+          <div class="space-y-2">
             <label for="feature-title" class="text-meta font-medium">Feature</label>
             <Input
               id="feature-title"
@@ -150,7 +150,7 @@
             />
           </div>
 
-          <div class="space-y-1.5">
+          <div class="space-y-2">
             <label for="feature-details" class="text-meta font-medium">
               What should it do?
               <span class="font-normal text-muted-foreground">Optional</span>
@@ -161,7 +161,7 @@
               maxlength={1500}
               rows={5}
               placeholder="A short use case or expected behavior."
-              class="w-full resize-none rounded-xl border border-input bg-transparent px-3 py-2.5 text-ui leading-5 shadow-none transition focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              class="w-full resize-none rounded-xl border border-input bg-transparent px-3 py-3 text-ui leading-5 shadow-none transition focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
             />
           </div>
 
@@ -176,7 +176,7 @@
           </div>
 
           {#if error}
-            <div class="rounded-xl bg-destructive/8 px-3 py-2.5 text-meta leading-5 text-destructive">
+            <div class="rounded-xl bg-destructive/8 px-3 py-3 text-meta leading-5 text-destructive">
               {error}
               {#if fallbackUrl}
                 <a
