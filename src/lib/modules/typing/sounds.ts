@@ -3,6 +3,8 @@ export type TypingSoundKind = 'correct' | 'error' | 'space';
 let context: AudioContext | null = null;
 let noiseBuffer: AudioBuffer | null = null;
 let strikeCounter = 0;
+let resumeRequest: Promise<void> | null = null;
+let pendingStrike: { kind: TypingSoundKind; key?: string } | null = null;
 
 function getAudioContext() {
   if (typeof window === 'undefined') return null;
@@ -14,8 +16,20 @@ function getAudioContext() {
 
   if (!AudioContextClass) return null;
 
-  context ??= new AudioContextClass();
-  return context;
+  // A browser can close an AudioContext when the audio device changes.
+  if (context?.state === 'closed') {
+    context = null;
+    noiseBuffer = null;
+    resumeRequest = null;
+    pendingStrike = null;
+  }
+
+  try {
+    context ??= new AudioContextClass();
+    return context;
+  } catch {
+    return null;
+  }
 }
 
 function getNoiseBuffer(audioContext: AudioContext) {
@@ -111,7 +125,7 @@ function playBody(
   filter.frequency.setValueAtTime(kind === 'space' ? 760 : 1120, startAt);
   filter.Q.setValueAtTime(0.65, startAt);
 
-  shapeGain(gain, startAt, kind === 'space' ? 0.026 : 0.017, duration);
+  shapeGain(gain, startAt, kind === 'space' ? 0.095 : 0.075, duration);
 
   oscillator.connect(filter);
   filter.connect(gain);
@@ -121,47 +135,47 @@ function playBody(
   oscillator.stop(startAt + duration + 0.008);
 }
 
-export function playTypingKeySound(
-  kind: TypingSoundKind = 'correct',
+function scheduleStrike(
+  audioContext: AudioContext,
+  kind: TypingSoundKind,
   key?: string
 ) {
-  const audioContext = getAudioContext();
-  if (!audioContext) return false;
+  if (audioContext.state !== 'running') return false;
 
   try {
-    if (audioContext.state === 'suspended') {
-      void audioContext.resume();
-    }
-
-    const startAt = audioContext.currentTime + 0.0015;
+    const startAt = audioContext.currentTime + 0.002;
     const variation = variationFor(key);
 
+    // The initial contact click makes the stroke audible on laptop speakers.
     playNoiseLayer(
       audioContext,
       startAt,
       (kind === 'space' ? 1800 : kind === 'error' ? 3150 : 2550) * variation,
       kind === 'space' ? 0.75 : 1.15,
-      kind === 'space' ? 0.022 : kind === 'error' ? 0.024 : 0.019,
-      kind === 'space' ? 0.013 : 0.009
+      kind === 'space' ? 0.085 : kind === 'error' ? 0.095 : 0.09,
+      kind === 'space' ? 0.018 : 0.013
     );
 
+    // Low-mid switch body (thock), slightly heavier for Space.
     playBody(audioContext, startAt, variation, kind);
 
+    // A short case resonance, not a long electronic beep.
     playNoiseLayer(
       audioContext,
       startAt + 0.001,
       (kind === 'space' ? 620 : 920) * variation,
       kind === 'space' ? 1.0 : 1.5,
-      kind === 'space' ? 0.011 : 0.007,
+      kind === 'space' ? 0.065 : 0.05,
       kind === 'space' ? 0.05 : 0.032
     );
 
+    // The switch release is quieter than the impact.
     playNoiseLayer(
       audioContext,
       startAt + (kind === 'space' ? 0.036 : 0.025),
       (kind === 'space' ? 1450 : 2200) * variation,
       1.25,
-      kind === 'space' ? 0.0065 : 0.005,
+      kind === 'space' ? 0.024 : 0.02,
       0.008
     );
 
@@ -171,9 +185,58 @@ export function playTypingKeySound(
   }
 }
 
+export function playTypingKeySound(
+  kind: TypingSoundKind = 'correct',
+  key?: string
+) {
+  const audioContext = getAudioContext();
+  if (!audioContext) return false;
+
+  if (audioContext.state === 'running') {
+    return scheduleStrike(audioContext, kind, key);
+  }
+
+  if (audioContext.state !== 'suspended') return false;
+
+  // Request resume while still inside the user's keydown or click gesture.
+  // Queue only the latest strike: if resume takes time, don't burst many old
+  // keystrokes all at once when the browser finally unlocks audio.
+  pendingStrike = { kind, key };
+
+  if (resumeRequest) return true;
+
+  try {
+    const request = audioContext.resume();
+    resumeRequest = request;
+
+    void request
+      .then(() => {
+        if (context !== audioContext) return;
+        const strike = pendingStrike;
+        pendingStrike = null;
+
+        if (strike) scheduleStrike(audioContext, strike.kind, strike.key);
+      })
+      .catch(() => {
+        if (context === audioContext) pendingStrike = null;
+      })
+      .finally(() => {
+        if (resumeRequest === request) resumeRequest = null;
+      });
+
+    return true;
+  } catch {
+    pendingStrike = null;
+    resumeRequest = null;
+    return false;
+  }
+}
+
 export function disposeTypingAudio() {
   noiseBuffer = null;
   strikeCounter = 0;
+  pendingStrike = null;
+  resumeRequest = null;
 
   if (!context) return;
 
