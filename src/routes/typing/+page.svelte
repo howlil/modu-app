@@ -42,6 +42,7 @@
   let testMode = $state('time');
   let learningState = $state<TypingLearningState>(createInitialTypingState());
   let preferences = $state<TypingPreferences>({ ...DEFAULT_TYPING_PREFERENCES });
+  let audioUnavailable = $state(false);
   let blockIndex = $state(0);
   let drillText = $state('');
   let typedIndex = $state(0);
@@ -342,6 +343,10 @@
   function cycleGuide() {
     const current = guideLevel;
     manualGuideLevel = current >= 2 ? 0 : current + 1;
+  }
+
+  function previewKeyboardSound() {
+    audioUnavailable = !playTypingKeySound('correct', 'f');
   }
 
   function togglePreference(key: keyof TypingPreferences) {
@@ -810,12 +815,26 @@
             <div class="min-w-0">
               <strong class="block text-[12px] font-medium">Keyboard sound</strong>
               <span class="mt-0.5 block text-[10px] text-muted-foreground">Mechanical key clicks.</span>
+              {#if audioUnavailable}
+                <span class="mt-1 block text-[10px] text-destructive">Web Audio is unavailable in this browser.</span>
+              {/if}
             </div>
-            <Switch
-              checked={preferences.keyboardSound}
-              aria-label="Keyboard sound"
-              onclick={() => togglePreference('keyboardSound')}
-            />
+            <div class="flex shrink-0 items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                class="h-8 rounded-full px-2 text-[11px] font-normal text-muted-foreground shadow-none"
+                aria-label="Preview mechanical keyboard sound"
+                onclick={previewKeyboardSound}
+              >
+                Preview
+              </Button>
+              <Switch
+                checked={preferences.keyboardSound}
+                aria-label="Keyboard sound"
+                onclick={() => togglePreference('keyboardSound')}
+              />
+            </div>
           </div>
 
           <div class="flex items-center justify-between gap-5 py-4">
