@@ -16,6 +16,7 @@ class FakeAudioContext {
   oscillatorStarts = 0;
   resumeCalls = 0;
   gains: number[] = [];
+  filters: Array<{ type: BiquadFilterType; frequency: number }> = [];
   private finishResume: (() => void) | null = null;
 
   constructor() {
@@ -52,12 +53,17 @@ class FakeAudioContext {
   }
 
   createBiquadFilter() {
-    return {
-      type: 'bandpass',
-      frequency: { setValueAtTime() {} },
+    const filter = {
+      type: 'bandpass' as BiquadFilterType,
+      frequency: {
+        setValueAtTime: (value: number) => {
+          this.filters.push({ type: filter.type, frequency: value });
+        }
+      },
       Q: { setValueAtTime() {} },
       connect() {}
-    } as unknown as BiquadFilterNode;
+    };
+    return filter as unknown as BiquadFilterNode;
   }
 
   createGain() {
@@ -102,13 +108,31 @@ describe('typing mechanical keyboard audio', () => {
     vi.unstubAllGlobals();
   });
 
-  it('plays contact, body, case and release layers on key press', () => {
+  it('produces a crisp high-frequency attack, short body and release', () => {
     expect(playTypingKeySound('correct', 'f')).toBe(true);
 
     const audio = FakeAudioContext.instances[0];
-    expect(audio.sourceStarts).toBe(3);
+    expect(audio.sourceStarts).toBe(4);
     expect(audio.oscillatorStarts).toBe(1);
-    expect(Math.max(...audio.gains)).toBeGreaterThan(0.07);
+    expect(Math.max(...audio.gains)).toBeGreaterThan(0.16);
+    expect(audio.filters.some((filter) =>
+      filter.type === 'highpass' && filter.frequency >= 4000
+    )).toBe(true);
+    expect(audio.filters.some((filter) =>
+      filter.type === 'bandpass' && filter.frequency >= 2000
+    )).toBe(true);
+  });
+
+  it('keeps the spacebar deeper than a normal key', () => {
+    expect(playTypingKeySound('space', ' ')).toBe(true);
+    const spaceFilters = [...FakeAudioContext.instances[0].filters];
+
+    disposeTypingAudio();
+    expect(playTypingKeySound('correct', 'f')).toBe(true);
+    const regularFilters = FakeAudioContext.instances[1].filters;
+
+    expect(spaceFilters[0].frequency).toBeLessThan(regularFilters[0].frequency);
+    expect(spaceFilters[1].frequency).toBeLessThan(regularFilters[1].frequency);
   });
 
   it('waits for the browser to unlock audio and avoids bursting queued keys', async () => {
@@ -125,7 +149,7 @@ describe('typing mechanical keyboard audio', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(audio.sourceStarts).toBe(3);
+    expect(audio.sourceStarts).toBe(4);
     expect(audio.oscillatorStarts).toBe(1);
   });
 
