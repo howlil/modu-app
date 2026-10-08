@@ -120,8 +120,8 @@
     border-radius: 50%;
     top: 16%;
   }
-  .orbital-halo-left { left: -2%; }
-  .orbital-halo-right { right: -2%; }
+  .orbital-halo-left { left: -7%; top: 12%; width: 43%; }
+  .orbital-halo-right { right: -5%; top: 20%; width: 38%; }
 
   .dot-field {
     position: absolute;
@@ -159,26 +159,43 @@
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
     transform: rotate(var(--tilt));
+    animation: hero-card-drift var(--drift-duration, 7s) ease-in-out var(--drift-delay, 0s) infinite alternate;
+    will-change: transform;
   }
+
+  /* Organic layout: deliberately uneven distances, angles, and rhythm. */
   .card-file {
-    left: 5.5%;
-    top: 29%;
-    --tilt: 7deg;
+    left: 7%;
+    top: 23%;
+    --tilt: -9deg;
+    --drift-duration: 6.4s;
+    --drift-delay: -1.2s;
   }
   .card-focus {
-    left: 3.5%;
-    top: 59%;
-    --tilt: 8deg;
+    left: 3%;
+    top: 68%;
+    --tilt: 5deg;
+    --drift-duration: 7.8s;
+    --drift-delay: -3.4s;
   }
   .card-everyday {
-    right: 5.5%;
-    top: 31%;
-    --tilt: -7deg;
+    right: 6%;
+    top: 27%;
+    --tilt: 8deg;
+    --drift-duration: 8.2s;
+    --drift-delay: -4.1s;
   }
   .card-source {
-    right: 3.5%;
-    top: 60%;
-    --tilt: -8deg;
+    right: 4%;
+    top: 71%;
+    --tilt: -6deg;
+    --drift-duration: 7.1s;
+    --drift-delay: -2.5s;
+  }
+
+  @keyframes hero-card-drift {
+    from { transform: translate3d(0, -4px, 0) rotate(var(--tilt)); }
+    to { transform: translate3d(0, 6px, 0) rotate(var(--tilt)); }
   }
 
   .card-icon {
@@ -235,8 +252,27 @@
     box-shadow: 0 12px 30px rgb(79 136 211 / 0.10);
     backdrop-filter: blur(15px);
   }
-  .chip-folder { left: 20%; top: 53%; color: #2585f9; transform: rotate(6deg); }
-  .chip-grid { right: 20%; top: 54%; color: #2585f9; transform: rotate(-7deg); }
+  .chip-folder {
+    left: 28%;
+    top: 65%;
+    color: #2585f9;
+    --tilt: 16deg;
+    --drift-duration: 7.4s;
+    --drift-delay: -2s;
+  }
+  .chip-grid {
+    right: 27%;
+    top: 54%;
+    color: #2585f9;
+    --tilt: -13deg;
+    --drift-duration: 6.8s;
+    --drift-delay: -3s;
+  }
+  .floating-chip {
+    transform: rotate(var(--tilt));
+    animation: hero-card-drift var(--drift-duration) ease-in-out var(--drift-delay) infinite alternate;
+    will-change: transform;
+  }
 
   .hero-content {
     min-height: calc(clamp(650px, 88svh, 810px) - 68px);
@@ -285,10 +321,12 @@
   @media (max-width: 1100px) {
     .float-card { width: 238px; min-height: 100px; padding: 13px; gap: 10px; }
     .card-icon { width: 48px; height: 48px; }
-    .card-file, .card-focus { left: 1%; }
-    .card-everyday, .card-source { right: 1%; }
-    .chip-folder { left: 19%; }
-    .chip-grid { right: 19%; }
+    .card-file { left: 3%; }
+    .card-focus { left: 1%; }
+    .card-everyday { right: 3%; }
+    .card-source { right: 1%; }
+    .chip-folder { left: 26%; }
+    .chip-grid { right: 25%; }
   }
 
   @media (max-width: 900px) {
@@ -317,6 +355,7 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
+    .float-card, .floating-chip { animation: none; will-change: auto; }
     .scroll-cue { transition: none; }
   }
 </style>
