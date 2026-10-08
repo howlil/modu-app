@@ -78,9 +78,9 @@
 
 {#if view === 'summary'}
   <div class="mt-4 border-t pt-4">
-    <div class="mb-1 text-[11px] font-medium text-muted-foreground">Focus protection</div>
+    <div class="mb-1 text-meta font-medium text-muted-foreground">Focus protection</div>
 
-    <div class="flex h-10 w-full items-center justify-between gap-4 px-1 text-[12px]">
+    <div class="flex h-10 w-full items-center justify-between gap-4 px-1 text-meta">
       <span>Block distracting websites</span>
       <Switch
         checked={enabled}
@@ -92,17 +92,17 @@
 
     <Button
       variant="ghost"
-      class="flex h-10 w-full items-center justify-between rounded-full px-1 text-[12px] font-normal"
+      class="flex h-10 w-full items-center justify-between rounded-full px-1 text-meta font-normal"
       onclick={onManage}
     >
       <span>Blocked websites</span>
-      <span class="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+      <span class="inline-flex items-center gap-1.5 text-meta text-muted-foreground">
         {blockedDomains.length}
         <ChevronRight class="size-3.5" strokeWidth={1.7} />
       </span>
     </Button>
 
-    <div class="flex min-h-8 items-center justify-between gap-3 px-1 text-[10px]">
+    <div class="flex min-h-8 items-center justify-between gap-3 px-1 text-meta">
       <span class="text-muted-foreground">Module extension</span>
       <span
         class={[
@@ -118,22 +118,22 @@
     </div>
 
     {#if connection === 'missing'}
-      <p class="m-0 px-1 text-[10px] leading-[1.5] text-muted-foreground">
+      <p class="m-0 px-1 text-meta  text-muted-foreground">
         Install or load the Module Focus extension to enable protection.
       </p>
     {:else if errorMessage}
-      <p class="m-0 px-1 text-[10px] leading-[1.5] text-destructive">{errorMessage}</p>
+      <p class="m-0 px-1 text-meta  text-destructive">{errorMessage}</p>
     {/if}
   </div>
 {:else}
   <div>
-    <p class="mb-4 mt-0 text-[11px] leading-[1.55] text-muted-foreground">
+    <p class="mb-4 mt-0 text-meta  text-muted-foreground">
       Add the sites that usually break your focus. Every route on these domains is blocked during Focus.
     </p>
 
     <div class="flex gap-2">
       <Input
-        class="h-9 flex-1 text-[12px]"
+        class="h-9 flex-1 text-meta"
         bind:value={domainDraft}
         placeholder="youtube.com"
         aria-label="Website to block"
@@ -146,7 +146,7 @@
       />
       <Button
         size="sm"
-        class="h-9 shrink-0 rounded-full px-3 text-[12px] font-medium shadow-none"
+        class="h-9 shrink-0 rounded-full px-3 text-meta font-medium shadow-none"
         onclick={() => addDomain()}
       >
         Add
@@ -154,19 +154,19 @@
     </div>
 
     {#if domainError}
-      <p class="mb-0 mt-2 text-[10px] text-destructive">{domainError}</p>
+      <p class="mb-0 mt-2 text-meta text-destructive">{domainError}</p>
     {/if}
 
     <div class="mt-4">
       {#if blockedDomains.length === 0}
-        <div class="rounded-xl border border-dashed px-4 py-7 text-center text-[11px] text-muted-foreground">
+        <div class="rounded-xl border border-dashed px-4 py-7 text-center text-meta text-muted-foreground">
           No websites blocked yet.
         </div>
       {:else}
         <div class="divide-y">
           {#each blockedDomains as domain}
             <div class="flex min-h-10 items-center justify-between gap-3">
-              <span class="truncate text-[12px]">{domain}</span>
+              <span class="truncate text-meta">{domain}</span>
               <Button
                 variant="ghost"
                 size="icon-sm"
@@ -183,16 +183,16 @@
     </div>
 
     <div class="mt-5 border-t pt-4">
-      <div class="mb-2 text-[11px] font-medium text-muted-foreground">Suggested</div>
+      <div class="mb-2 text-meta font-medium text-muted-foreground">Suggested</div>
       <div class="grid gap-1">
         {#each suggestions.filter((domain) => !blockedDomains.includes(domain)) as domain}
           <Button
             variant="ghost"
-            class="flex h-9 w-full items-center justify-between rounded-full px-2 text-[12px] font-normal shadow-none"
+            class="flex h-9 w-full items-center justify-between rounded-full px-2 text-meta font-normal shadow-none"
             onclick={() => addDomain(domain)}
           >
             <span>{domain}</span>
-            <span class="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+            <span class="inline-flex items-center gap-1 text-meta text-muted-foreground">
               <Plus class="size-3" strokeWidth={1.7} />
               Add
             </span>
