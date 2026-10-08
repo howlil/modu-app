@@ -53,7 +53,7 @@
         <FileText class="size-[44%] opacity-70" strokeWidth={1.45} />
       </div>
 
-      <div class="absolute bottom-[10%] left-1/2 flex h-9 -translate-x-1/2 items-center gap-1.5 rounded-full border border-white/[0.18] bg-[#552433]/[0.11] px-3 backdrop-blur-sm">
+      <div class="absolute bottom-[10%] left-1/2 flex h-9 -translate-x-1/2 items-center gap-2 rounded-full border border-white/[0.18] bg-[#552433]/[0.11] px-3 backdrop-blur-sm">
         <ArrowRight class="size-4" strokeWidth={1.8} />
       </div>
     </div>
