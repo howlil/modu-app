@@ -435,28 +435,28 @@
       >
         <Tabs.Trigger
           value="train"
-          class="h-7 flex-none rounded-full px-3 py-0 text-[12px] font-normal data-[state=active]:font-medium data-[state=active]:shadow-none"
+          class="h-7 flex-none rounded-full px-3 py-0 text-meta font-normal data-[state=active]:font-medium data-[state=active]:shadow-none"
           onclick={() => setPrimaryTab('train')}
         >
           Train
         </Tabs.Trigger>
         <Tabs.Trigger
           value="lessons"
-          class="h-7 flex-none rounded-full px-3 py-0 text-[12px] font-normal data-[state=active]:font-medium data-[state=active]:shadow-none"
+          class="h-7 flex-none rounded-full px-3 py-0 text-meta font-normal data-[state=active]:font-medium data-[state=active]:shadow-none"
           onclick={() => setPrimaryTab('lessons')}
         >
           Lessons
         </Tabs.Trigger>
         <Tabs.Trigger
           value="test"
-          class="h-7 flex-none rounded-full px-3 py-0 text-[12px] font-normal data-[state=active]:font-medium data-[state=active]:shadow-none"
+          class="h-7 flex-none rounded-full px-3 py-0 text-meta font-normal data-[state=active]:font-medium data-[state=active]:shadow-none"
           onclick={() => setPrimaryTab('test')}
         >
           Test
         </Tabs.Trigger>
         <Tabs.Trigger
           value="progress"
-          class="h-7 flex-none rounded-full px-3 py-0 text-[12px] font-normal data-[state=active]:font-medium data-[state=active]:shadow-none"
+          class="h-7 flex-none rounded-full px-3 py-0 text-meta font-normal data-[state=active]:font-medium data-[state=active]:shadow-none"
           onclick={() => setPrimaryTab('progress')}
         >
           Progress
@@ -474,15 +474,15 @@
       <Tabs.Content value="train" class="min-w-0 pt-7 max-[640px]:pt-6">
         <div class="flex min-w-0 items-start justify-between gap-5">
           <div class="min-w-0">
-            <h2 class="m-0 truncate text-[14px] font-medium tracking-[-0.015em]">
+            <h2 class="m-0 truncate text-ui font-medium tracking-[-0.015em]">
               {currentBlock.name}
             </h2>
-            <p class="mt-1 truncate font-mono text-[11px] text-muted-foreground">
+            <p class="mt-1 truncate font-mono text-meta text-muted-foreground">
               {target}
             </p>
           </div>
 
-          <span class="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+          <span class="shrink-0 text-meta tabular-nums text-muted-foreground">
             {blockIndex + 1} / {TRAINING_BLOCKS.length}
             {#if minutesLeft > 0}
               <span class="ml-2">~{minutesLeft}m</span>
@@ -514,7 +514,7 @@
           </div>
         </div>
 
-        <div class="flex min-w-0 items-center justify-between gap-4 border-b border-border pb-4 text-[11px] max-[560px]:items-start max-[560px]:flex-col max-[560px]:gap-2.5">
+        <div class="flex min-w-0 items-center justify-between gap-4 border-b border-border pb-4 text-meta max-[560px]:items-start max-[560px]:flex-col max-[560px]:gap-2.5">
           <div class="min-w-0 text-muted-foreground">
             {#if runComplete}
               <strong class="font-medium text-foreground">Complete</strong>
@@ -590,7 +590,7 @@
             {/each}
           </div>
 
-          <div class="mt-2 text-center text-[10px] text-muted-foreground">
+          <div class="mt-2 text-center text-meta text-muted-foreground">
             {currentBlock.shortName}
           </div>
         </div>
@@ -599,7 +599,7 @@
           <Button
             variant="ghost"
             size="sm"
-            class="h-8 px-2 text-[11px] font-normal text-muted-foreground shadow-none"
+            class="h-8 px-2 text-meta font-normal text-muted-foreground shadow-none"
             onclick={() => startAdaptiveBlock()}
           >
             <RotateCcw class="size-3.5" strokeWidth={1.8} />
@@ -610,7 +610,7 @@
             <Button
               variant="ghost"
               size="sm"
-              class="h-8 px-2 text-[11px] font-normal text-muted-foreground shadow-none"
+              class="h-8 px-2 text-meta font-normal text-muted-foreground shadow-none"
               onclick={cycleGuide}
             >
               {guideLevel === 0 ? 'Less guide' : guideLevel === 1 ? 'Hide guide' : 'Show guide'}
@@ -620,7 +620,7 @@
               <Button
                 variant="ghost"
                 size="sm"
-                class="h-8 px-2 text-[11px] font-medium text-primary shadow-none"
+                class="h-8 px-2 text-meta font-medium text-primary shadow-none"
                 onclick={nextBlock}
               >
                 Next →
@@ -632,8 +632,8 @@
 
       <Tabs.Content value="lessons" class="pt-7">
         <div class="mb-5">
-          <h2 class="m-0 text-[18px] font-semibold tracking-[-0.03em]">Lessons</h2>
-          <p class="mt-1 text-[11px] text-muted-foreground">Learn the movement, then reinforce it in Train.</p>
+          <h2 class="m-0 text-title font-semibold tracking-[-0.03em]">Lessons</h2>
+          <p class="mt-1 text-meta text-muted-foreground">Learn the movement, then reinforce it in Train.</p>
         </div>
 
         <div class="border-y border-border">
@@ -643,16 +643,16 @@
               class="grid h-auto w-full grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-3 rounded-full border-b border-border px-1 py-3.5 text-left font-normal whitespace-normal shadow-none last:border-b-0 hover:bg-muted/50 max-[560px]:grid-cols-[28px_minmax(0,1fr)]"
               onclick={() => setPrimaryTab('train')}
             >
-              <span class="font-mono text-[10px] text-muted-foreground">
+              <span class="font-mono text-meta text-muted-foreground">
                 {String(index + 1).padStart(2, '0')}
               </span>
 
               <span class="min-w-0">
-                <strong class="block text-[12px] font-medium text-foreground">{lesson[0]}</strong>
-                <span class="mt-0.5 block text-[10px] leading-4 text-muted-foreground">{lesson[1]}</span>
+                <strong class="block text-meta font-medium text-foreground">{lesson[0]}</strong>
+                <span class="mt-0.5 block text-meta leading-4 text-muted-foreground">{lesson[1]}</span>
               </span>
 
-              <span class="text-[10px] text-muted-foreground max-[560px]:col-start-2">
+              <span class="text-meta text-muted-foreground max-[560px]:col-start-2">
                 {index < 2 ? 'Review →' : index === 2 ? 'Continue →' : 'Practice →'}
               </span>
             </Button>
@@ -669,15 +669,15 @@
             spacing={1}
             class="max-w-full flex-wrap"
           >
-            <ToggleGroup.Item value="time" class="rounded-full text-[11px] font-medium">Time</ToggleGroup.Item>
-            <ToggleGroup.Item value="words" class="rounded-full text-[11px]" disabled>Words</ToggleGroup.Item>
-            <ToggleGroup.Item value="paragraph" class="rounded-full text-[11px]" disabled>Paragraph</ToggleGroup.Item>
-            <ToggleGroup.Item value="custom" class="rounded-full text-[11px]" disabled>Custom</ToggleGroup.Item>
+            <ToggleGroup.Item value="time" class="rounded-full text-meta font-medium">Time</ToggleGroup.Item>
+            <ToggleGroup.Item value="words" class="rounded-full text-meta" disabled>Words</ToggleGroup.Item>
+            <ToggleGroup.Item value="paragraph" class="rounded-full text-meta" disabled>Paragraph</ToggleGroup.Item>
+            <ToggleGroup.Item value="custom" class="rounded-full text-meta" disabled>Custom</ToggleGroup.Item>
           </ToggleGroup.Root>
 
           <div class="flex shrink-0 items-baseline gap-4 tabular-nums">
-            <span><strong class="text-[18px] font-semibold">{wpm}</strong> <small class="text-[9px] text-muted-foreground">wpm</small></span>
-            <span class="text-[10px] text-muted-foreground">{accuracy}% acc</span>
+            <span><strong class="text-title font-semibold">{wpm}</strong> <small class="text-[9px] text-muted-foreground">wpm</small></span>
+            <span class="text-meta text-muted-foreground">{accuracy}% acc</span>
           </div>
         </div>
 
@@ -708,7 +708,7 @@
           <Button
             variant="ghost"
             size="sm"
-            class="h-8 px-2 text-[11px] font-normal text-muted-foreground shadow-none"
+            class="h-8 px-2 text-meta font-normal text-muted-foreground shadow-none"
             onclick={startTest}
           >
             <RotateCcw class="size-3.5" strokeWidth={1.8} />
@@ -719,20 +719,20 @@
 
       <Tabs.Content value="progress" class="pt-7">
         <div>
-          <h2 class="m-0 text-[18px] font-semibold tracking-[-0.03em]">Progress</h2>
-          <p class="mt-1 text-[11px] text-muted-foreground">What changed, and what still needs work.</p>
+          <h2 class="m-0 text-title font-semibold tracking-[-0.03em]">Progress</h2>
+          <p class="mt-1 text-meta text-muted-foreground">What changed, and what still needs work.</p>
         </div>
 
         <section class="mt-8 border-b border-border pb-7">
           <div class="flex items-end justify-between gap-4">
             <div>
-              <span class="text-[10px] text-muted-foreground">Recent speed</span>
-              <div class="mt-0.5 text-[26px] font-semibold tracking-[-0.04em]">
+              <span class="text-meta text-muted-foreground">Recent speed</span>
+              <div class="mt-0.5 text-page-title font-semibold tracking-[-0.04em]">
                 {recentTrainingSessions[recentTrainingSessions.length - 1]?.wpm ?? 0}
-                <span class="text-[10px] font-normal tracking-normal text-muted-foreground">wpm</span>
+                <span class="text-meta font-normal tracking-normal text-muted-foreground">wpm</span>
               </div>
             </div>
-            <span class="text-[10px] text-muted-foreground">{recentTrainingSessions.length} sessions</span>
+            <span class="text-meta text-muted-foreground">{recentTrainingSessions.length} sessions</span>
           </div>
 
           {#if recentTrainingSessions.length > 0}
@@ -746,17 +746,17 @@
               {/each}
             </div>
           {:else}
-            <p class="mt-5 text-[11px] text-muted-foreground">Finish a training block to start the trend.</p>
+            <p class="mt-5 text-meta text-muted-foreground">Finish a training block to start the trend.</p>
           {/if}
         </section>
 
         <div class="grid grid-cols-2 gap-10 py-7 max-[680px]:grid-cols-1 max-[680px]:gap-7">
           <section class="min-w-0">
-            <h3 class="m-0 text-[12px] font-medium">Needs work</h3>
+            <h3 class="m-0 text-meta font-medium">Needs work</h3>
             <div class="mt-3 divide-y divide-border">
               {#if weakKeyMetrics.length > 0}
                 {#each weakKeyMetrics as metric}
-                  <div class="grid grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-3 py-2.5 text-[11px]">
+                  <div class="grid grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-3 py-2.5 text-meta">
                     <strong class="font-mono font-medium">{formatKey(metric.key)}</strong>
                     <div class="h-px min-w-0 bg-border">
                       <div
@@ -770,11 +770,11 @@
                   </div>
                 {/each}
               {:else}
-                <p class="py-2.5 text-[11px] text-muted-foreground">More samples needed.</p>
+                <p class="py-2.5 text-meta text-muted-foreground">More samples needed.</p>
               {/if}
 
               {#each weakTransitionMetrics.slice(0, 2) as metric}
-                <div class="grid grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-3 py-2.5 text-[11px]">
+                <div class="grid grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-3 py-2.5 text-meta">
                   <strong class="font-mono font-medium">{metric.pair.toUpperCase()}</strong>
                   <div class="h-px min-w-0 bg-border">
                     <div
@@ -791,14 +791,14 @@
           </section>
 
           <section>
-            <h3 class="m-0 text-[12px] font-medium">Review today</h3>
-            <div class="mt-3 flex flex-wrap gap-x-4 gap-y-2 font-mono text-[12px]">
+            <h3 class="m-0 text-meta font-medium">Review today</h3>
+            <div class="mt-3 flex flex-wrap gap-x-4 gap-y-2 font-mono text-meta">
               {#if dueReviewKeys.length > 0}
                 {#each dueReviewKeys as key}
                   <span>{formatKey(key)}</span>
                 {/each}
               {:else}
-                <span class="font-sans text-[11px] text-muted-foreground">Nothing due.</span>
+                <span class="font-sans text-meta text-muted-foreground">Nothing due.</span>
               {/if}
             </div>
           </section>
@@ -807,23 +807,23 @@
 
       <Tabs.Content value="settings" class="pt-7">
         <div class="border-b border-border pb-4">
-          <h2 class="m-0 text-[18px] font-semibold tracking-[-0.03em]">Settings</h2>
+          <h2 class="m-0 text-title font-semibold tracking-[-0.03em]">Settings</h2>
         </div>
 
         <div class="divide-y divide-border">
           <div class="flex items-center justify-between gap-5 py-4">
             <div class="min-w-0">
-              <strong class="block text-[12px] font-medium">Keyboard sound</strong>
-              <span class="mt-0.5 block text-[10px] text-muted-foreground">Mechanical key clicks.</span>
+              <strong class="block text-meta font-medium">Keyboard sound</strong>
+              <span class="mt-0.5 block text-meta text-muted-foreground">Mechanical key clicks.</span>
               {#if audioUnavailable}
-                <span class="mt-1 block text-[10px] text-destructive">Web Audio is unavailable in this browser.</span>
+                <span class="mt-1 block text-meta text-destructive">Web Audio is unavailable in this browser.</span>
               {/if}
             </div>
             <div class="flex shrink-0 items-center gap-2">
               <Button
                 variant="ghost"
                 size="sm"
-                class="h-8 rounded-full px-2 text-[11px] font-normal text-muted-foreground shadow-none"
+                class="h-8 rounded-full px-2 text-meta font-normal text-muted-foreground shadow-none"
                 aria-label="Preview mechanical keyboard sound"
                 onclick={previewKeyboardSound}
               >
@@ -839,8 +839,8 @@
 
           <div class="flex items-center justify-between gap-5 py-4">
             <div class="min-w-0">
-              <strong class="block text-[12px] font-medium">Strict correction</strong>
-              <span class="mt-0.5 block text-[10px] text-muted-foreground">Wrong keys stay on the current character.</span>
+              <strong class="block text-meta font-medium">Strict correction</strong>
+              <span class="mt-0.5 block text-meta text-muted-foreground">Wrong keys stay on the current character.</span>
             </div>
             <Switch
               checked={preferences.strictCorrection}
@@ -851,8 +851,8 @@
 
           <div class="flex items-center justify-between gap-5 py-4">
             <div class="min-w-0">
-              <strong class="block text-[12px] font-medium">Guide fading</strong>
-              <span class="mt-0.5 block text-[10px] text-muted-foreground">Hide keyboard help as keys stabilize.</span>
+              <strong class="block text-meta font-medium">Guide fading</strong>
+              <span class="mt-0.5 block text-meta text-muted-foreground">Hide keyboard help as keys stabilize.</span>
             </div>
             <Switch
               checked={preferences.automaticGuideFading}
@@ -863,12 +863,12 @@
 
           <div class="flex items-center justify-between gap-5 py-4">
             <div class="min-w-0">
-              <strong class="block text-[12px] font-medium">Mastery</strong>
-              <span class="mt-0.5 block text-[10px] text-muted-foreground">
+              <strong class="block text-meta font-medium">Mastery</strong>
+              <span class="mt-0.5 block text-meta text-muted-foreground">
                 {preferences.minSamples}+ samples · ≤ {preferences.masteryLatency}ms
               </span>
             </div>
-            <span class="shrink-0 text-[11px] tabular-nums">{preferences.masteryAccuracy}%</span>
+            <span class="shrink-0 text-meta tabular-nums">{preferences.masteryAccuracy}%</span>
           </div>
         </div>
       </Tabs.Content>
