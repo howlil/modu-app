@@ -177,6 +177,19 @@ export const LESSONS = [
   ['Developer Patterns', 'Brackets, operators, and common code transitions.']
 ] as const;
 
+export const LESSON_DRILLS = [
+  "asdf jkl; fj dk sl a; asdf jkl; fdsa ;lkj asdf jkl; fj dk sl",
+  "rtfg vb rtf gvb yuhj nm yu hj nm rtfg yuhj fj gh vb nm",
+  "qwer tyui op qwerty uiop qwe rty uiop qwerty top row",
+  "zxcv bnm zxcv bnm cvbn xz zxcv bnm zxcv bnm",
+  "asdf jkl; fj dk sl a; jkl asdf f j d k a ; s l",
+  "code data build test server client request response backend async",
+  ", . / ; ' , . / ; ' end. test, code / file; it's done.",
+  "Hello World Type This Keep Focus Shift Practice Upper Lower",
+  "12345 67890 1024 2048 512 16 32 64 ! @ # $ % ^ & *",
+  "if (data) { return value; } arr[index] => value === true;"
+] as const;
+
 export const TEST_TEXT =
   'clean systems are easier to change when state transitions remain explicit and predictable';
 
