@@ -36,10 +36,12 @@ Homepage typography:
 
 Homepage atmosphere:
 
-- hero uses the semantic primary cobalt as a restrained top-to-bottom field rather than an unrelated decorative color
-- the blue field dissolves into the warm-white page through large, soft cloud-like white forms; the cloud treatment should feel editorial and atmospheric, not cartoonish
-- the cloud transition must resolve fully into the normal page background before the tool grid
-- decorative hero layers must stay within the hero's layout width; use clipped child positioning rather than widening the document or introducing horizontal page scroll
+- hero uses a pale cobalt-to-warm-white atmosphere, soft blue glows, faint dot fields, and orbital curves inspired by the approved visual reference
+- four translucent tool-themed panels and two icon chips are visual ornaments, not controls; the actual tool launcher remains the grid below
+- an understated white curved wave transitions the hero into the warm-white tool grid without a harsh section boundary
+- keep the centered title, supporting copy, and Request feature dialog functional and legible above all decorative layers
+- ornamental cards disappear on tablet/mobile widths; clip every decorative layer to prevent horizontal scrolling
+- the scroll cue is a real anchor to the tool grid; motion effects must respect reduced-motion preferences
 - do not add a separate Tools heading/count row when the launcher grid is self-explanatory
 
 Home tool presentation:
