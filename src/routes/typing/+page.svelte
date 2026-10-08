@@ -514,13 +514,13 @@
           </div>
         </div>
 
-        <div class="flex min-w-0 items-center justify-between gap-4 border-b border-border pb-4 text-meta max-[560px]:items-start max-[560px]:flex-col max-[560px]:gap-2.5">
+        <div class="flex min-w-0 items-center justify-between gap-4 border-b border-border pb-4 text-meta max-[560px]:items-start max-[560px]:flex-col max-[560px]:gap-3">
           <div class="min-w-0 text-muted-foreground">
             {#if runComplete}
               <strong class="font-medium text-foreground">Complete</strong>
             {:else if currentCharacter}
               <strong class="font-medium text-foreground">{fingerFor(currentCharacter)}</strong>
-              <span class="mx-1.5">·</span>
+              <span class="mx-2">·</span>
               <span>{currentCharacter === ' ' ? 'Space' : currentCharacter}</span>
             {:else}
               <span>Start typing</span>
@@ -640,7 +640,7 @@
           {#each LESSONS as lesson, index}
             <Button
               variant="ghost"
-              class="grid h-auto w-full grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-3 rounded-full border-b border-border px-1 py-3.5 text-left font-normal whitespace-normal shadow-none last:border-b-0 hover:bg-muted/50 max-[560px]:grid-cols-[28px_minmax(0,1fr)]"
+              class="grid h-auto w-full grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-3 rounded-full border-b border-border px-1 py-4 text-left font-normal whitespace-normal shadow-none last:border-b-0 hover:bg-muted/50 max-[560px]:grid-cols-[28px_minmax(0,1fr)]"
               onclick={() => setPrimaryTab('train')}
             >
               <span class="font-mono text-meta text-muted-foreground">
@@ -649,7 +649,7 @@
 
               <span class="min-w-0">
                 <strong class="block text-meta font-medium text-foreground">{lesson[0]}</strong>
-                <span class="mt-0.5 block text-meta leading-4 text-muted-foreground">{lesson[1]}</span>
+                <span class="mt-1 block text-meta leading-4 text-muted-foreground">{lesson[1]}</span>
               </span>
 
               <span class="text-meta text-muted-foreground max-[560px]:col-start-2">
@@ -727,7 +727,7 @@
           <div class="flex items-end justify-between gap-4">
             <div>
               <span class="text-meta text-muted-foreground">Recent speed</span>
-              <div class="mt-0.5 text-page-title font-semibold tracking-[-0.04em]">
+              <div class="mt-1 text-page-title font-semibold tracking-[-0.04em]">
                 {recentTrainingSessions[recentTrainingSessions.length - 1]?.wpm ?? 0}
                 <span class="text-meta font-normal tracking-normal text-muted-foreground">wpm</span>
               </div>
@@ -736,7 +736,7 @@
           </div>
 
           {#if recentTrainingSessions.length > 0}
-            <div class="mt-6 flex h-[96px] items-end gap-1.5">
+            <div class="mt-6 flex h-[96px] items-end gap-2">
               {#each recentTrainingSessions as session}
                 <div
                   class="relative min-w-1 flex-1 border-t border-primary bg-secondary/45"
@@ -756,7 +756,7 @@
             <div class="mt-3 divide-y divide-border">
               {#if weakKeyMetrics.length > 0}
                 {#each weakKeyMetrics as metric}
-                  <div class="grid grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-3 py-2.5 text-meta">
+                  <div class="grid grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-3 py-3 text-meta">
                     <strong class="font-mono font-medium">{formatKey(metric.key)}</strong>
                     <div class="h-px min-w-0 bg-border">
                       <div
@@ -770,11 +770,11 @@
                   </div>
                 {/each}
               {:else}
-                <p class="py-2.5 text-meta text-muted-foreground">More samples needed.</p>
+                <p class="py-3 text-meta text-muted-foreground">More samples needed.</p>
               {/if}
 
               {#each weakTransitionMetrics.slice(0, 2) as metric}
-                <div class="grid grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-3 py-2.5 text-meta">
+                <div class="grid grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-3 py-3 text-meta">
                   <strong class="font-mono font-medium">{metric.pair.toUpperCase()}</strong>
                   <div class="h-px min-w-0 bg-border">
                     <div
@@ -814,7 +814,7 @@
           <div class="flex items-center justify-between gap-5 py-4">
             <div class="min-w-0">
               <strong class="block text-meta font-medium">Keyboard sound</strong>
-              <span class="mt-0.5 block text-meta text-muted-foreground">Mechanical key clicks.</span>
+              <span class="mt-1 block text-meta text-muted-foreground">Mechanical key clicks.</span>
               {#if audioUnavailable}
                 <span class="mt-1 block text-meta text-destructive">Web Audio is unavailable in this browser.</span>
               {/if}
@@ -840,7 +840,7 @@
           <div class="flex items-center justify-between gap-5 py-4">
             <div class="min-w-0">
               <strong class="block text-meta font-medium">Strict correction</strong>
-              <span class="mt-0.5 block text-meta text-muted-foreground">Wrong keys stay on the current character.</span>
+              <span class="mt-1 block text-meta text-muted-foreground">Wrong keys stay on the current character.</span>
             </div>
             <Switch
               checked={preferences.strictCorrection}
@@ -852,7 +852,7 @@
           <div class="flex items-center justify-between gap-5 py-4">
             <div class="min-w-0">
               <strong class="block text-meta font-medium">Guide fading</strong>
-              <span class="mt-0.5 block text-meta text-muted-foreground">Hide keyboard help as keys stabilize.</span>
+              <span class="mt-1 block text-meta text-muted-foreground">Hide keyboard help as keys stabilize.</span>
             </div>
             <Switch
               checked={preferences.automaticGuideFading}
@@ -864,7 +864,7 @@
           <div class="flex items-center justify-between gap-5 py-4">
             <div class="min-w-0">
               <strong class="block text-meta font-medium">Mastery</strong>
-              <span class="mt-0.5 block text-meta text-muted-foreground">
+              <span class="mt-1 block text-meta text-muted-foreground">
                 {preferences.minSamples}+ samples · ≤ {preferences.masteryLatency}ms
               </span>
             </div>
