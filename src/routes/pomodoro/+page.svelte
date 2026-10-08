@@ -1103,8 +1103,8 @@
             role="tab"
             aria-selected={timer.mode === typedMode}
             class={timer.mode === typedMode
-              ? 'h-[30px] rounded-full bg-[var(--pomodoro-soft)] px-3.5 text-meta font-normal text-[var(--pomodoro-accent)] shadow-none hover:bg-[var(--pomodoro-soft)] hover:text-[var(--pomodoro-accent)]'
-              : 'h-[30px] rounded-full px-3.5 text-meta font-normal text-muted-foreground shadow-none'}
+              ? 'h-[30px] rounded-full bg-[var(--pomodoro-soft)] px-4 text-meta font-normal text-[var(--pomodoro-accent)] shadow-none hover:bg-[var(--pomodoro-soft)] hover:text-[var(--pomodoro-accent)]'
+              : 'h-[30px] rounded-full px-4 text-meta font-normal text-muted-foreground shadow-none'}
             onclick={() => switchPomodoroMode(typedMode)}
           >
             {MODE_META[typedMode].shortLabel}
@@ -1188,7 +1188,7 @@
         {/each}
       </div>
 
-      <div class="mt-7 flex items-center justify-center gap-2.5">
+      <div class="mt-7 flex items-center justify-center gap-3">
         <Button
           variant="ghost"
           size="icon-lg"
@@ -1219,7 +1219,7 @@
         </Button>
       </div>
 
-      <div class="mt-4 flex items-center justify-center gap-1.5 text-meta text-muted-foreground">
+      <div class="mt-4 flex items-center justify-center gap-2 text-meta text-muted-foreground">
         <span>
           {timer.completedFocus >= 4
             ? 'Long break next'
@@ -1374,7 +1374,7 @@
             onclick={() => openSettingsPanel('ringtone')}
           >
             <span>Ringtone</span>
-            <span class="inline-flex items-center gap-1.5 text-meta text-muted-foreground">
+            <span class="inline-flex items-center gap-2 text-meta text-muted-foreground">
               {RINGTONE_OPTIONS.find((option) => option.id === ringtone)?.label ?? 'Soft chime'}
               <ChevronRight class="size-3.5" strokeWidth={1.7} />
             </span>
@@ -1432,7 +1432,7 @@
                 >
                   <span class="min-w-0">
                     <span class="block text-meta">{option.label}</span>
-                    <span class="mt-0.5 block text-meta text-muted-foreground">{option.description}</span>
+                    <span class="mt-1 block text-meta text-muted-foreground">{option.description}</span>
                   </span>
                   {#if ringtone === option.id}
                     <Check class="size-4 shrink-0 text-primary" strokeWidth={1.8} />
