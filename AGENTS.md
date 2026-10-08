@@ -49,6 +49,10 @@ Prefer deleting dead scaffold over preserving hypothetical architecture.
 ## UI
 
 - Tailwind CSS v4 is the default styling system.
+- Typography tokens are defined in `src/app.css`; use `text-meta`, `text-ui`, `text-body`, `text-title`, `text-title-lg`, `text-page-title`, and `text-display` instead of ad hoc pixel sizes.
+- Use system fonts (`font-sans` defaults to native SF Pro on Apple / Segoe UI on Windows; `font-mono` prefers SF Mono with Consolas / Liberation Mono / Menlo fallbacks).
+- Font weights are restricted to `font-normal`, `font-medium`, and `font-semibold`; keep nonstandard sizes only for functional large counters, typing glyphs, or diagram micro-labels.
+- Spacing uses 4px steps: 1, 2, 3, 4, 5, 6, 8 Tailwind spacing units (4, 8, 12, 16, 20, 24, 32px); preserve justified geometry and mobile gutter exceptions.
 - Reuse components when repetition is real.
 - For generic interactive primitives, use shadcn-svelte first.
 - Import generic UI from `$lib/components/ui/*`; do not import `bits-ui` directly from routes when shadcn-svelte provides the component.
