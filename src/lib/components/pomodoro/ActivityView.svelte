@@ -171,7 +171,7 @@
     <Button
       variant="ghost"
       size="sm"
-      class="h-8 rounded-full px-2.5 text-meta font-normal text-muted-foreground"
+      class="h-8 rounded-full px-3 text-meta font-normal text-muted-foreground"
       onclick={openGoal}
     >
       <Target class="size-3.5" strokeWidth={1.7} />
@@ -324,7 +324,7 @@
               <time class="text-meta text-muted-foreground">{formatClock(session.startedAt)}</time>
               <div class="min-w-0">
                 <div class="truncate text-meta">{session.label || 'Focus session'}</div>
-                <div class="mt-0.5 text-meta text-muted-foreground">
+                <div class="mt-1 text-meta text-muted-foreground">
                   {formatFocusTotal(session.plannedDurationMs)} target
                   {#if session.overtimeMs > 0}
                     + {formatFocusTotal(session.overtimeMs)} overtime
@@ -423,7 +423,7 @@
                 <time class="text-meta text-muted-foreground">{formatClock(session.startedAt)}</time>
                 <div class="min-w-0">
                   <div class="truncate text-meta">{session.label || 'Focus session'}</div>
-                  <div class="mt-0.5 text-meta text-muted-foreground">
+                  <div class="mt-1 text-meta text-muted-foreground">
                     {formatFocusTotal(session.plannedDurationMs)} target
                     {#if session.overtimeMs > 0}
                       + {formatFocusTotal(session.overtimeMs)} overtime
