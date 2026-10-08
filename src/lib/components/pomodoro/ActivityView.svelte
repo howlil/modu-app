@@ -164,14 +164,14 @@
 <div>
   <div class="mb-7 flex items-end justify-between gap-4">
     <div class="text-left">
-      <h2 class="m-0 text-[20px] font-[500] tracking-[-0.035em]">Activity</h2>
-      <p class="mt-1.5 text-[11px] text-muted-foreground">Focus time, goals, and session history.</p>
+      <h2 class="m-0 text-title-lg font-medium tracking-[-0.035em]">Activity</h2>
+      <p class="mt-1.5 text-meta text-muted-foreground">Focus time, goals, and session history.</p>
     </div>
 
     <Button
       variant="ghost"
       size="sm"
-      class="h-8 rounded-full px-2.5 text-[11px] font-normal text-muted-foreground"
+      class="h-8 rounded-full px-2.5 text-meta font-normal text-muted-foreground"
       onclick={openGoal}
     >
       <Target class="size-3.5" strokeWidth={1.7} />
@@ -181,11 +181,11 @@
 
   <div class="grid grid-cols-[1.2fr_0.8fr] gap-6 max-[700px]:grid-cols-1">
     <div class="border-t pt-4">
-      <div class="mb-2 text-[11px] text-muted-foreground">Today</div>
-      <div class="text-[40px] font-[450] leading-none tracking-[-0.05em]">
+      <div class="mb-2 text-meta text-muted-foreground">Today</div>
+      <div class="text-display font-normal leading-none tracking-[-0.05em]">
         {formatFocusTotal(today.focusedMs)}
         {#if todayHasGoal}
-          <span class="text-[14px] font-normal tracking-normal text-muted-foreground">/ {goalHours}h</span>
+          <span class="text-ui font-normal tracking-normal text-muted-foreground">/ {goalHours}h</span>
         {/if}
       </div>
 
@@ -197,7 +197,7 @@
           ></div>
         </div>
 
-        <div class="mt-2 flex justify-between gap-4 text-[11px] text-muted-foreground">
+        <div class="mt-2 flex justify-between gap-4 text-meta text-muted-foreground">
           <span>{Math.round(todayProgress * 100)}% of goal</span>
           <span>
             {today.focusedMs >= goalMs
@@ -206,28 +206,28 @@
           </span>
         </div>
       {:else}
-        <div class="mt-3 text-[11px] text-muted-foreground">No goal scheduled today</div>
+        <div class="mt-3 text-meta text-muted-foreground">No goal scheduled today</div>
       {/if}
     </div>
 
     <div class="border-t pt-4">
-      <div class="mb-2 text-[11px] text-muted-foreground">Today at a glance</div>
+      <div class="mb-2 text-meta text-muted-foreground">Today at a glance</div>
       <div class="grid grid-cols-2 gap-x-5 gap-y-4">
         <div>
-          <strong class="block text-[22px] font-[500] tracking-[-0.03em]">{today.sessionCount}</strong>
-          <span class="text-[11px] text-muted-foreground">focus sessions</span>
+          <strong class="block text-title-lg font-medium tracking-[-0.03em]">{today.sessionCount}</strong>
+          <span class="text-meta text-muted-foreground">focus sessions</span>
         </div>
         <div>
-          <strong class="block text-[22px] font-[500] tracking-[-0.03em]">{formatFocusTotal(today.overtimeMs)}</strong>
-          <span class="text-[11px] text-muted-foreground">overtime</span>
+          <strong class="block text-title-lg font-medium tracking-[-0.03em]">{formatFocusTotal(today.overtimeMs)}</strong>
+          <span class="text-meta text-muted-foreground">overtime</span>
         </div>
         <div>
-          <strong class="block text-[22px] font-[500] tracking-[-0.03em]">{formatFocusTotal(todayAverageMs)}</strong>
-          <span class="text-[11px] text-muted-foreground">avg. session</span>
+          <strong class="block text-title-lg font-medium tracking-[-0.03em]">{formatFocusTotal(todayAverageMs)}</strong>
+          <span class="text-meta text-muted-foreground">avg. session</span>
         </div>
         <div>
-          <strong class="block text-[22px] font-[500] tracking-[-0.03em]">{formatClock(today.firstStartedAt)}</strong>
-          <span class="text-[11px] text-muted-foreground">first session</span>
+          <strong class="block text-title-lg font-medium tracking-[-0.03em]">{formatClock(today.firstStartedAt)}</strong>
+          <span class="text-meta text-muted-foreground">first session</span>
         </div>
       </div>
     </div>
@@ -236,11 +236,11 @@
   <div class="mt-9">
     <div class="mb-3 flex items-center justify-between gap-4">
       <div>
-        <h3 class="m-0 text-[14px] font-medium">Focus heatmap</h3>
-        <p class="mt-1 text-[10px] text-muted-foreground">Last 52 weeks · intensity follows each day's goal</p>
+        <h3 class="m-0 text-ui font-medium">Focus heatmap</h3>
+        <p class="mt-1 text-meta text-muted-foreground">Last 52 weeks · intensity follows each day's goal</p>
       </div>
 
-      <div class="flex items-center gap-1 text-[10px] text-muted-foreground max-[560px]:hidden">
+      <div class="flex items-center gap-1 text-meta text-muted-foreground max-[560px]:hidden">
         <span>Less</span>
         {#each ['#ECECE6', '#DCE8FF', '#ABC6FB', '#6E9DF5', '#4F82F2', '#2468F2'] as color}
           <span class="size-2.5 rounded-[3px]" style={`background: ${color}`}></span>
@@ -273,35 +273,35 @@
 
   <div class="mt-8">
     <div class="mb-3 flex items-center justify-between">
-      <h3 class="m-0 text-[14px] font-medium">This week</h3>
-      <span class="text-[10px] text-muted-foreground">Mon–Sun</span>
+      <h3 class="m-0 text-ui font-medium">This week</h3>
+      <span class="text-meta text-muted-foreground">Mon–Sun</span>
     </div>
 
     <div class="grid grid-cols-3 gap-6 max-[620px]:grid-cols-1 max-[620px]:gap-3">
       <div class="border-t pt-3">
-        <strong class="block text-[24px] font-[500] tracking-[-0.035em]">{formatFocusTotal(week.focusedMs)}</strong>
-        <span class="text-[11px] text-muted-foreground">focused</span>
+        <strong class="block text-title-lg font-medium tracking-[-0.035em]">{formatFocusTotal(week.focusedMs)}</strong>
+        <span class="text-meta text-muted-foreground">focused</span>
       </div>
       <div class="border-t pt-3">
-        <strong class="block text-[24px] font-[500] tracking-[-0.035em]">{formatFocusTotal(week.averageActiveDayMs)}</strong>
-        <span class="text-[11px] text-muted-foreground">avg. / active day</span>
+        <strong class="block text-title-lg font-medium tracking-[-0.035em]">{formatFocusTotal(week.averageActiveDayMs)}</strong>
+        <span class="text-meta text-muted-foreground">avg. / active day</span>
       </div>
       <div class="border-t pt-3">
-        <strong class="block text-[24px] font-[500] tracking-[-0.035em]">
+        <strong class="block text-title-lg font-medium tracking-[-0.035em]">
           {week.goalsReached} / {week.scheduledGoalDays}
         </strong>
-        <span class="text-[11px] text-muted-foreground">targets reached</span>
+        <span class="text-meta text-muted-foreground">targets reached</span>
       </div>
     </div>
   </div>
 
   <div class="mt-9">
     <div class="mb-2 flex items-center justify-between gap-4">
-      <h3 class="m-0 text-[14px] font-medium">Recent activity</h3>
+      <h3 class="m-0 text-ui font-medium">Recent activity</h3>
     </div>
 
     {#if sessions.length === 0}
-      <div class="border-t py-10 text-center text-[12px] text-muted-foreground">
+      <div class="border-t py-10 text-center text-meta text-muted-foreground">
         Completed focus sessions will appear here.
       </div>
     {:else}
@@ -315,23 +315,23 @@
             class="mb-1 flex h-auto w-full items-center justify-between gap-4 rounded-full px-2 py-1 text-left font-normal shadow-none"
             onclick={() => openHistoryDay(dateKey)}
           >
-            <strong class="text-[12px] font-medium">{formatDayLabel(dateKey)}</strong>
-            <span class="text-[11px] text-muted-foreground">{formatFocusTotal(day?.focusedMs ?? 0)}</span>
+            <strong class="text-meta font-medium">{formatDayLabel(dateKey)}</strong>
+            <span class="text-meta text-muted-foreground">{formatFocusTotal(day?.focusedMs ?? 0)}</span>
           </Button>
 
           {#each daySessions.slice(0, 6) as session}
             <div class="grid grid-cols-[68px_1fr_auto] items-center gap-3 py-2 max-[520px]:grid-cols-[54px_1fr_auto]">
-              <time class="text-[11px] text-muted-foreground">{formatClock(session.startedAt)}</time>
+              <time class="text-meta text-muted-foreground">{formatClock(session.startedAt)}</time>
               <div class="min-w-0">
-                <div class="truncate text-[12px]">{session.label || 'Focus session'}</div>
-                <div class="mt-0.5 text-[10px] text-muted-foreground">
+                <div class="truncate text-meta">{session.label || 'Focus session'}</div>
+                <div class="mt-0.5 text-meta text-muted-foreground">
                   {formatFocusTotal(session.plannedDurationMs)} target
                   {#if session.overtimeMs > 0}
                     + {formatFocusTotal(session.overtimeMs)} overtime
                   {/if}
                 </div>
               </div>
-              <div class="text-[11px] text-muted-foreground">{formatFocusTotal(session.actualDurationMs)}</div>
+              <div class="text-meta text-muted-foreground">{formatFocusTotal(session.actualDurationMs)}</div>
             </div>
           {/each}
         </div>
@@ -347,27 +347,27 @@
         aria-labelledby="daily-goal-title"
       >
         <div class="mb-4 flex items-center justify-between">
-          <h3 id="daily-goal-title" class="m-0 text-[14px] font-medium">Daily focus target</h3>
+          <h3 id="daily-goal-title" class="m-0 text-ui font-medium">Daily focus target</h3>
           <Button variant="ghost" size="icon-sm" class="rounded-full text-muted-foreground" aria-label="Close goal settings" onclick={() => (goalOpen = false)}>
             <X class="size-4" strokeWidth={1.7} />
           </Button>
         </div>
 
-        <label class="grid min-h-11 grid-cols-[1fr_100px] items-center gap-3 text-[12px]">
+        <label class="grid min-h-11 grid-cols-[1fr_100px] items-center gap-3 text-meta">
           Target
           <div class="flex items-center gap-2">
-            <Input type="number" min="1" max="16" step="0.5" class="h-8 text-right text-[12px]" bind:value={goalDraftHours} />
-            <span class="text-[11px] text-muted-foreground">h</span>
+            <Input type="number" min="1" max="16" step="0.5" class="h-8 text-right text-meta" bind:value={goalDraftHours} />
+            <span class="text-meta text-muted-foreground">h</span>
           </div>
         </label>
 
         <div class="mt-3 border-t pt-4">
-          <div class="mb-2 text-[11px] text-muted-foreground">Apply on</div>
+          <div class="mb-2 text-meta text-muted-foreground">Apply on</div>
           <div class="flex gap-2">
             <Button
               variant={goalDraftSchedule === 'weekdays' ? 'secondary' : 'outline'}
               size="sm"
-              class="h-8 rounded-full text-[11px] font-normal shadow-none"
+              class="h-8 rounded-full text-meta font-normal shadow-none"
               onclick={() => (goalDraftSchedule = 'weekdays')}
             >
               Weekdays
@@ -375,7 +375,7 @@
             <Button
               variant={goalDraftSchedule === 'every-day' ? 'secondary' : 'outline'}
               size="sm"
-              class="h-8 rounded-full text-[11px] font-normal shadow-none"
+              class="h-8 rounded-full text-meta font-normal shadow-none"
               onclick={() => (goalDraftSchedule = 'every-day')}
             >
               Every day
@@ -383,7 +383,7 @@
           </div>
         </div>
 
-        <Button class="mt-5 h-9 w-full rounded-full text-[12px] font-medium shadow-none" onclick={saveGoal}>
+        <Button class="mt-5 h-9 w-full rounded-full text-meta font-medium shadow-none" onclick={saveGoal}>
           Update target
         </Button>
       </Dialog.Content>
@@ -399,15 +399,15 @@
           aria-labelledby="day-inspector-title"
         >
         <div class="mb-4 flex items-center justify-between">
-          <h3 id="day-inspector-title" class="m-0 text-[14px] font-medium">{formatLongDay(selectedDayKey)}</h3>
+          <h3 id="day-inspector-title" class="m-0 text-ui font-medium">{formatLongDay(selectedDayKey)}</h3>
           <Button variant="ghost" size="icon-sm" class="rounded-full text-muted-foreground" aria-label="Close day details" onclick={() => (dayOpen = false)}>
             <X class="size-4" strokeWidth={1.7} />
           </Button>
         </div>
 
         <div class="border-b pb-4">
-          <strong class="block text-[30px] font-[450] tracking-[-0.04em]">{formatFocusTotal(selectedDay?.focusedMs ?? 0)}</strong>
-          <span class="text-[11px] text-muted-foreground">
+          <strong class="block text-page-title font-normal tracking-[-0.04em]">{formatFocusTotal(selectedDay?.focusedMs ?? 0)}</strong>
+          <span class="text-meta text-muted-foreground">
             {selectedDay && selectedDay.goalMs > 0
               ? Math.round((selectedDay.focusedMs / selectedDay.goalMs) * 100)
               : 0}% of {formatFocusTotal(selectedDay?.goalMs ?? goalMs)} goal · {selectedDay?.sessionCount ?? 0} sessions
@@ -415,22 +415,22 @@
         </div>
 
         {#if selectedSessions.length === 0}
-          <div class="py-8 text-center text-[12px] text-muted-foreground">No focus sessions on this day.</div>
+          <div class="py-8 text-center text-meta text-muted-foreground">No focus sessions on this day.</div>
         {:else}
           <div class="divide-y">
             {#each selectedSessions as session}
               <div class="grid grid-cols-[58px_1fr_auto] items-center gap-3 py-3">
-                <time class="text-[10px] text-muted-foreground">{formatClock(session.startedAt)}</time>
+                <time class="text-meta text-muted-foreground">{formatClock(session.startedAt)}</time>
                 <div class="min-w-0">
-                  <div class="truncate text-[12px]">{session.label || 'Focus session'}</div>
-                  <div class="mt-0.5 text-[10px] text-muted-foreground">
+                  <div class="truncate text-meta">{session.label || 'Focus session'}</div>
+                  <div class="mt-0.5 text-meta text-muted-foreground">
                     {formatFocusTotal(session.plannedDurationMs)} target
                     {#if session.overtimeMs > 0}
                       + {formatFocusTotal(session.overtimeMs)} overtime
                     {/if}
                   </div>
                 </div>
-                <span class="text-[11px] text-muted-foreground">{formatFocusTotal(session.actualDurationMs)}</span>
+                <span class="text-meta text-muted-foreground">{formatFocusTotal(session.actualDurationMs)}</span>
               </div>
             {/each}
           </div>
