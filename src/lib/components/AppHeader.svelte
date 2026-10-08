@@ -29,7 +29,7 @@
         ? "mx-auto flex h-full w-full items-center justify-between gap-3 px-3.5"
         : "mx-auto flex h-full w-full max-w-[1180px] items-center justify-between gap-3 px-4 max-[700px]:px-2.5"}
     >
-      <a class="inline-flex items-center gap-2.5 text-[14px] font-[600] tracking-[-0.02em]" href="/">
+      <a class="inline-flex items-center gap-2.5 text-ui font-semibold tracking-[-0.02em]" href="/">
         <span class="grid size-6 grid-cols-2 gap-[3px] rounded-md bg-primary p-[5px]" aria-hidden="true">
           <span class="rounded-[1px] bg-primary-foreground"></span>
           <span class="rounded-[1px] bg-primary-foreground"></span>
@@ -46,7 +46,7 @@
           rel="noreferrer"
           variant="outline"
           size="sm"
-          class="h-8 rounded-full border-border/[0.75] bg-white/[0.50] px-2.5 text-xs font-normal shadow-none backdrop-blur-sm hover:bg-white/[0.80] max-[520px]:px-2"
+          class="h-8 rounded-full border-border/[0.75] bg-white/[0.50] px-2.5 text-meta font-normal shadow-none backdrop-blur-sm hover:bg-white/[0.80] max-[520px]:px-2"
         >
           <Heart class="size-3.5 text-[#BF4B71]" strokeWidth={1.8} />
           <span class="max-[430px]:hidden">Sponsor</span>
@@ -57,7 +57,7 @@
           target="_blank"
           rel="noreferrer"
           size="sm"
-          class="h-8 rounded-full bg-foreground px-2.5 text-xs font-normal text-background shadow-none hover:bg-foreground/90 max-[520px]:px-2"
+          class="h-8 rounded-full bg-foreground px-2.5 text-meta font-normal text-background shadow-none hover:bg-foreground/90 max-[520px]:px-2"
         >
           <Github class="size-3.5" strokeWidth={1.8} />
           <span class="max-[520px]:hidden">Star on GitHub</span>
