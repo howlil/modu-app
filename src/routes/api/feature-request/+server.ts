@@ -28,6 +28,23 @@ function githubIssueUrl(title: string, body: string) {
   return 'https://github.com/' + repository + '/issues/new?' + params.toString();
 }
 
+// Read-only deployment diagnostic; never returns secret values or uses limiter quota.
+export const GET: RequestHandler = () => {
+  const settings = env as unknown as FeatureRequestEnv;
+
+  return json(
+    {
+      release: 'rate-limit-only',
+      configuration: {
+        githubToken: settings.GITHUB_TOKEN ? 'configured' : 'missing',
+        ipLimiter: settings.FEATURE_REQUEST_IP_LIMITER?.limit ? 'bound' : 'missing',
+        globalLimiter: settings.FEATURE_REQUEST_GLOBAL_LIMITER?.limit ? 'bound' : 'missing'
+      }
+    },
+    { headers: { 'cache-control': 'no-store' } }
+  );
+};
+
 export const POST: RequestHandler = async ({ request, url }) => {
   if (!isAllowedOrigin(request.headers.get('origin'), url.origin)) {
     return json({ error: 'Invalid request origin.' }, { status: 403 });
