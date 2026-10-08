@@ -5,4 +5,5 @@ export interface ModuleDefinition {
   name: string;
   route: string;
   layout: ModuleLayout;
+  status: 'available' | 'coming-soon';
 }

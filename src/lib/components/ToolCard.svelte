@@ -1,7 +1,8 @@
 <script lang="ts">
   import type { ModuleDefinition } from '#lib/platform/registry/types.ts';
 
-  let { module, preview = false }: { module: ModuleDefinition; preview?: boolean } = $props();
+  let { module }: { module: ModuleDefinition } = $props();
+  const preview = module.status === 'coming-soon';
 
   const tileStyle = {
     'pdf-merge': 'background: linear-gradient(145deg, #F8C7D3 0%, #F1AEC0 56%, #E99CB2 100%);',
