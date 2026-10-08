@@ -30,12 +30,7 @@
         : "mx-auto flex h-full w-full max-w-[1180px] items-center justify-between gap-3 px-4 max-[700px]:px-2.5"}
     >
       <a class="inline-flex items-center gap-3 text-ui font-semibold tracking-[-0.02em]" href="/">
-        <span class="grid size-6 grid-cols-2 gap-[3px] rounded-md bg-primary p-[5px]" aria-hidden="true">
-          <span class="rounded-[1px] bg-primary-foreground"></span>
-          <span class="rounded-[1px] bg-primary-foreground"></span>
-          <span class="rounded-[1px] bg-primary-foreground"></span>
-          <span class="rounded-[1px] bg-primary-foreground"></span>
-        </span>
+        <img src="/modu-logo.svg" alt="" width="24" height="24" class="size-6 shrink-0" aria-hidden="true" />
         Module
       </a>
 
