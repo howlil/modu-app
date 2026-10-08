@@ -22,7 +22,7 @@
 <section id="tools" class="px-4 pb-8 pt-2 max-[760px]:px-2.5 max-[700px]:pb-6">
   <div class="mx-auto grid w-full max-w-[1040px] grid-cols-4 gap-3 max-[820px]:grid-cols-2">
     {#each modules as module}
-      <ToolCard {module} />
+      <ToolCard {module} preview={module.id === 'pdf-merge'} />
     {/each}
 
     <ToolCard module={imageCompressPreview} preview />
