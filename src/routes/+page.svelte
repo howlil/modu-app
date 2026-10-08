@@ -36,14 +36,14 @@
         Small utilities for files, focus, and everyday work — designed to get out of the way.
       </p>
 
-      <div class="mt-7 flex justify-center">
+      <div class="mt-6 flex justify-center">
         <FeatureRequestDialog />
       </div>
     </div>
   </div>
 </section>
 
-<section id="tools" class="px-4 pb-16 pt-2 max-[760px]:px-2.5 max-[700px]:pb-12">
+<section id="tools" class="px-4 pb-8 pt-2 max-[760px]:px-2.5 max-[700px]:pb-6">
   <div class="mx-auto grid w-full max-w-[1040px] grid-cols-4 gap-3 max-[820px]:grid-cols-2">
     {#each modules as module}
       <ToolCard {module} />
