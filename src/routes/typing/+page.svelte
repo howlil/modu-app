@@ -424,7 +424,7 @@
   <title>Typing — Module</title>
 </svelte:head>
 
-<section class="mx-auto w-full max-w-[1180px] px-4 py-10 max-[760px]:px-2.5 max-[760px]:py-7">
+<section class="mx-auto w-full max-w-[1180px] px-4 py-8 max-[760px]:px-2.5 max-[760px]:py-6">
   <div class="mx-auto w-full max-w-[860px] min-w-0">
     <ToolHeader title="Typing" />
 
@@ -471,7 +471,7 @@
         </Tabs.Trigger>
       </Tabs.List>
 
-      <Tabs.Content value="train" class="min-w-0 pt-7 max-[640px]:pt-6">
+      <Tabs.Content value="train" class="min-w-0 pt-6 max-[640px]:pt-6">
         <div class="flex min-w-0 items-start justify-between gap-5">
           <div class="min-w-0">
             <h2 class="m-0 truncate text-ui font-medium tracking-[-0.015em]">
@@ -491,7 +491,7 @@
         </div>
 
         <div
-          class="mt-8 min-h-[168px] w-full min-w-0 max-w-full overflow-x-clip outline-none ring-ring focus-visible:ring-2 max-[640px]:mt-7 max-[640px]:min-h-[150px]"
+          class="mt-8 min-h-[168px] w-full min-w-0 max-w-full overflow-x-clip outline-none ring-ring focus-visible:ring-2 max-[640px]:mt-6 max-[640px]:min-h-[150px]"
           role="textbox"
           aria-label="Typing practice"
           aria-multiline="true"
@@ -563,7 +563,7 @@
           </div>
         {/if}
 
-        <div class="mt-7 px-1">
+        <div class="mt-6 px-1">
           <div class="flex items-center" aria-label={`Session block ${blockIndex + 1} of ${TRAINING_BLOCKS.length}`}>
             {#each TRAINING_BLOCKS as block, index}
               <div class="flex flex-1 items-center last:flex-none">
@@ -630,7 +630,7 @@
         </div>
       </Tabs.Content>
 
-      <Tabs.Content value="lessons" class="pt-7">
+      <Tabs.Content value="lessons" class="pt-6">
         <div class="mb-5">
           <h2 class="m-0 text-title font-semibold tracking-[-0.03em]">Lessons</h2>
           <p class="mt-1 text-meta text-muted-foreground">Learn the movement, then reinforce it in Train.</p>
@@ -660,7 +660,7 @@
         </div>
       </Tabs.Content>
 
-      <Tabs.Content value="test" class="min-w-0 pt-7">
+      <Tabs.Content value="test" class="min-w-0 pt-6">
         <div class="flex min-w-0 items-center justify-between gap-4 border-b border-border pb-3 max-[560px]:items-start max-[560px]:flex-col">
           <ToggleGroup.Root
             type="single"
@@ -717,13 +717,13 @@
         </div>
       </Tabs.Content>
 
-      <Tabs.Content value="progress" class="pt-7">
+      <Tabs.Content value="progress" class="pt-6">
         <div>
           <h2 class="m-0 text-title font-semibold tracking-[-0.03em]">Progress</h2>
           <p class="mt-1 text-meta text-muted-foreground">What changed, and what still needs work.</p>
         </div>
 
-        <section class="mt-8 border-b border-border pb-7">
+        <section class="mt-8 border-b border-border pb-6">
           <div class="flex items-end justify-between gap-4">
             <div>
               <span class="text-meta text-muted-foreground">Recent speed</span>
@@ -750,7 +750,7 @@
           {/if}
         </section>
 
-        <div class="grid grid-cols-2 gap-10 py-7 max-[680px]:grid-cols-1 max-[680px]:gap-7">
+        <div class="grid grid-cols-2 gap-8 py-6 max-[680px]:grid-cols-1 max-[680px]:gap-6">
           <section class="min-w-0">
             <h3 class="m-0 text-meta font-medium">Needs work</h3>
             <div class="mt-3 divide-y divide-border">
@@ -805,7 +805,7 @@
         </div>
       </Tabs.Content>
 
-      <Tabs.Content value="settings" class="pt-7">
+      <Tabs.Content value="settings" class="pt-6">
         <div class="border-b border-border pb-4">
           <h2 class="m-0 text-title font-semibold tracking-[-0.03em]">Settings</h2>
         </div>
