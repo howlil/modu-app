@@ -26,7 +26,7 @@
     <span class="cloud cloud-5"></span>
   </div>
 
-  <div class="relative z-10 grid min-h-[570px] place-items-center px-4 py-[72px] pb-[98px] text-center max-[760px]:px-2.5 max-[700px]:min-h-[500px] max-[700px]:py-14">
+  <div class="relative z-10 grid min-h-[570px] place-items-center px-4 py-[72px] pb-[98px] text-center max-[760px]:px-2.5 max-[700px]:min-h-[500px] max-[700px]:py-8">
     <div class="mx-auto w-full max-w-[820px]">
       <h1 class="m-0 text-display font-medium  tracking-[-0.055em]">
         Useful tools.<br />Nothing extra.
