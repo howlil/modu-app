@@ -249,23 +249,24 @@
       </div>
     </div>
 
-    <div class="overflow-x-auto pb-2">
+    <div class="overflow-x-auto pb-2 focus-visible:outline-2 focus-visible:outline-ring" role="region" aria-label="Focus activity by date" tabindex="0">
       <div class="grid w-max grid-flow-col grid-rows-7 gap-1">
         {#each heatmapDays as day}
           <Button
             variant="ghost"
             class={[
-              'size-3 min-w-0 rounded-full border-0 p-0 shadow-none transition',
+              'flex size-6 min-w-0 items-center justify-center rounded-md border-0 p-0 shadow-none transition',
               day.future
                 ? 'cursor-default opacity-45'
-                : 'hover:outline hover:outline-2 hover:outline-foreground/15 hover:outline-offset-1'
+                : 'hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring'
             ].join(' ')}
-            style={`background: ${heatmapColor(day)}`}
             title={heatmapTitle(day)}
             aria-label={heatmapTitle(day)}
             disabled={day.future}
             onclick={() => inspectDay(day)}
-          ></Button>
+          >
+            <span class="size-3 rounded-[3px]" style={`background: ${heatmapColor(day)}`} aria-hidden="true"></span>
+          </Button>
         {/each}
       </div>
     </div>
@@ -341,9 +342,9 @@
 
   <Dialog.Root bind:open={goalOpen}>
     <Dialog.Portal>
-      <Dialog.Overlay class="fixed inset-0 z-[110] bg-foreground/[0.12] backdrop-blur-[3px]" />
+      <Dialog.Overlay class="fixed inset-0 z-[110] bg-black/25 backdrop-blur-[2px]" />
       <Dialog.Content
-        class="fixed left-1/2 top-1/2 z-[111] w-[calc(100%-2rem)] max-w-[390px] -translate-x-1/2 -translate-y-1/2 rounded-[18px] border border-white/[0.65] bg-background/[0.96] p-4 text-left shadow-[0_24px_70px_rgba(28,28,24,0.16)] backdrop-blur-xl outline-none"
+        class="fixed left-1/2 top-1/2 z-[111] w-[calc(100%-2rem)] max-w-[390px] -translate-x-1/2 -translate-y-1/2 rounded-[22px] border border-border bg-background p-5 text-left shadow-[0_24px_70px_rgba(25,25,25,0.18)] outline-none"
         aria-labelledby="daily-goal-title"
       >
         <div class="mb-4 flex items-center justify-between">
@@ -393,9 +394,9 @@
   {#if selectedDayKey}
     <Dialog.Root bind:open={dayOpen}>
       <Dialog.Portal>
-        <Dialog.Overlay class="fixed inset-0 z-[110] bg-foreground/[0.12] backdrop-blur-[3px]" />
+        <Dialog.Overlay class="fixed inset-0 z-[110] bg-black/25 backdrop-blur-[2px]" />
         <Dialog.Content
-          class="fixed left-1/2 top-1/2 z-[111] max-h-[min(620px,calc(100vh-32px))] w-[calc(100%-2rem)] max-w-[410px] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-[18px] border border-white/[0.65] bg-background/[0.96] p-4 text-left shadow-[0_24px_70px_rgba(28,28,24,0.16)] backdrop-blur-xl outline-none"
+          class="fixed left-1/2 top-1/2 z-[111] max-h-[min(620px,calc(100vh-32px))] w-[calc(100%-2rem)] max-w-[410px] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-[22px] border border-border bg-background p-5 text-left shadow-[0_24px_70px_rgba(25,25,25,0.18)] outline-none"
           aria-labelledby="day-inspector-title"
         >
         <div class="mb-4 flex items-center justify-between">
