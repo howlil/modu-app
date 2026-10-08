@@ -6,8 +6,8 @@
   import { Switch } from "$lib/components/ui/switch/index.js";
   import * as Tabs from '$lib/components/ui/tabs/index.js';
   import ToolHeader from '#lib/components/ToolHeader.svelte';
-  import ActivityView from '#lib/components/pomodoro/ActivityView.svelte';
-  import FocusProtectionSettings from '#lib/components/pomodoro/FocusProtectionSettings.svelte';
+  import ActivityView from '#lib/modules/pomodoro/components/ActivityView.svelte';
+  import FocusProtectionSettings from '#lib/modules/pomodoro/components/FocusProtectionSettings.svelte';
   import {
     clearFocusSessions,
     loadFocusSessions,
@@ -49,7 +49,7 @@
     type TimerState
   } from '#lib/modules/pomodoro/timer.ts';
 
-  const STORAGE_KEY = 'module-pomodoro-v2';
+  import { readPomodoroSnapshot, savePomodoroSnapshot, clearPomodoroSnapshot } from '#lib/modules/pomodoro/persistence.ts';
 
   type PomodoroView = 'timer' | 'activity' | 'settings';
   type SettingsPanel = 'main' | 'blocked-sites' | 'ringtone' | 'data';
@@ -220,51 +220,30 @@
   }
 
   function persist() {
-    if (!hydrated || typeof localStorage === 'undefined') return;
+    if (!hydrated) return;
 
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        timer,
-        durations,
-        preferences,
-        focusText,
-        soundEnabled,
-        ringtone,
-        notificationsEnabled,
-        focusProtection: {
-          enabled: focusProtectionEnabled,
-          blockedDomains
-        },
-        sessionStartedAt,
-        dailyGoalHours,
-        goalSchedule
-      })
-    );
+    savePomodoroSnapshot({
+      timer,
+      durations,
+      preferences,
+      focusText,
+      soundEnabled,
+      ringtone,
+      notificationsEnabled,
+      focusProtection: {
+        enabled: focusProtectionEnabled,
+        blockedDomains
+      },
+      sessionStartedAt,
+      dailyGoalHours,
+      goalSchedule
+    });
   }
 
   function restore() {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
-
     try {
-      const saved = JSON.parse(raw) as {
-        timer?: Partial<TimerState>;
-        durations?: Partial<Record<PomodoroMode, number>>;
-        preferences?: Partial<PomodoroPreferences>;
-        focusText?: string;
-        soundEnabled?: boolean;
-        ringtone?: unknown;
-        notificationsEnabled?: boolean;
-        focusProtection?: {
-          enabled?: boolean;
-          blockedDomains?: string[];
-        };
-        sessionStartedAt?: number | null;
-        dailyGoalHours?: number;
-        goalSchedule?: GoalSchedule;
-        history?: LegacyFocusSession[];
-      };
+      const saved = readPomodoroSnapshot();
+      if (!saved) return;
 
       durations = {
         focus: clampMinutes(saved.durations?.focus, 25, 180),
@@ -340,7 +319,7 @@
       blockedDomains = normalizeBlocklist(saved.focusProtection?.blockedDomains ?? []);
       legacyHistory = Array.isArray(saved.history) ? saved.history : [];
     } catch {
-      localStorage.removeItem(STORAGE_KEY);
+      clearPomodoroSnapshot();
     }
   }
 
@@ -808,9 +787,7 @@
     await releaseWakeLock();
     await clearFocusSessions();
 
-    if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem(STORAGE_KEY);
-    }
+    clearPomodoroSnapshot();
 
     durations = { ...DEFAULT_DURATIONS };
     preferences = { ...DEFAULT_PREFERENCES };
