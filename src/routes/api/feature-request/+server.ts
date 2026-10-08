@@ -1,18 +1,14 @@
 import { env } from 'cloudflare:workers';
 import { json } from '@sveltejs/kit';
-import { isAllowedOrigin, verifyTurnstileToken } from '$lib/server/feature-request-security';
+import { checkFeatureRequestRateLimit, isAllowedOrigin } from '$lib/server/feature-request-security';
 import type { RequestHandler } from './$types';
 
 const repository = 'howlil/modu-app';
 
-type RateLimiter = {
-  limit(options: { key: string }): Promise<{ success: boolean }>;
-};
+import type { RateLimiter } from '$lib/server/feature-request-security';
 
 type FeatureRequestEnv = {
   GITHUB_TOKEN?: string;
-  TURNSTILE_SITE_KEY?: string;
-  TURNSTILE_SECRET_KEY?: string;
   FEATURE_REQUEST_IP_LIMITER?: RateLimiter;
   FEATURE_REQUEST_GLOBAL_LIMITER?: RateLimiter;
 };
@@ -21,7 +17,6 @@ type FeatureRequestPayload = {
   title?: unknown;
   details?: unknown;
   website?: unknown;
-  turnstileToken?: unknown;
 };
 
 function githubIssueUrl(title: string, body: string) {
@@ -33,45 +28,28 @@ function githubIssueUrl(title: string, body: string) {
   return 'https://github.com/' + repository + '/issues/new?' + params.toString();
 }
 
-export const GET: RequestHandler = async () => {
-  const settings = env as unknown as FeatureRequestEnv;
-  const siteKey =
-    settings.TURNSTILE_SITE_KEY && settings.TURNSTILE_SECRET_KEY && settings.GITHUB_TOKEN
-      ? settings.TURNSTILE_SITE_KEY
-      : null;
-
-  return json({ siteKey }, { headers: { 'cache-control': 'no-store' } });
-};
-
 export const POST: RequestHandler = async ({ request, url }) => {
   if (!isAllowedOrigin(request.headers.get('origin'), url.origin)) {
     return json({ error: 'Invalid request origin.' }, { status: 403 });
   }
 
   const settings = env as unknown as FeatureRequestEnv;
-  const ipLimiter = settings.FEATURE_REQUEST_IP_LIMITER;
-  const globalLimiter = settings.FEATURE_REQUEST_GLOBAL_LIMITER;
+  const clientIp = request.headers.get('cf-connecting-ip') || 'unknown';
+  const rateLimit = await checkFeatureRequestRateLimit(
+    settings.FEATURE_REQUEST_IP_LIMITER,
+    settings.FEATURE_REQUEST_GLOBAL_LIMITER,
+    clientIp
+  );
 
-  if (!ipLimiter || !globalLimiter) {
+  if (rateLimit === 'unavailable') {
     return json({ error: 'Feature requests are temporarily unavailable.' }, { status: 503 });
   }
 
-  const clientIp = request.headers.get('cf-connecting-ip') || 'unknown';
-
-  try {
-    const [perIp, global] = await Promise.all([
-      ipLimiter.limit({ key: 'feature-request:ip:' + clientIp }),
-      globalLimiter.limit({ key: 'feature-request:global' })
-    ]);
-
-    if (!perIp.success || !global.success) {
-      return json(
-        { error: 'Too many requests. Try again later.' },
-        { status: 429, headers: { 'retry-after': '60' } }
-      );
-    }
-  } catch {
-    return json({ error: 'Feature requests are temporarily unavailable.' }, { status: 503 });
+  if (rateLimit === 'limited') {
+    return json(
+      { error: 'Too many requests. Try again later.' },
+      { status: 429, headers: { 'retry-after': '60' } }
+    );
   }
 
   if (request.headers.get('content-type')?.split(';')[0].trim().toLowerCase() !== 'application/json') {
@@ -115,34 +93,11 @@ export const POST: RequestHandler = async ({ request, url }) => {
 
   const fallbackUrl = githubIssueUrl(title, issueBody);
   const token = settings.GITHUB_TOKEN;
-  const secret = settings.TURNSTILE_SECRET_KEY;
 
-  // Never attempt a privileged GitHub write when bot verification isn't configured.
-  if (!token || !secret || !settings.TURNSTILE_SITE_KEY) {
+  if (!token) {
     return json(
       { error: 'Direct submissions are unavailable. Open GitHub instead.', fallbackUrl },
       { status: 503 }
-    );
-  }
-
-  if (typeof payload.turnstileToken !== 'string') {
-    return json(
-      { error: 'Complete the verification before sending.', fallbackUrl },
-      { status: 403 }
-    );
-  }
-
-  const verified = await verifyTurnstileToken({
-    token: payload.turnstileToken,
-    secret,
-    hostname: url.hostname,
-    remoteIp: clientIp === 'unknown' ? undefined : clientIp
-  });
-
-  if (!verified) {
-    return json(
-      { error: 'Verification expired or failed. Please retry.', fallbackUrl },
-      { status: 403 }
     );
   }
 

@@ -1,32 +1,9 @@
 <script lang="ts">
-  import { tick } from 'svelte';
   import { Dialog } from '$lib/components/ui/dialog/index.js';
   import { Check, ExternalLink, Send, X } from 'lucide-svelte';
   import { Button } from '$lib/components/ui/button/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
   import { Textarea } from '$lib/components/ui/textarea/index.js';
-
-  type TurnstileApi = {
-    render: (
-      container: HTMLElement,
-      options: {
-        sitekey: string;
-        action: string;
-        theme: 'auto';
-        size: 'flexible';
-        callback: (token: string) => void;
-        'expired-callback': () => void;
-        'error-callback': () => void;
-      }
-    ) => string;
-    reset: (widgetId: string) => void;
-    remove: (widgetId: string) => void;
-  };
-
-  function getTurnstile(): TurnstileApi | undefined {
-    if (typeof window === 'undefined') return undefined;
-    return (window as Window & { turnstile?: TurnstileApi }).turnstile;
-  }
 
   function githubFallbackUrl() {
     const params = new URLSearchParams({
@@ -34,32 +11,6 @@
       body: details.trim() || 'No additional details provided.'
     });
     return 'https://github.com/howlil/modu-app/issues/new?' + params.toString();
-  }
-
-  async function loadTurnstile(): Promise<TurnstileApi> {
-    const existing = getTurnstile();
-    if (existing) return existing;
-
-    let script = document.querySelector<HTMLScriptElement>('script[data-modu-turnstile]');
-    if (!script) {
-      script = document.createElement('script');
-      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-      script.async = true;
-      script.dataset.moduTurnstile = '';
-      document.head.appendChild(script);
-    }
-
-    await new Promise<void>((resolve, reject) => {
-      if (getTurnstile()) return resolve();
-      script!.addEventListener('load', () => resolve(), { once: true });
-      script!.addEventListener('error', () => reject(new Error('Verification unavailable.')), {
-        once: true
-      });
-    });
-
-    const widget = getTurnstile();
-    if (!widget) throw new Error('Verification unavailable.');
-    return widget;
   }
 
   let open = $state(false);
@@ -70,20 +21,8 @@
   let error = $state('');
   let issueUrl = $state('');
   let fallbackUrl = $state('');
-  let siteKey = $state('');
-  let turnstileToken = $state('');
-  let loadingChallenge = $state(false);
-  let turnstileContainer: HTMLDivElement | undefined;
-  let widgetId: string | null = null;
 
   function reset() {
-    if (widgetId && getTurnstile()) {
-      getTurnstile()?.remove(widgetId);
-    }
-    widgetId = null;
-    turnstileToken = '';
-    siteKey = '';
-    loadingChallenge = false;
     title = '';
     details = '';
     website = '';
@@ -93,41 +32,9 @@
     fallbackUrl = '';
   }
 
-  async function openDialog() {
+  function openDialog() {
     reset();
     open = true;
-    loadingChallenge = true;
-
-    try {
-      const response = await fetch('/api/feature-request', { cache: 'no-store' });
-      const configuration: { siteKey?: unknown } = await response.json();
-      if (!response.ok || typeof configuration.siteKey !== 'string') {
-        throw new Error('Verification is not configured.');
-      }
-
-      siteKey = configuration.siteKey;
-      await tick();
-      const widget = await loadTurnstile();
-      if (!open || !turnstileContainer) return;
-
-      widgetId = widget.render(turnstileContainer, {
-        sitekey: siteKey,
-        action: 'feature_request',
-        theme: 'auto',
-        size: 'flexible',
-        callback: (token) => { turnstileToken = token; error = ''; },
-        'expired-callback': () => { turnstileToken = ''; },
-        'error-callback': () => {
-          turnstileToken = '';
-          error = 'Verification failed. Please try again.';
-        }
-      });
-    } catch {
-      error = 'Direct submission unavailable. Open GitHub instead.';
-      fallbackUrl = githubFallbackUrl();
-    } finally {
-      loadingChallenge = false;
-    }
   }
 
   async function submitRequest(event: SubmitEvent) {
@@ -138,11 +45,6 @@
 
     if (!cleanTitle) {
       error = 'Add a short feature name.';
-      return;
-    }
-
-    if (!turnstileToken) {
-      error = 'Complete the verification before sending.';
       return;
     }
 
@@ -159,8 +61,7 @@
         body: JSON.stringify({
           title: cleanTitle,
           details: cleanDetails,
-          website,
-          turnstileToken
+          website
         })
       });
 
@@ -179,8 +80,6 @@
     } catch (cause) {
       error = cause instanceof Error ? cause.message : 'Could not send the feature request.';
       fallbackUrl ||= githubFallbackUrl();
-      turnstileToken = '';
-      if (widgetId) getTurnstile()?.reset(widgetId);
     } finally {
       submitting = false;
     }
@@ -285,16 +184,6 @@
             />
           </div>
 
-          {#if siteKey}
-            <div
-              class="flex min-h-12 items-center justify-center"
-              bind:this={turnstileContainer}
-              aria-label="Bot protection verification"
-            ></div>
-          {:else if loadingChallenge}
-            <p class="text-meta text-muted-foreground">Loading verification…</p>
-          {/if}
-
           {#if error}
             <div class="rounded-xl bg-destructive/8 px-3 py-3 text-meta leading-5 text-destructive">
               {error}
@@ -320,7 +209,7 @@
 
             <Button
               type="submit"
-              disabled={submitting || loadingChallenge || !turnstileToken}
+              disabled={submitting}
               class="h-9 rounded-full px-3 text-meta font-medium !text-white shadow-none"
             >
               {submitting ? 'Sending…' : 'Send request'}
