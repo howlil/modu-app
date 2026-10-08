@@ -50,8 +50,6 @@
   } from '#lib/modules/pomodoro/timer.ts';
 
   const STORAGE_KEY = 'module-pomodoro-v2';
-  const RADIUS = 52;
-  const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
   type PomodoroView = 'timer' | 'activity' | 'settings';
   type SettingsPanel = 'main' | 'blocked-sites' | 'ringtone' | 'data';
@@ -147,14 +145,6 @@
       ? `+${formatDuration(overtimeMs)}`
       : formatDuration(timer.remainingMs)
   );
-  const progressRatio = $derived(
-    timer.status === 'overtime'
-      ? 1
-      : timer.durationMs > 0
-        ? Math.max(0, Math.min(1, timer.remainingMs / timer.durationMs))
-        : 0
-  );
-  const progressOffset = $derived(CIRCUMFERENCE * (1 - progressRatio));
   const primaryLabel = $derived(
     timer.status === 'running'
       ? 'Pause'
@@ -1103,20 +1093,18 @@
 
   <div class="mx-auto w-full max-w-[860px] min-w-0">
   {#if activeView === 'timer'}
-    <div class="mx-auto flex max-w-[680px] flex-col items-center text-center">
-      <div
-        class="mb-[22px] flex items-center gap-1 rounded-[13px] border bg-muted p-1"
-        role="tablist"
-        aria-label="Timer mode"
-      >
+    <div class="mx-auto flex min-h-[500px] w-full min-w-0 flex-col items-center justify-center border-y border-border px-3 py-11 text-center max-[760px]:min-h-[460px] max-[760px]:px-2">
+      <div class="mb-9 flex items-center gap-1" role="tablist" aria-label="Timer mode">
         {#each ['focus', 'short', 'long'] as mode}
           {@const typedMode = mode as PomodoroMode}
           <Button
-            variant={timer.mode === typedMode ? 'secondary' : 'ghost'}
+            variant="ghost"
             size="sm"
             role="tab"
             aria-selected={timer.mode === typedMode}
-            class="h-[31px] rounded-full px-3 text-[12px] font-normal shadow-none"
+            class={timer.mode === typedMode
+              ? 'h-[30px] rounded-full bg-[var(--pomodoro-soft)] px-3.5 text-[11px] font-normal text-[var(--pomodoro-accent)] shadow-none hover:bg-[var(--pomodoro-soft)] hover:text-[var(--pomodoro-accent)]'
+              : 'h-[30px] rounded-full px-3.5 text-[11px] font-normal text-muted-foreground shadow-none'}
             onclick={() => switchPomodoroMode(typedMode)}
           >
             {MODE_META[typedMode].shortLabel}
@@ -1124,48 +1112,27 @@
         {/each}
       </div>
 
-      <div class="relative size-[min(72vw,274px)]">
-        <svg class="size-full -rotate-90" viewBox="0 0 120 120" aria-hidden="true">
-          <circle cx="60" cy="60" r={RADIUS} fill="none" stroke="var(--muted)" stroke-opacity="0.12" stroke-width="6" />
-          <circle
-            cx="60"
-            cy="60"
-            r={RADIUS}
-            fill="none"
-            stroke="var(--pomodoro-accent)"
-            stroke-width="6"
-            stroke-linecap="round"
-            stroke-dasharray={CIRCUMFERENCE}
-            stroke-dashoffset={progressOffset}
-            class="transition-[stroke-dashoffset] duration-200"
-          />
-        </svg>
+      <div class="max-w-full whitespace-nowrap text-[clamp(78px,13vw,140px)] font-normal leading-[0.84] tracking-[-0.075em] tabular-nums max-[420px]:text-[clamp(72px,18vw,104px)]" role="timer" aria-label={`Time remaining: ${formattedTime}`}>
+        {formattedTime}
+      </div>
 
-        <div class="absolute inset-0 grid place-content-center">
-          <div class="text-[clamp(56px,8vw,74px)] font-[410] leading-[0.9] tracking-[-0.055em] tabular-nums">
-            {formattedTime}
-          </div>
-          <div class="mt-2.5 min-h-[15px] text-[11px] font-normal text-muted-foreground">
-            <span>
-              {timer.status === 'running'
-                ? modeMeta.label
-                : timer.status === 'paused'
-                  ? 'Paused'
-                  : timer.status === 'overtime'
-                    ? 'Overtime'
-                    : timer.status === 'complete'
-                      ? 'Complete'
-                      : ''}
-            </span>
-            {#if protectionTimerLabel}
-              <span> · {protectionTimerLabel}</span>
-            {/if}
-          </div>
-        </div>
+      <div class="mt-5 flex min-h-5 items-center justify-center gap-1 text-[11px] text-muted-foreground">
+        <span>
+          {timer.status === 'paused'
+            ? 'Paused'
+            : timer.status === 'overtime'
+              ? 'Overtime'
+              : timer.status === 'complete'
+                ? 'Complete'
+                : modeMeta.label}
+        </span>
+        {#if protectionTimerLabel}
+          <span>· {protectionTimerLabel}</span>
+        {/if}
       </div>
 
       {#if timer.mode === 'focus'}
-        <div class="mt-3.5 grid min-h-9 w-full max-w-[330px] place-items-center">
+        <div class="mt-3 grid min-h-8 w-full max-w-[330px] place-items-center">
           {#if focusEditing}
             <Input
               bind:this={focusInput}
@@ -1209,35 +1176,60 @@
         </div>
       {/if}
 
-      <div class="mt-3.5 flex items-center justify-center gap-[11px]">
-        <Button variant="ghost" size="icon" class="size-[38px] rounded-full text-muted-foreground" aria-label="Reset timer" title="Reset (R)" onclick={handleReset}>
-          <RotateCcw class="size-4" strokeWidth={1.7} />
+
+      <div class="mt-6 flex items-center justify-center gap-2" aria-label="Focus cycle">
+        {#each [0, 1, 2, 3] as index}
+          <span
+            class={index < timer.completedFocus
+              ? 'size-[7px] rounded-full bg-[var(--pomodoro-accent)]'
+              : 'size-[7px] rounded-full bg-[#d7d7d1]'}
+            aria-hidden="true"
+          ></span>
+        {/each}
+      </div>
+
+      <div class="mt-7 flex items-center justify-center gap-2.5">
+        <Button
+          variant="ghost"
+          size="icon-lg"
+          class="size-10 rounded-full text-muted-foreground shadow-none hover:text-foreground"
+          aria-label="Reset timer"
+          title="Reset (R)"
+          onclick={handleReset}
+        >
+          <RotateCcw class="size-[17px]" strokeWidth={1.7} />
         </Button>
 
-        <Button class="h-[42px] min-w-[132px] rounded-full px-5 text-[13px] font-medium shadow-none" onclick={handlePrimary}>
+        <Button
+          class="h-11 min-w-[146px] rounded-full px-6 text-[13px] font-semibold shadow-[0_8px_20px_rgba(36,104,242,0.12)]"
+          onclick={handlePrimary}
+        >
           {primaryLabel}
         </Button>
 
-        <Button variant="ghost" size="icon" class="size-[38px] rounded-full text-muted-foreground" aria-label="Skip session" title="Skip (S)" onclick={handleSkip}>
-          <SkipForward class="size-4" strokeWidth={1.7} />
+        <Button
+          variant="ghost"
+          size="icon-lg"
+          class="size-10 rounded-full text-muted-foreground shadow-none hover:text-foreground"
+          aria-label="Skip session"
+          title="Skip (S)"
+          onclick={handleSkip}
+        >
+          <SkipForward class="size-[17px]" strokeWidth={1.7} />
         </Button>
       </div>
 
-      <div class="mt-[18px]">
-        <div class="flex items-center justify-center gap-2" aria-label="Focus cycle">
-          {#each [0, 1, 2, 3] as index}
-            <span class="size-1.5 rounded-full transition-colors" style={`background: ${index < timer.completedFocus ? modeMeta.accent : '#d7d7d1'};`}></span>
-          {/each}
-        </div>
-
-        <div class="mt-2 text-[11px] font-normal text-muted-foreground">
-          {timer.completedFocus >= 4 ? 'Long break next' : `Session ${Math.min(timer.completedFocus + 1, 4)} of 4`}
-        </div>
-
+      <div class="mt-4 flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
+        <span>
+          {timer.completedFocus >= 4
+            ? 'Long break next'
+            : `Session ${Math.min(timer.completedFocus + 1, 4)} of 4`}
+        </span>
+        <span aria-hidden="true">·</span>
         <Button
           variant="ghost"
           size="xs"
-          class="mt-2 h-auto rounded-full px-2 py-1 text-[11px] font-normal text-muted-foreground shadow-none"
+          class="h-auto rounded-full px-0.5 py-0 text-[11px] font-normal text-muted-foreground shadow-none hover:text-foreground"
           onclick={() => (activeView = 'activity')}
         >
           {formatFocusTotal(todayFocusMs)} today
