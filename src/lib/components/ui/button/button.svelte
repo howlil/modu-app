@@ -4,7 +4,7 @@
   import type { HTMLAnchorAttributes, HTMLButtonAttributes } from "svelte/elements";
 
   export const buttonVariants = tv({
-    base: "focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 aria-invalid:border-destructive rounded-full border border-transparent bg-clip-padding text-sm font-medium focus-visible:ring-3 aria-invalid:ring-3 active:not-aria-[haspopup]:translate-y-px [&_svg:not([class*='size-'])]:size-4 group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-all outline-none select-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+    base: "focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 aria-invalid:border-destructive rounded-full border border-transparent bg-clip-padding text-ui font-medium focus-visible:ring-3 aria-invalid:ring-3 active:not-aria-[haspopup]:translate-y-px [&_svg:not([class*='size-'])]:size-4 group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-all outline-none select-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
     variants: {
       variant: {
         default: "bg-primary text-primary-foreground hover:bg-primary/90",
@@ -16,7 +16,7 @@
       },
       size: {
         default: "h-9 gap-1.5 px-3",
-        xs: "h-6 gap-1 px-2 text-xs [&_svg:not([class*='size-'])]:size-3",
+        xs: "h-6 gap-1 px-2 text-meta [&_svg:not([class*='size-'])]:size-3",
         sm: "h-8 gap-1 px-2.5",
         lg: "h-10 gap-1.5 px-4",
         icon: "size-9",
