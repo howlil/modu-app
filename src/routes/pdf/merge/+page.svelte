@@ -7,7 +7,7 @@
 
 <svelte:head><title>Merge PDF — Module</title></svelte:head>
 
-<section class="mx-auto w-full max-w-[1180px] px-4 py-10 max-[760px]:px-2.5 max-[760px]:py-7">
+<section class="mx-auto w-full max-w-[1180px] px-4 py-8 max-[760px]:px-2.5 max-[760px]:py-6">
   <div class="mx-auto w-full max-w-[860px] min-w-0">
     <ToolHeader
       title="Merge PDF"
