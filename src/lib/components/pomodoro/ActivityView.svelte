@@ -162,10 +162,10 @@
 </script>
 
 <div>
-  <div class="mb-7 flex items-end justify-between gap-4">
+  <div class="mb-6 flex items-end justify-between gap-4">
     <div class="text-left">
       <h2 class="m-0 text-title-lg font-medium tracking-[-0.035em]">Activity</h2>
-      <p class="mt-1.5 text-meta text-muted-foreground">Focus time, goals, and session history.</p>
+      <p class="mt-2 text-meta text-muted-foreground">Focus time, goals, and session history.</p>
     </div>
 
     <Button
@@ -233,7 +233,7 @@
     </div>
   </div>
 
-  <div class="mt-9">
+  <div class="mt-8">
     <div class="mb-3 flex items-center justify-between gap-4">
       <div>
         <h3 class="m-0 text-ui font-medium">Focus heatmap</h3>
@@ -295,13 +295,13 @@
     </div>
   </div>
 
-  <div class="mt-9">
+  <div class="mt-8">
     <div class="mb-2 flex items-center justify-between gap-4">
       <h3 class="m-0 text-ui font-medium">Recent activity</h3>
     </div>
 
     {#if sessions.length === 0}
-      <div class="border-t py-10 text-center text-meta text-muted-foreground">
+      <div class="border-t py-8 text-center text-meta text-muted-foreground">
         Completed focus sessions will appear here.
       </div>
     {:else}
