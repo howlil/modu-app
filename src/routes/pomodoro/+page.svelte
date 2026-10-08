@@ -49,7 +49,14 @@
     type TimerState
   } from '#lib/modules/pomodoro/timer.ts';
 
-  import { readPomodoroSnapshot, savePomodoroSnapshot, clearPomodoroSnapshot } from '#lib/modules/pomodoro/persistence.ts';
+  import {
+    readPomodoroSnapshot,
+    savePomodoroSnapshot,
+    clearPomodoroSnapshot,
+    normalizePomodoroSnapshot,
+    clampMinutes,
+    clampGoalHours
+  } from '#lib/modules/pomodoro/persistence.ts';
 
   type PomodoroView = 'timer' | 'activity' | 'settings';
   type SettingsPanel = 'main' | 'blocked-sites' | 'ringtone' | 'data';
@@ -201,24 +208,6 @@
     return `${hours}h ${minutes}m`;
   }
 
-  function clampMinutes(value: unknown, fallback: number, max: number) {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric)) return fallback;
-
-    return Math.max(1, Math.min(max, Math.round(numeric)));
-  }
-
-  function clampGoalHours(value: unknown) {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric)) return 8;
-
-    return Math.max(1, Math.min(16, Math.round(numeric * 2) / 2));
-  }
-
-  function isMode(value: unknown): value is PomodoroMode {
-    return value === 'focus' || value === 'short' || value === 'long';
-  }
-
   function persist() {
     if (!hydrated) return;
 
@@ -245,79 +234,21 @@
       const saved = readPomodoroSnapshot();
       if (!saved) return;
 
-      durations = {
-        focus: clampMinutes(saved.durations?.focus, 25, 180),
-        short: clampMinutes(saved.durations?.short, 5, 60),
-        long: clampMinutes(saved.durations?.long, 15, 120)
-      };
-
-      preferences = {
-        autoStartBreaks: saved.preferences?.autoStartBreaks === true,
-        autoStartFocus: saved.preferences?.autoStartFocus === true,
-        overtime: saved.preferences?.overtime !== false,
-        keepAwake: saved.preferences?.keepAwake === true
-      };
-
-      dailyGoalHours = clampGoalHours(saved.dailyGoalHours);
-      goalSchedule =
-        saved.goalSchedule === 'every-day' ? 'every-day' : 'weekdays';
-
-      if (saved.timer && isMode(saved.timer.mode)) {
-        const fallback = createTimer(saved.timer.mode, durationMs(saved.timer.mode));
-
-        timer = {
-          ...fallback,
-          ...saved.timer,
-          mode: saved.timer.mode,
-          durationMs:
-            typeof saved.timer.durationMs === 'number'
-              ? saved.timer.durationMs
-              : fallback.durationMs,
-          remainingMs:
-            typeof saved.timer.remainingMs === 'number'
-              ? saved.timer.remainingMs
-              : fallback.remainingMs,
-          endsAt: typeof saved.timer.endsAt === 'number' ? saved.timer.endsAt : null,
-          overtimeStartedAt:
-            typeof saved.timer.overtimeStartedAt === 'number'
-              ? saved.timer.overtimeStartedAt
-              : null,
-          completedFocus:
-            typeof saved.timer.completedFocus === 'number'
-              ? Math.max(0, Math.min(4, saved.timer.completedFocus))
-              : 0
-        } as TimerState;
-
-        if (timer.status === 'running') {
-          timer = syncTimer(timer, clockNow, preferences.overtime);
-        }
-      }
-
-      sessionStartedAt =
-        typeof saved.sessionStartedAt === 'number' ? saved.sessionStartedAt : null;
-
-      if (
-        sessionStartedAt === null &&
-        timer.mode === 'focus' &&
-        (timer.status === 'running' || timer.status === 'paused' || timer.status === 'overtime')
-      ) {
-        if (timer.status === 'overtime' && timer.overtimeStartedAt !== null) {
-          sessionStartedAt = timer.overtimeStartedAt - timer.durationMs;
-        } else if (timer.endsAt !== null) {
-          sessionStartedAt = timer.endsAt - timer.durationMs;
-        } else {
-          sessionStartedAt = Date.now() - Math.max(0, timer.durationMs - timer.remainingMs);
-        }
-      }
-
-      focusText = typeof saved.focusText === 'string' ? saved.focusText.slice(0, 80) : '';
-      focusDraft = focusText;
-      soundEnabled = saved.soundEnabled !== false;
-      ringtone = isPomodoroRingtone(saved.ringtone) ? saved.ringtone : DEFAULT_RINGTONE;
-      notificationsEnabled = saved.notificationsEnabled === true;
-      focusProtectionEnabled = saved.focusProtection?.enabled === true;
-      blockedDomains = normalizeBlocklist(saved.focusProtection?.blockedDomains ?? []);
-      legacyHistory = Array.isArray(saved.history) ? saved.history : [];
+      const restored = normalizePomodoroSnapshot(saved, clockNow);
+      durations = restored.durations;
+      preferences = restored.preferences;
+      dailyGoalHours = restored.dailyGoalHours;
+      goalSchedule = restored.goalSchedule;
+      timer = restored.timer;
+      sessionStartedAt = restored.sessionStartedAt;
+      focusText = restored.focusText;
+      focusDraft = restored.focusText;
+      soundEnabled = restored.soundEnabled;
+      ringtone = restored.ringtone;
+      notificationsEnabled = restored.notificationsEnabled;
+      focusProtectionEnabled = restored.focusProtectionEnabled;
+      blockedDomains = restored.blockedDomains;
+      legacyHistory = restored.legacyHistory;
     } catch {
       clearPomodoroSnapshot();
     }
