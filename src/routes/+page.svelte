@@ -28,11 +28,11 @@
 
   <div class="relative z-10 grid min-h-[570px] place-items-center px-4 py-[72px] pb-[98px] text-center max-[760px]:px-2.5 max-[700px]:min-h-[500px] max-[700px]:py-14">
     <div class="mx-auto w-full max-w-[820px]">
-      <h1 class="m-0 text-[clamp(42px,6vw,64px)] font-[520] leading-[0.98] tracking-[-0.055em]">
+      <h1 class="m-0 text-display font-medium  tracking-[-0.055em]">
         Useful tools.<br />Nothing extra.
       </h1>
 
-      <p class="mx-auto mt-5 max-w-[540px] text-[15px] font-normal leading-[1.55] tracking-[-0.01em] text-muted-foreground">
+      <p class="mx-auto mt-5 max-w-[540px] text-body font-normal  tracking-[-0.01em] text-muted-foreground">
         Small utilities for files, focus, and everyday work — designed to get out of the way.
       </p>
 
