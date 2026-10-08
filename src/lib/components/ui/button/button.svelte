@@ -15,10 +15,10 @@
         link: "text-primary underline-offset-4 hover:underline"
       },
       size: {
-        default: "h-9 gap-1.5 px-3",
+        default: "h-9 gap-2 px-3",
         xs: "h-6 gap-1 px-2 text-meta [&_svg:not([class*='size-'])]:size-3",
-        sm: "h-8 gap-1 px-2.5",
-        lg: "h-10 gap-1.5 px-4",
+        sm: "h-8 gap-1 px-3",
+        lg: "h-10 gap-2 px-4",
         icon: "size-9",
         "icon-xs": "size-6",
         "icon-sm": "size-8",
