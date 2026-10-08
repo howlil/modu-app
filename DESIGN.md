@@ -29,11 +29,10 @@ Home directly exposes the three modules.
 
 Homepage typography:
 
-- keep the hero compact rather than billboard-sized
-- hero title should usually stay around 42–64px, using medium/regular weight rather than bold display weight
-- supporting copy stays around 14–16px with normal weight
-- navigation, buttons, labels, and tool names should avoid heavy bold weights unless hierarchy truly requires it
-- prefer weight contrast through spacing and scale before using 700–800 weights
+- keep the hero compact and use the shared Display token (36px / 40px) rather than an oversized billboard title
+- supporting copy uses the Body token (16px / 24px)
+- navigation, buttons, labels, and tool names use the same semantic typography as other routes
+- hierarchy comes from type role, spacing, and restrained weight contrast (400 / 500 / 600), not custom 700–800 weights
 
 Homepage atmosphere:
 
@@ -128,6 +127,50 @@ Icon rule:
 - Lucide is the default icon source for UI actions, controls, and simple tool symbolism
 - do not hand-draw an SVG when an equivalent Lucide icon exists
 - custom illustration is allowed only when the composition itself carries product meaning beyond a single icon
+
+### Typography and spacing foundations
+
+Fonts use OS-native UI rendering; no bundled or downloaded font files.
+
+```text
+Sans   -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif
+       macOS / iOS: SF Pro (system); Windows: Segoe UI
+Mono   "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace
+```
+
+Semantic text tokens are registered in `src/app.css` via Tailwind v4 `@theme inline`:
+
+| Role | Utility | Size / line height |
+| --- | --- | --- |
+| Meta | `text-meta` | 12 / 16px |
+| UI | `text-ui` | 14 / 20px |
+| Body | `text-body` | 16 / 24px |
+| Title | `text-title` | 18 / 24px |
+| Title LG | `text-title-lg` | 20 / 28px |
+| Page Title | `text-page-title` | 28 / 34px |
+| Display | `text-display` | 36 / 40px |
+
+- Only `font-normal` (400), `font-medium` (500), and `font-semibold` (600) for application typography.
+- Default page text is Body. Control labels generally use UI, secondary metadata uses Meta, view titles use Title or Title LG, module headings use Page Title, and hero heading uses Display.
+- Never introduce arbitrary 9/10/11/13/15px text or 450/520/750 font weights as new application typography.
+- Exceptions are functional visualization/data glyphs such as the oversized Pomodoro countdown, typing drill glyphs, and extremely dense keyboard diagram legends—not new general type styles.
+- Use `font-sans` / `font-mono`; do not introduce font downloads or CSS font-face definitions.
+
+Spacing derives from a 4px Tailwind base (`--spacing: 4px`). Approved application layout intervals:
+
+```text
+4px   p-1 / gap-1
+8px   p-2 / gap-2
+12px  p-3 / gap-3
+16px  p-4 / gap-4
+20px  p-5 / gap-5
+24px  p-6 / gap-6
+32px  p-8 / gap-8
+```
+
+- Combine these intervals rather than inventing 10/11/18/22px rhythm values for standard padding, gaps, and margins.
+- Viewport geometry, control hit targets, page gutters, hairline details, and the fixed navigation height may use intentional exceptions.
+- Use the Tailwind semantic utilities in route/components so typography stays centralized and can change without searching arbitrary pixels.
 
 ### Layout width
 
