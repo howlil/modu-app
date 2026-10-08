@@ -35,9 +35,8 @@
 
   type PrimaryTab = 'train' | 'lessons' | 'test' | 'progress' | 'settings';
 
-  const STATE_KEY = 'module-typing-state-v1';
-  const PREFERENCES_KEY = 'module-typing-preferences-v1';
-  const BLOCK_KEY = 'module-typing-block-v1';
+  import { calculateTypingMetrics, evaluateTypingInput } from '#lib/modules/typing/session.ts';
+  import { loadTypingSnapshot, saveTypingSnapshot } from '#lib/modules/typing/persistence.ts';
 
   let primaryTab = $state<PrimaryTab>('train');
   let selectedLessonIndex = $state<number | null>(null);
@@ -65,14 +64,8 @@
   const currentBlock = $derived(TRAINING_BLOCKS[blockIndex]);
   const currentCharacter = $derived(drillText[typedIndex] ?? '');
   const elapsedMs = $derived(startedAt > 0 ? Math.max(0, clockNow - startedAt) : 0);
-  const accuracy = $derived(
-    attempts > 0 ? Math.round(((attempts - errors) / attempts) * 100) : 100
-  );
-  const wpm = $derived(
-    elapsedMs > 0
-      ? Math.round((typedIndex / 5) / (elapsedMs / 60_000))
-      : 0
-  );
+  const accuracy = $derived(calculateTypingMetrics(typedIndex, attempts, errors, elapsedMs).accuracy);
+  const wpm = $derived(calculateTypingMetrics(typedIndex, attempts, errors, elapsedMs).wpm);
   const adaptiveGuideLevel = $derived(
     recommendedGuideLevel(drillText, learningState, preferences)
   );
@@ -99,11 +92,7 @@
 
   onMount(() => {
     try {
-      const savedState = JSON.parse(localStorage.getItem(STATE_KEY) ?? 'null');
-      const savedPreferences = JSON.parse(
-        localStorage.getItem(PREFERENCES_KEY) ?? 'null'
-      );
-      const savedBlock = Number(localStorage.getItem(BLOCK_KEY));
+      const { savedState, savedPreferences, savedBlock } = loadTypingSnapshot();
 
       if (savedState && typeof savedState === 'object') {
         learningState = {
@@ -191,9 +180,7 @@
   function persistNow() {
     if (typeof window === 'undefined' || !hydrated) return;
 
-    localStorage.setItem(STATE_KEY, JSON.stringify(learningState));
-    localStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences));
-    localStorage.setItem(BLOCK_KEY, String(blockIndex));
+    saveTypingSnapshot(learningState, preferences, blockIndex);
   }
 
   function schedulePersist() {
@@ -255,7 +242,7 @@
     }
 
     const latency = Math.max(0, now - lastAdvanceAt);
-    const correct = typed === expected;
+    const { correct, advance } = evaluateTypingInput(expected, typed, preferences.strictCorrection);
 
     attempts += 1;
     if (!correct) errors += 1;
@@ -279,7 +266,7 @@
 
     wrongAtCursor = !correct;
 
-    if (correct || !preferences.strictCorrection) {
+    if (advance) {
       previousExpected = expected;
       typedIndex += 1;
       lastAdvanceAt = now;
@@ -298,9 +285,12 @@
     clockNow = now;
 
     const durationMs = Math.max(1, now - startedAt);
-    const finalAccuracy =
-      attempts > 0 ? Math.round(((attempts - errors) / attempts) * 100) : 100;
-    const finalWpm = Math.round((typedIndex / 5) / (durationMs / 60_000));
+    const { accuracy: finalAccuracy, wpm: finalWpm } = calculateTypingMetrics(
+      typedIndex,
+      attempts,
+      errors,
+      durationMs
+    );
 
     if (primaryTab === 'train') {
       const reviewedKeys =
