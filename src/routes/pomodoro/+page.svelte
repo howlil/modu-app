@@ -1269,7 +1269,7 @@
 
             <Button
               variant="outline"
-              class="h-10 w-full justify-start rounded-full text-meta font-normal shadow-none"
+              class="h-10 w-full justify-start rounded-lg px-3 text-ui font-normal text-foreground shadow-none hover:bg-muted/70 hover:text-foreground"
               onclick={exportAllPomodoroData}
             >
               <Download class="size-3.5" strokeWidth={1.7} />
@@ -1284,7 +1284,7 @@
               {#if !deleteConfirm}
                 <Button
                   variant="ghost"
-                  class="h-10 w-full justify-start rounded-full px-2 text-meta font-normal text-destructive"
+                  class="h-10 w-full justify-start rounded-lg px-3 text-ui font-normal text-destructive shadow-none hover:bg-destructive/10 hover:text-destructive"
                   onclick={() => {
                     deleteConfirm = true;
                     dataMessage = '';
