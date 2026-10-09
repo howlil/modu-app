@@ -5,6 +5,7 @@
   import { Input } from "$lib/components/ui/input/index.js";
   import { Switch } from "$lib/components/ui/switch/index.js";
   import * as Tabs from '$lib/components/ui/tabs/index.js';
+  import * as Card from '$lib/components/ui/card/index.js';
   import ToolHeader from '#lib/components/ToolHeader.svelte';
   import { createWakeLockController } from '#lib/modules/pomodoro/wake-lock.ts';
   import ActivityView from '#lib/modules/pomodoro/components/ActivityView.svelte';
@@ -956,165 +957,181 @@
 
   <div class="mx-auto w-full max-w-[860px] min-w-0">
   {#if activeView === 'timer'}
-    <div class="mx-auto flex min-h-[500px] w-full min-w-0 flex-col items-center justify-center border-y border-border px-3 py-8 text-center max-[760px]:min-h-[460px] max-[760px]:px-2">
-      <div class="mb-8 flex items-center gap-1" role="tablist" aria-label="Timer mode">
-        {#each ['focus', 'short', 'long'] as mode}
-          {@const typedMode = mode as PomodoroMode}
-          <Button
-            variant="ghost"
-            size="sm"
-            role="tab"
-            aria-selected={timer.mode === typedMode}
-            class={timer.mode === typedMode
-              ? 'h-[30px] rounded-full bg-[var(--pomodoro-soft)] px-4 text-meta font-normal text-[var(--pomodoro-accent)] shadow-none hover:bg-[var(--pomodoro-soft)] hover:text-[var(--pomodoro-accent)]'
-              : 'h-[30px] rounded-full px-4 text-meta font-normal text-muted-foreground shadow-none'}
-            onclick={() => switchPomodoroMode(typedMode)}
+    <div class="grid min-w-0 grid-cols-12 gap-3">
+      <Card.Root class="col-span-12 gap-0 overflow-hidden rounded-[20px] bg-[radial-gradient(ellipse_at_50%_0%,#eaf1ff_0%,#f7faff_34%,#ffffff_77%)] py-0 shadow-none lg:col-span-8">
+        <div class="flex min-h-[456px] flex-col items-center px-3 pb-6 pt-8 text-center sm:px-6">
+          <div class="flex items-center gap-1 rounded-full border border-border bg-white/85 p-1" role="group" aria-label="Timer mode">
+            {#each ['focus', 'short', 'long'] as mode}
+              {@const typedMode = mode as PomodoroMode}
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-pressed={timer.mode === typedMode}
+                class={timer.mode === typedMode
+                  ? 'h-[30px] rounded-full bg-secondary px-4 text-meta font-medium text-secondary-foreground shadow-none hover:bg-secondary'
+                  : 'h-[30px] rounded-full px-4 text-meta font-normal text-muted-foreground shadow-none'}
+                onclick={() => switchPomodoroMode(typedMode)}
+              >
+                {MODE_META[typedMode].shortLabel}
+              </Button>
+            {/each}
+          </div>
+
+          <div
+            class="mb-2 mt-12 max-w-full whitespace-nowrap text-[clamp(76px,10vw,122px)] font-normal leading-none tracking-[-0.075em] tabular-nums max-[420px]:text-[clamp(70px,17vw,92px)]"
+            role="timer"
+            aria-label={'Time remaining: ' + formattedTime}
           >
-            {MODE_META[typedMode].shortLabel}
-          </Button>
-        {/each}
-      </div>
+            {formattedTime}
+          </div>
 
-      <div class="max-w-full whitespace-nowrap text-[clamp(78px,13vw,140px)] font-normal leading-[0.84] tracking-[-0.075em] tabular-nums max-[420px]:text-[clamp(72px,18vw,104px)]" role="timer" aria-label={`Time remaining: ${formattedTime}`}>
-        {formattedTime}
-      </div>
+          <div class="flex min-h-4 items-center justify-center gap-1 text-meta text-muted-foreground">
+            <span>
+              {timer.status === 'paused'
+                ? 'Paused'
+                : timer.status === 'overtime'
+                  ? 'Overtime'
+                  : timer.status === 'complete'
+                    ? 'Complete'
+                    : timer.status === 'idle' ? '' : modeMeta.label}
+            </span>
+            {#if protectionTimerLabel}
+              <span>· {protectionTimerLabel}</span>
+            {/if}
+          </div>
 
-      <div class="mt-5 flex min-h-5 items-center justify-center gap-1 text-meta text-muted-foreground">
-        <span>
-          {timer.status === 'paused'
-            ? 'Paused'
-            : timer.status === 'overtime'
-              ? 'Overtime'
-              : timer.status === 'complete'
-                ? 'Complete'
-                : modeMeta.label}
-        </span>
-        {#if protectionTimerLabel}
-          <span>· {protectionTimerLabel}</span>
-        {/if}
-      </div>
+          <div class="mt-1 flex h-14 w-full max-w-[330px] items-center justify-center">
+            {#if timer.mode === 'focus'}
+              {#if focusEditing}
+                <Input
+                  bind:this={focusInput}
+                  class="w-full max-w-[300px] rounded-none border-0 border-b border-border bg-transparent px-2 py-2 text-center text-ui font-normal shadow-none focus-visible:ring-0"
+                  type="text"
+                  maxlength="80"
+                  bind:value={focusDraft}
+                  placeholder="What are you focusing on?"
+                  aria-label="Focus label"
+                  onblur={commitFocusEdit}
+                  onkeydown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      commitFocusEdit();
+                    } else if (event.key === 'Escape') {
+                      event.preventDefault();
+                      cancelFocusEdit();
+                    }
+                  }}
+                />
+              {:else}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  class="h-auto max-w-full rounded-full px-3 py-2 text-meta font-normal text-muted-foreground shadow-none"
+                  onclick={beginFocusEdit}
+                >
+                  <span class="truncate">{focusText || '+ Add focus'}</span>
+                  {#if focusText}
+                    <Pencil class="size-3 shrink-0 opacity-60" strokeWidth={1.7} />
+                  {/if}
+                </Button>
+              {/if}
+            {/if}
+          </div>
 
-      {#if timer.mode === 'focus'}
-        <div class="mt-3 grid min-h-8 w-full max-w-[330px] place-items-center">
-          {#if focusEditing}
-            <Input
-              bind:ref={focusInput}
-              class="w-full max-w-[300px] rounded-none border-0 border-b border-border bg-transparent px-2 py-2 text-center text-ui font-normal shadow-none placeholder:text-muted-foreground/60 focus-visible:ring-0"
-              type="text"
-              maxlength={80}
-              bind:value={focusDraft}
-              placeholder="What are you focusing on?"
-              aria-label="Focus label"
-              onblur={commitFocusEdit}
-              onkeydown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault();
-                  commitFocusEdit();
-                } else if (event.key === 'Escape') {
-                  event.preventDefault();
-                  cancelFocusEdit();
-                }
-              }}
-            />
-          {:else if focusText}
+          <div class="mt-1 flex items-center justify-center gap-3">
             <Button
               variant="ghost"
-              size="sm"
-              class="group h-auto max-w-full rounded-full px-2 py-2 text-ui font-normal text-foreground shadow-none"
-              onclick={beginFocusEdit}
+              size="icon-lg"
+              class="size-10 rounded-full text-muted-foreground shadow-none"
+              aria-label="Reset timer"
+              title="Reset (R)"
+              onclick={handleReset}
             >
-              <span class="truncate">{focusText}</span>
-              <Pencil class="size-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" strokeWidth={1.7} />
+              <RotateCcw class="size-[17px]" strokeWidth={1.7} />
             </Button>
-          {:else}
+            <Button
+              class="h-11 min-w-[144px] rounded-full px-6 text-ui font-semibold shadow-none"
+              onclick={handlePrimary}
+            >
+              {primaryLabel}
+            </Button>
             <Button
               variant="ghost"
-              size="sm"
-              class="h-auto rounded-full px-2 py-2 text-meta font-normal text-muted-foreground shadow-none"
-              onclick={beginFocusEdit}
+              size="icon-lg"
+              class="size-10 rounded-full text-muted-foreground shadow-none"
+              aria-label="Skip session"
+              title="Skip (S)"
+              onclick={handleSkip}
             >
-              + Add focus
+              <SkipForward class="size-[17px]" strokeWidth={1.7} />
             </Button>
+          </div>
+
+          {#if timer.status === 'complete' || timer.status === 'overtime'}
+            <p class="mt-3 text-meta text-muted-foreground">
+              {timer.status === 'overtime' ? 'Focus target reached.' : timer.mode === 'focus' ? 'Focus complete.' : 'Break complete.'}
+            </p>
           {/if}
+          <div class="mt-auto pt-6 text-meta text-muted-foreground">Your focus, your pace.</div>
         </div>
-      {/if}
+      </Card.Root>
 
+      <div class="col-span-12 grid min-w-0 grid-cols-2 gap-3 lg:col-span-4 lg:grid-cols-1">
+        <Card.Root class="min-w-0 justify-between gap-3 rounded-[20px] p-4 shadow-none sm:p-5">
+          <div class="flex items-center justify-between">
+            <h2 class="m-0 text-meta font-medium text-muted-foreground">TODAY</h2>
+            <Button
+              size="icon-xs"
+              variant="ghost"
+              class="rounded-full text-muted-foreground"
+              aria-label="View focus activity"
+              onclick={() => (activeView = 'activity')}
+            >
+              <ChevronRight class="size-4" strokeWidth={1.7} />
+            </Button>
+          </div>
+          <div>
+            <strong class="block whitespace-nowrap text-[clamp(24px,4vw,36px)] font-normal tracking-[-0.05em] tabular-nums">{formatFocusTotal(todayFocusMs)}</strong>
+            <span class="text-meta text-muted-foreground">Focused time</span>
+          </div>
+          <div>
+            <div
+              class="h-1.5 overflow-hidden rounded-full bg-muted"
+              role="progressbar"
+              aria-label="Today's focus goal"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              aria-valuenow={Math.min(100, Math.round((todayFocusMs / goalMs) * 100))}
+            >
+              <div class="h-full rounded-full bg-primary transition-[width]" style:width={Math.min(100, (todayFocusMs / goalMs) * 100) + '%'}></div>
+            </div>
+            <div class="mt-2 flex flex-wrap justify-between gap-1 text-meta text-muted-foreground">
+              <span>{Math.round((todayFocusMs / goalMs) * 100)}% of goal</span>
+              <span>{dailyGoalHours}h target</span>
+            </div>
+          </div>
+        </Card.Root>
 
-      <div class="mt-6 flex items-center justify-center gap-2" aria-label="Focus cycle">
-        {#each [0, 1, 2, 3] as index}
-          <span
-            class={index < timer.completedFocus
-              ? 'size-[7px] rounded-full bg-[var(--pomodoro-accent)]'
-              : 'size-[7px] rounded-full bg-[#d7d7d1]'}
-            aria-hidden="true"
-          ></span>
-        {/each}
+        <Card.Root class="min-w-0 justify-between gap-3 rounded-[20px] p-4 shadow-none sm:p-5">
+          <div class="flex items-center justify-between gap-2">
+            <h2 class="m-0 text-meta font-medium text-muted-foreground">CURRENT CYCLE</h2>
+          </div>
+          <div>
+            <div class="text-title-lg font-medium tabular-nums">
+              {Math.min(timer.completedFocus + 1, 4)}
+              <span class="text-ui font-normal text-muted-foreground">/ 4 sessions</span>
+            </div>
+            <div class="mt-3 flex items-center gap-2" aria-label={timer.completedFocus + ' of 4 focus sessions completed'}>
+              {#each [0, 1, 2, 3] as index}
+                <span class={index < timer.completedFocus ? 'h-[7px] flex-1 rounded-full bg-primary' : 'h-[7px] flex-1 rounded-full bg-border'} aria-hidden="true"></span>
+              {/each}
+            </div>
+          </div>
+          <div class="border-t border-border pt-3 text-meta text-muted-foreground">
+            Next up <strong class="font-medium text-foreground">{MODE_META[getNextMode(timer)].label}</strong>
+          </div>
+        </Card.Root>
       </div>
-
-      <div class="mt-6 flex items-center justify-center gap-3">
-        <Button
-          variant="ghost"
-          size="icon-lg"
-          class="size-10 rounded-full text-muted-foreground shadow-none hover:text-foreground"
-          aria-label="Reset timer"
-          title="Reset (R)"
-          onclick={handleReset}
-        >
-          <RotateCcw class="size-[17px]" strokeWidth={1.7} />
-        </Button>
-
-        <Button
-          class="h-11 min-w-[146px] rounded-full px-6 text-ui font-semibold shadow-[0_8px_20px_rgba(36,104,242,0.12)]"
-          onclick={handlePrimary}
-        >
-          {primaryLabel}
-        </Button>
-
-        <Button
-          variant="ghost"
-          size="icon-lg"
-          class="size-10 rounded-full text-muted-foreground shadow-none hover:text-foreground"
-          aria-label="Skip session"
-          title="Skip (S)"
-          onclick={handleSkip}
-        >
-          <SkipForward class="size-[17px]" strokeWidth={1.7} />
-        </Button>
-      </div>
-
-      <div class="mt-4 flex items-center justify-center gap-2 text-meta text-muted-foreground">
-        <span>
-          {timer.completedFocus >= 4
-            ? 'Long break next'
-            : `Session ${Math.min(timer.completedFocus + 1, 4)} of 4`}
-        </span>
-        <span aria-hidden="true">·</span>
-        <Button
-          variant="ghost"
-          size="xs"
-          class="h-auto rounded-full px-1 py-0 text-meta font-normal text-muted-foreground shadow-none hover:text-foreground"
-          onclick={() => (activeView = 'activity')}
-        >
-          {formatFocusTotal(todayFocusMs)} today
-        </Button>
-      </div>
-
-      {#if timer.status === 'complete' || timer.status === 'overtime'}
-        <p class="mt-4 min-h-5 text-meta font-normal text-muted-foreground">
-          <span class="font-medium text-foreground">
-            {timer.status === 'overtime'
-              ? 'Focus target reached.'
-              : timer.mode === 'focus'
-                ? 'Focus complete.'
-                : 'Break complete.'}
-          </span>
-          {timer.status === 'overtime'
-            ? ' Continue while the flow lasts.'
-            : timer.mode === 'focus'
-              ? ' Take a break.'
-              : ' Ready to focus.'}
-        </p>
-      {/if}
     </div>
   {:else if activeView === 'activity'}
     <ActivityView
@@ -1151,125 +1168,96 @@
       </div>
 
         {#if settingsPanel === 'main'}
-          <div>
-          <div class="mb-2 text-meta font-medium text-muted-foreground">Timer</div>
+          <div class="grid grid-cols-12 gap-3">
+            <Card.Root class="col-span-12 gap-4 rounded-[20px] p-5 shadow-none sm:col-span-7">
+              <div>
+                <h3 class="m-0 text-ui font-medium">Timer durations</h3>
+                <p class="mt-1 text-meta text-muted-foreground">Set the length of each session.</p>
+              </div>
+              <div class="grid grid-cols-3 gap-2">
+                {#each [['focus', 'Focus', 180], ['short', 'Short', 60], ['long', 'Long', 120]] as row}
+                  {@const timerMode = row[0] as PomodoroMode}
+                  <label class="flex min-w-0 flex-col items-center gap-2 rounded-xl border border-border bg-muted p-3 text-meta text-muted-foreground">
+                    <span>{row[1]}</span>
+                    <Input
+                      type="number"
+                      min="1"
+                      max={row[2]}
+                      aria-label={row[1] + ' duration in minutes'}
+                      class="h-8 w-full max-w-[76px] border-0 bg-transparent px-1 text-center text-title-lg font-medium text-foreground shadow-none focus-visible:ring-1"
+                      value={durations[timerMode]}
+                      onchange={(event) => updateDuration(timerMode, event.currentTarget.value)}
+                    />
+                    <span>minutes</span>
+                  </label>
+                {/each}
+              </div>
+            </Card.Root>
 
-          {#each [
-            ['focus', 'Focus', 180],
-            ['short', 'Short', 60],
-            ['long', 'Long', 120]
-          ] as row}
-            {@const timerMode = row[0] as PomodoroMode}
-            <label class="grid min-h-10 grid-cols-[1fr_90px] items-center gap-3 text-meta">
-              {row[1]}
-              <Input
-                type="number"
-                min="1"
-                max={row[2]}
-                class="h-8 text-right text-meta"
-                value={durations[timerMode]}
-                onchange={(event) => updateDuration(timerMode, event.currentTarget.value)}
+            <Card.Root class="col-span-12 gap-3 rounded-[20px] p-5 shadow-none sm:col-span-5">
+              <div>
+                <h3 class="m-0 text-ui font-medium">Automation</h3>
+                <p class="mt-1 text-meta text-muted-foreground">Control your focus rhythm.</p>
+              </div>
+              {#each [
+                ['autoStartBreaks', 'Auto-start breaks'],
+                ['autoStartFocus', 'Auto-start focus'],
+                ['overtime', 'Count overtime']
+              ] as option}
+                {@const key = option[0] as keyof PomodoroPreferences}
+                <div class="flex min-h-9 items-center justify-between gap-3 border-t border-border pt-2 text-ui">
+                  <span>{option[1]}</span>
+                  <Switch checked={preferences[key]} aria-label={option[1]} onclick={() => togglePreference(key)} />
+                </div>
+              {/each}
+            </Card.Root>
+
+            <Card.Root class="col-span-12 gap-0 rounded-[20px] p-5 shadow-none sm:col-span-7">
+              <FocusProtectionSettings
+                enabled={focusProtectionEnabled}
+                {blockedDomains}
+                connection={focusProtectionConnection}
+                errorMessage={focusProtectionError}
+                onToggle={toggleFocusProtection}
+                onBlocklistChange={updateBlockedDomains}
+                onManage={() => openSettingsPanel('blocked-sites')}
               />
-            </label>
-          {/each}
-        </div>
+            </Card.Root>
 
-        <div class="mt-4 border-t pt-4">
-          <div class="mb-1 text-meta font-medium text-muted-foreground">Automation</div>
+            <Card.Root class="col-span-12 gap-2 rounded-[20px] p-5 shadow-none sm:col-span-5">
+              <div>
+                <h3 class="m-0 text-ui font-medium">Sounds & system</h3>
+                <p class="mt-1 text-meta text-muted-foreground">Quiet feedback and device options.</p>
+              </div>
+              <div class="flex min-h-9 items-center justify-between gap-2 border-t border-border pt-2 text-ui">
+                <span>Sound</span>
+                <Switch checked={soundEnabled} aria-label="Sound" onclick={toggleSound} />
+              </div>
+              <Button variant="ghost" class="flex h-10 w-full items-center justify-between rounded-full px-1 text-ui font-normal" onclick={() => openSettingsPanel('ringtone')}>
+                <span>Ringtone</span>
+                <span class="inline-flex items-center gap-1 text-meta text-muted-foreground">
+                  {RINGTONE_OPTIONS.find((option) => option.id === ringtone)?.label ?? 'Soft chime'}
+                  <ChevronRight class="size-3.5" strokeWidth={1.7} />
+                </span>
+              </Button>
+              <div class="flex min-h-9 items-center justify-between gap-2 border-t border-border pt-2 text-ui">
+                <span>Notifications {#if !notificationsSupported}<span class="text-meta text-muted-foreground">Unavailable</span>{/if}</span>
+                <Switch checked={notificationsEnabled} aria-label="Notifications" disabled={!notificationsSupported} onclick={toggleNotifications} />
+              </div>
+              <div class="flex min-h-9 items-center justify-between gap-2 border-t border-border pt-2 text-ui">
+                <span>Keep screen awake {#if !wakeLockSupported}<span class="text-meta text-muted-foreground">Unavailable</span>{/if}</span>
+                <Switch checked={preferences.keepAwake} aria-label="Keep screen awake" disabled={!wakeLockSupported} onclick={() => togglePreference('keepAwake')} />
+              </div>
+            </Card.Root>
 
-          {#each [
-            ['autoStartBreaks', 'Auto-start breaks'],
-            ['autoStartFocus', 'Auto-start focus'],
-            ['overtime', 'Count overtime']
-          ] as option}
-            {@const key = option[0] as keyof PomodoroPreferences}
-            <div class="flex h-10 w-full items-center justify-between gap-4 px-1 text-meta">
-              <span>{option[1]}</span>
-              <Switch
-                checked={preferences[key]}
-                aria-label={option[1]}
-                onclick={() => togglePreference(key)}
-              />
-            </div>
-          {/each}
-        </div>
-
-        <FocusProtectionSettings
-          enabled={focusProtectionEnabled}
-          {blockedDomains}
-          connection={focusProtectionConnection}
-          errorMessage={focusProtectionError}
-          onToggle={toggleFocusProtection}
-          onBlocklistChange={updateBlockedDomains}
-          onManage={() => openSettingsPanel('blocked-sites')}
-        />
-
-        <div class="mt-4 border-t pt-4">
-          <div class="mb-1 text-meta font-medium text-muted-foreground">System</div>
-
-          <div class="flex h-10 w-full items-center justify-between gap-4 px-1 text-meta">
-            <span>
-              Notifications
-              {#if !notificationsSupported}
-                <span class="ml-1 text-meta text-muted-foreground">Unavailable</span>
-              {/if}
-            </span>
-            <Switch
-              checked={notificationsEnabled}
-              aria-label="Notifications"
-              disabled={!notificationsSupported}
-              onclick={toggleNotifications}
-            />
+            <Card.Root class="col-span-12 gap-2 rounded-[20px] p-5 shadow-none">
+              <h3 class="m-0 text-ui font-medium">Your data</h3>
+              <p class="text-meta text-muted-foreground">Timer settings and focus history stay in your browser.</p>
+              <Button variant="outline" size="sm" class="mt-1 w-fit rounded-full shadow-none" onclick={() => openSettingsPanel('data')}>
+                Export & delete data <ChevronRight class="size-3.5" strokeWidth={1.7} />
+              </Button>
+            </Card.Root>
           </div>
-
-          <div class="flex h-10 w-full items-center justify-between gap-4 px-1 text-meta">
-            <span>Sound</span>
-            <Switch
-              checked={soundEnabled}
-              aria-label="Sound"
-              onclick={toggleSound}
-            />
-          </div>
-
-          <Button
-            variant="ghost"
-            class="flex h-10 w-full items-center justify-between rounded-full px-1 text-meta font-normal"
-            onclick={() => openSettingsPanel('ringtone')}
-          >
-            <span>Ringtone</span>
-            <span class="inline-flex items-center gap-2 text-meta text-muted-foreground">
-              {RINGTONE_OPTIONS.find((option) => option.id === ringtone)?.label ?? 'Soft chime'}
-              <ChevronRight class="size-3.5" strokeWidth={1.7} />
-            </span>
-          </Button>
-
-          <div class="flex h-10 w-full items-center justify-between gap-4 px-1 text-meta">
-            <span>
-              Keep screen awake
-              {#if !wakeLockSupported}
-                <span class="ml-1 text-meta text-muted-foreground">Unavailable</span>
-              {/if}
-            </span>
-            <Switch
-              checked={preferences.keepAwake}
-              aria-label="Keep screen awake"
-              disabled={!wakeLockSupported}
-              onclick={() => togglePreference('keepAwake')}
-            />
-          </div>
-        </div>
-
-        <div class="mt-4 border-t pt-4">
-          <div class="mb-1 text-meta font-medium text-muted-foreground">Data</div>
-          <Button
-            variant="ghost"
-            class="flex h-10 w-full items-center justify-between rounded-full px-1 text-meta font-normal"
-            onclick={() => openSettingsPanel('data')}
-          >
-            <span>Export & delete data</span>
-            <ChevronRight class="size-3.5 text-muted-foreground" strokeWidth={1.7} />
-          </Button>
-        </div>
         {:else if settingsPanel === 'blocked-sites'}
           <FocusProtectionSettings
             view="manager"
