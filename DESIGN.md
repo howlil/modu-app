@@ -295,6 +295,7 @@ Pomodoro module contract:
 - growing Activity history uses IndexedDB while active timer state and preferences stay in localStorage
 - Activity includes daily focus target, 52-week goal-relative heatmap, weekly summary, recent sessions, day inspection, and local JSON/CSV export
 - heatmap intensity is based on focused time relative to the goal that applied to that day, not raw Pomodoro count
+- The 52-week heatmap stays dense: 12px color squares centered in 16px interactive cells (4px visible separation); do not enlarge invisible button padding or grid gaps until the cells look far apart
 - history stays local and intentionally lightweight rather than becoming a productivity-score dashboard
 - progressive disclosure is mandatory: the Timer bento shows one dominant countdown card (8/12 columns) and only Today / Current Cycle support cards (4/12 columns); on narrow viewports these stack beneath the timer
 - Pomodoro uses the same top hierarchy as Typing: ToolHeader title, then one compact fully rounded navigation bar
