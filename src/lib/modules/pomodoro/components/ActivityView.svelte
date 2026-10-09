@@ -3,6 +3,7 @@
   import { Button } from "$lib/components/ui/button/index.js";
   import { Input } from "$lib/components/ui/input/index.js";
   import { Dialog } from "$lib/components/ui/dialog/index.js";
+  import * as Card from '$lib/components/ui/card/index.js';
   import {
     aggregateDailyActivity,
     buildHeatmapDays,
@@ -62,6 +63,23 @@
   );
   const heatmapDays = $derived(buildHeatmapDays(daily, goalMs, clockNow, 52));
   const week = $derived(calculateWeekSummary(daily, goalMs, goalSchedule, clockNow));
+  const weekBars = $derived.by(() => {
+    const monday = new Date(clockNow);
+    monday.setHours(0, 0, 0, 0);
+    monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(monday);
+      date.setDate(monday.getDate() + index);
+      const dateKey = localDateKey(date.getTime());
+      const day = daily.find((item) => item.dateKey === dateKey);
+      return {
+        dateKey,
+        label: ['M', 'T', 'W', 'T', 'F', 'S', 'S'][index],
+        focusedMs: day?.focusedMs ?? 0,
+        isToday: dateKey === todayKey
+      };
+    });
+  });
   const recentDateKeys = $derived(
     [...new Set(sessions.slice(0, 60).map((session) => localDateKey(session.endedAt)))]
   );
@@ -162,182 +180,136 @@
 </script>
 
 <div>
-  <div class="mb-6 flex items-end justify-between gap-4">
-    <div class="text-left">
-      <h2 class="m-0 text-title-lg font-medium tracking-[-0.035em]">Activity</h2>
-      <p class="mt-2 text-meta text-muted-foreground">Focus time, goals, and session history.</p>
+  <div class="mb-5 flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <h2 class="m-0 text-title-lg font-medium tracking-[-0.03em]">Activity</h2>
+      <p class="mt-1 text-meta text-muted-foreground">A quiet record of your progress.</p>
     </div>
-
-    <Button
-      variant="ghost"
-      size="sm"
-      class="h-8 rounded-full px-3 text-meta font-normal text-muted-foreground"
-      onclick={openGoal}
-    >
+    <Button variant="outline" size="sm" class="rounded-full text-meta font-normal shadow-none" onclick={openGoal}>
       <Target class="size-3.5" strokeWidth={1.7} />
       Daily goal · {goalHours}h
     </Button>
   </div>
 
-  <div class="grid grid-cols-[1.2fr_0.8fr] gap-6 max-[700px]:grid-cols-1">
-    <div class="border-t pt-4">
-      <div class="mb-2 text-meta text-muted-foreground">Today</div>
-      <div class="text-display font-normal tracking-[-0.05em]">
+  <div class="grid grid-cols-12 gap-3">
+    <Card.Root class="col-span-12 min-w-0 justify-between gap-5 rounded-[20px] bg-[linear-gradient(135deg,#ffffff_34%,#f5f8ff_100%)] p-5 shadow-none sm:col-span-7 sm:p-6">
+      <span class="text-meta text-muted-foreground">Focused today</span>
+      <div class="whitespace-nowrap text-[clamp(36px,6vw,48px)] font-normal leading-none tracking-[-0.05em] tabular-nums">
         {formatFocusTotal(today.focusedMs)}
         {#if todayHasGoal}
-          <span class="text-ui font-normal tracking-normal text-muted-foreground">/ {goalHours}h</span>
+          <span class="text-ui font-normal tracking-normal text-muted-foreground">/ {goalHours}h target</span>
         {/if}
       </div>
-
       {#if todayHasGoal}
-        <div class="mt-4 h-2 overflow-hidden rounded-full bg-muted">
-          <div
-            class="h-full rounded-full bg-primary transition-[width]"
-            style={`width: ${Math.min(100, todayProgress * 100)}%`}
-          ></div>
-        </div>
-
-        <div class="mt-2 flex justify-between gap-4 text-meta text-muted-foreground">
-          <span>{Math.round(todayProgress * 100)}% of goal</span>
-          <span>
-            {today.focusedMs >= goalMs
-              ? 'Goal reached'
-              : `${formatFocusTotal(goalMs - today.focusedMs)} remaining`}
-          </span>
+        <div>
+          <div class="h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label="Daily focus progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.min(100, Math.round(todayProgress * 100))}>
+            <div class="h-full rounded-full bg-primary transition-[width]" style:width={Math.min(100, todayProgress * 100) + '%'}></div>
+          </div>
+          <div class="mt-2 flex flex-wrap justify-between gap-2 text-meta text-muted-foreground">
+            <span>{Math.round(todayProgress * 100)}% of goal</span>
+            <span>{today.focusedMs >= goalMs ? 'Goal reached' : formatFocusTotal(goalMs - today.focusedMs) + ' remaining'}</span>
+          </div>
         </div>
       {:else}
-        <div class="mt-3 text-meta text-muted-foreground">No goal scheduled today</div>
+        <div class="text-meta text-muted-foreground">No goal scheduled today</div>
       {/if}
-    </div>
+    </Card.Root>
 
-    <div class="border-t pt-4">
-      <div class="mb-2 text-meta text-muted-foreground">Today at a glance</div>
-      <div class="grid grid-cols-2 gap-x-5 gap-y-4">
-        <div>
-          <strong class="block text-title-lg font-medium tracking-[-0.03em]">{today.sessionCount}</strong>
-          <span class="text-meta text-muted-foreground">focus sessions</span>
-        </div>
-        <div>
-          <strong class="block text-title-lg font-medium tracking-[-0.03em]">{formatFocusTotal(today.overtimeMs)}</strong>
-          <span class="text-meta text-muted-foreground">overtime</span>
-        </div>
-        <div>
-          <strong class="block text-title-lg font-medium tracking-[-0.03em]">{formatFocusTotal(todayAverageMs)}</strong>
-          <span class="text-meta text-muted-foreground">avg. session</span>
-        </div>
-        <div>
-          <strong class="block text-title-lg font-medium tracking-[-0.03em]">{formatClock(today.firstStartedAt)}</strong>
-          <span class="text-meta text-muted-foreground">first session</span>
-        </div>
+    <Card.Root class="col-span-12 min-w-0 gap-4 rounded-[20px] p-5 shadow-none sm:col-span-5 sm:p-6">
+      <div class="flex items-center justify-between gap-2">
+        <h3 class="m-0 text-meta font-medium text-muted-foreground">THIS WEEK</h3>
+        <span class="text-meta text-muted-foreground">Mon–Sun</span>
       </div>
-    </div>
-  </div>
+      <div class="flex flex-wrap items-baseline justify-between gap-2">
+        <strong class="text-page-title font-normal tracking-[-0.04em]">{formatFocusTotal(week.focusedMs)}</strong>
+        <span class="text-meta text-muted-foreground">{week.goalsReached} of {week.scheduledGoalDays} goals</span>
+      </div>
+      <div class="flex h-24 items-end gap-2" aria-label="Daily focus time this week">
+        {#each weekBars as day}
+          <div class="flex h-full min-w-0 flex-1 flex-col justify-end gap-1">
+            <div class="flex h-[76px] items-end justify-center">
+              <span
+                class={day.isToday ? 'block w-full max-w-7 rounded-t-md bg-primary' : 'block w-full max-w-7 rounded-t-md bg-secondary'}
+                style:height={Math.max(6, Math.min(100, (day.focusedMs / goalMs) * 100)) + '%'}
+                title={formatFocusTotal(day.focusedMs)}
+                aria-label={day.label + ': ' + formatFocusTotal(day.focusedMs)}
+              ></span>
+            </div>
+            <span class="text-center text-meta text-muted-foreground">{day.label}</span>
+          </div>
+        {/each}
+      </div>
+    </Card.Root>
 
-  <div class="mt-8">
-    <div class="mb-3 flex items-center justify-between gap-4">
-      <div>
+    <Card.Root class="col-span-12 min-w-0 gap-3 rounded-[20px] p-4 shadow-none sm:p-6">
+      <div class="flex flex-wrap items-baseline justify-between gap-2">
         <h3 class="m-0 text-ui font-medium">Focus heatmap</h3>
-        <p class="mt-1 text-meta text-muted-foreground">Last 52 weeks · intensity follows each day's goal</p>
+        <span class="text-meta text-muted-foreground">Last 52 weeks · goal-relative intensity</span>
       </div>
-
-      <div class="flex items-center gap-1 text-meta text-muted-foreground max-[560px]:hidden">
+      <div class="w-full overflow-x-auto pb-2 focus-visible:outline-2 focus-visible:outline-ring" role="region" aria-label="Focus activity by date" tabindex="0">
+        <div class="grid w-max grid-flow-col grid-rows-7 gap-1">
+          {#each heatmapDays as day}
+            <Button
+              variant="ghost"
+              class={[
+                'flex size-6 min-w-0 items-center justify-center rounded-md border-0 p-0 shadow-none transition',
+                day.future ? 'cursor-default opacity-45' : 'hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring'
+              ].join(' ')}
+              title={heatmapTitle(day)}
+              aria-label={heatmapTitle(day)}
+              disabled={day.future}
+              onclick={() => inspectDay(day)}
+            >
+              <span class="size-3 rounded-[3px]" style:background={heatmapColor(day)} aria-hidden="true"></span>
+            </Button>
+          {/each}
+        </div>
+      </div>
+      <div class="flex items-center gap-1 text-meta text-muted-foreground">
         <span>Less</span>
         {#each ['#ECECE6', '#DCE8FF', '#ABC6FB', '#6E9DF5', '#4F82F2', '#2468F2'] as color}
-          <span class="size-2.5 rounded-[3px]" style={`background: ${color}`}></span>
+          <span class="size-2.5 rounded-[3px]" style:background={color} aria-hidden="true"></span>
         {/each}
         <span>Goal</span>
       </div>
-    </div>
+    </Card.Root>
 
-    <div class="overflow-x-auto pb-2 focus-visible:outline-2 focus-visible:outline-ring" role="region" aria-label="Focus activity by date" tabindex="0">
-      <div class="grid w-max grid-flow-col grid-rows-7 gap-1">
-        {#each heatmapDays as day}
-          <Button
-            variant="ghost"
-            class={[
-              'flex size-6 min-w-0 items-center justify-center rounded-md border-0 p-0 shadow-none transition',
-              day.future
-                ? 'cursor-default opacity-45'
-                : 'hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring'
-            ].join(' ')}
-            title={heatmapTitle(day)}
-            aria-label={heatmapTitle(day)}
-            disabled={day.future}
-            onclick={() => inspectDay(day)}
-          >
-            <span class="size-3 rounded-[3px]" style={`background: ${heatmapColor(day)}`} aria-hidden="true"></span>
-          </Button>
-        {/each}
-      </div>
-    </div>
-  </div>
-
-  <div class="mt-8">
-    <div class="mb-3 flex items-center justify-between">
-      <h3 class="m-0 text-ui font-medium">This week</h3>
-      <span class="text-meta text-muted-foreground">Mon–Sun</span>
-    </div>
-
-    <div class="grid grid-cols-3 gap-6 max-[620px]:grid-cols-1 max-[620px]:gap-3">
-      <div class="border-t pt-3">
-        <strong class="block text-title-lg font-medium tracking-[-0.035em]">{formatFocusTotal(week.focusedMs)}</strong>
-        <span class="text-meta text-muted-foreground">focused</span>
-      </div>
-      <div class="border-t pt-3">
-        <strong class="block text-title-lg font-medium tracking-[-0.035em]">{formatFocusTotal(week.averageActiveDayMs)}</strong>
-        <span class="text-meta text-muted-foreground">avg. / active day</span>
-      </div>
-      <div class="border-t pt-3">
-        <strong class="block text-title-lg font-medium tracking-[-0.035em]">
-          {week.goalsReached} / {week.scheduledGoalDays}
-        </strong>
-        <span class="text-meta text-muted-foreground">targets reached</span>
-      </div>
-    </div>
-  </div>
-
-  <div class="mt-8">
-    <div class="mb-2 flex items-center justify-between gap-4">
-      <h3 class="m-0 text-ui font-medium">Recent activity</h3>
-    </div>
-
-    {#if sessions.length === 0}
-      <div class="border-t py-8 text-center text-meta text-muted-foreground">
-        Completed focus sessions will appear here.
-      </div>
-    {:else}
-      {#each recentDateKeys as dateKey}
-        {@const daySessions = sessionsForDate(sessions, dateKey)}
-        {@const day = daily.find((item) => item.dateKey === dateKey)}
-
-        <div class="border-t py-3">
-          <Button
-            variant="ghost"
-            class="mb-1 flex h-auto w-full items-center justify-between gap-4 rounded-full px-2 py-1 text-left font-normal shadow-none"
-            onclick={() => openHistoryDay(dateKey)}
-          >
-            <strong class="text-meta font-medium">{formatDayLabel(dateKey)}</strong>
-            <span class="text-meta text-muted-foreground">{formatFocusTotal(day?.focusedMs ?? 0)}</span>
-          </Button>
-
-          {#each daySessions.slice(0, 6) as session}
-            <div class="grid grid-cols-[68px_1fr_auto] items-center gap-3 py-2 max-[520px]:grid-cols-[54px_1fr_auto]">
-              <time class="text-meta text-muted-foreground">{formatClock(session.startedAt)}</time>
-              <div class="min-w-0">
-                <div class="truncate text-meta">{session.label || 'Focus session'}</div>
-                <div class="mt-1 text-meta text-muted-foreground">
-                  {formatFocusTotal(session.plannedDurationMs)} target
-                  {#if session.overtimeMs > 0}
-                    + {formatFocusTotal(session.overtimeMs)} overtime
-                  {/if}
+    <Card.Root class="col-span-12 min-w-0 gap-2 rounded-[20px] p-4 shadow-none sm:p-6">
+      <h3 class="m-0 text-ui font-medium">Recent sessions</h3>
+      {#if sessions.length === 0}
+        <div class="py-8 text-center text-meta text-muted-foreground">Completed focus sessions will appear here.</div>
+      {:else}
+        {#each recentDateKeys as dateKey}
+          {@const daySessions = sessionsForDate(sessions, dateKey)}
+          {@const day = daily.find((item) => item.dateKey === dateKey)}
+          <div class="border-t border-border pt-3">
+            <Button
+              variant="ghost"
+              class="mb-1 flex h-auto w-full items-center justify-between gap-4 rounded-full px-2 py-1 text-left font-normal shadow-none"
+              onclick={() => openHistoryDay(dateKey)}
+            >
+              <strong class="text-meta font-medium">{formatDayLabel(dateKey)}</strong>
+              <span class="text-meta text-muted-foreground">{formatFocusTotal(day?.focusedMs ?? 0)}</span>
+            </Button>
+            {#each daySessions.slice(0, 6) as session}
+              <div class="grid grid-cols-[54px_minmax(0,1fr)_auto] items-center gap-3 border-t border-border/50 py-3 sm:grid-cols-[68px_minmax(0,1fr)_auto]">
+                <time class="text-meta text-muted-foreground">{formatClock(session.startedAt)}</time>
+                <div class="min-w-0">
+                  <div class="truncate text-ui font-medium">{session.label || 'Focus session'}</div>
+                  <div class="mt-1 text-meta text-muted-foreground">
+                    {formatFocusTotal(session.plannedDurationMs)} target
+                    {#if session.overtimeMs > 0}
+                      + {formatFocusTotal(session.overtimeMs)} overtime
+                    {/if}
+                  </div>
                 </div>
+                <span class="text-ui tabular-nums">{formatFocusTotal(session.actualDurationMs)}</span>
               </div>
-              <div class="text-meta text-muted-foreground">{formatFocusTotal(session.actualDurationMs)}</div>
-            </div>
-          {/each}
-        </div>
-      {/each}
-    {/if}
+            {/each}
+          </div>
+        {/each}
+      {/if}
+    </Card.Root>
   </div>
 
   <Dialog.Root bind:open={goalOpen}>
