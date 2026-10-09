@@ -92,7 +92,7 @@
 
     <Button
       variant="ghost"
-      class="flex h-10 w-full items-center justify-between rounded-full px-1 text-ui font-normal"
+      class="flex h-10 w-full items-center justify-between rounded-lg px-3 text-ui font-normal text-foreground shadow-none hover:bg-muted/70 hover:text-foreground"
       onclick={onManage}
     >
       <span>Blocked websites</span>
@@ -146,7 +146,7 @@
       />
       <Button
         size="sm"
-        class="h-9 shrink-0 rounded-full px-3 text-meta font-medium shadow-none"
+        class="h-9 shrink-0 rounded-full px-4 text-ui font-medium !text-primary-foreground shadow-none"
         onclick={() => addDomain()}
       >
         Add
@@ -170,7 +170,7 @@
               <Button
                 variant="ghost"
                 size="icon-sm"
-                class="shrink-0 rounded-full text-muted-foreground"
+                class="shrink-0 rounded-full text-muted-foreground hover:text-destructive"
                 aria-label={`Remove ${domain}`}
                 onclick={() => removeDomain(domain)}
               >
@@ -188,7 +188,7 @@
         {#each suggestions.filter((domain) => !blockedDomains.includes(domain)) as domain}
           <Button
             variant="ghost"
-            class="flex h-9 w-full items-center justify-between rounded-full px-2 text-meta font-normal shadow-none"
+            class="flex h-10 w-full items-center justify-between rounded-lg px-3 text-ui font-normal text-foreground shadow-none hover:bg-muted/70 hover:text-foreground"
             onclick={() => addDomain(domain)}
           >
             <span>{domain}</span>
