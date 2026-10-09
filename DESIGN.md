@@ -262,7 +262,7 @@ UIArc remains a visual/interaction reference while its official implementation i
 
 ## 6. Pomodoro module contract
 
-Pomodoro is a focused single-column tool, not a productivity dashboard.
+Pomodoro is a focus-first tool using a restrained responsive bento grid, not a productivity dashboard.
 
 Core flow:
 
@@ -291,19 +291,19 @@ Pomodoro module contract:
 - optional auto-start breaks and auto-start focus live in settings
 - overtime is available for focus sessions; it counts upward after the scheduled focus target and remains mutually exclusive with auto-start breaks
 - optional Screen Wake Lock keeps the display awake only while an active session is running and only on supported browsers
-- completed focus sessions are stored locally as Activity history; the timer surface exposes only a quiet Today summary
+- completed focus sessions are stored locally as Activity history; the timer surface exposes a small Today progress card and a compact Cycle card beside the primary timer
 - growing Activity history uses IndexedDB while active timer state and preferences stay in localStorage
 - Activity includes daily focus target, 52-week goal-relative heatmap, weekly summary, recent sessions, day inspection, and local JSON/CSV export
 - heatmap intensity is based on focused time relative to the goal that applied to that day, not raw Pomodoro count
 - history stays local and intentionally lightweight rather than becoming a productivity-score dashboard
-- progressive disclosure is mandatory: the primary Timer surface shows mode, timer, primary action, cycle, optional focus label, and quiet Today activity only
+- progressive disclosure is mandatory: the Timer bento shows one dominant countdown card (8/12 columns) and only Today / Current Cycle support cards (4/12 columns); on narrow viewports these stack beneath the timer
 - Pomodoro uses the same top hierarchy as Typing: ToolHeader title, then one compact fully rounded navigation bar
 - Timer / Activity are pill tabs on the left of that bar; Settings stays aligned on the right and opens as a sibling in-page view, not a popup
 - Activity and Settings content may widen for their needs without pulling the title/navigation axis off-center
 - distinguish page-level navigation from timer-mode controls: Timer / Activity is the module navigation bar, while Focus / Short / Long remains a compact mode selector
-- Timer follows the chosen minimal A design: frameless focus surface with only quiet top/bottom dividers, compact mode pills, oversized numeric countdown, subtle state text, cycle dots, and a small session/today summary; do not render a timer ring
+- Timer follows the approved functional bento composition: one light cobalt atmospheric card with compact mode pills, oversized numeric countdown, focus label, and primary control row; separate quiet Today and Cycle cards; never render a timer ring
 - idle state should not show redundant `Ready` copy; state text appears only when it adds information such as Focus, Paused, Overtime, or Complete
-- cycle copy must be semantically explicit, e.g. `Session 2 of 4`, and match the completed-dot state
+- cycle copy must be semantically explicit, e.g. `2 / 4 sessions`, and match the completed-dot state; the Cycle card also indicates the next mode
 - Reset and Skip are quiet icon-only shadcn Buttons with accessible labels, arranged in the same horizontal row immediately to the left and right of the primary Start/Pause/Resume action
 - Sound, ringtone choice, notifications, auto-start behavior, overtime, Wake Lock, custom durations, Focus Protection, and data controls live in Settings rather than the primary timer surface
 - Focus Protection is optional enforcement, not a separate productivity product: the user explicitly chooses blocked domains and the timer remains the core experience
@@ -328,7 +328,11 @@ Pomodoro module contract:
 - the focus label is optional: show `+ Add focus` until the user chooses to add one, then allow lightweight inline editing
 - overtime shows the elapsed extra time with a leading plus sign; do not reintroduce a circular progress ring
 - keyboard shortcuts remain functional but should not be permanently explained on the primary surface
-- keep the interface single-column, light-weight, and free of task-management or heavy analytics scope
+- Activity uses a bento grid with a prominent Today-goal card (7/12 columns), a weekly summary card (5/12 columns), then full-width goal-relative heatmap and recent session history cards
+- Settings groups controls into bento cards for durations (7/12), automation (5/12), protection (7/12), sounds & system (5/12), and data (full width); sub-settings remain in-page drill-downs
+- Keep cards flat with light borders, restrained cobalt details, 20px corner radii, and 12px grid gaps; use the existing Modu tokens and shadcn primitives
+- Do not add a footer beneath the Timer cards repeating the focus/rest cycle or today's total (such as `Focus → Rest → Repeat · 2h 15m recorded today`)
+- keep the interface light-weight and free of task-management or heavy analytics scope
 
 ## 7. Typing module contract
 
