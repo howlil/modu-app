@@ -1,11 +1,12 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
-  import { ArrowLeft, Check, ChevronRight, Download, Pencil, RotateCcw, Settings2, SkipForward, Trash2 } from 'lucide-svelte';
+  import { ArrowLeft, Check, ChevronRight, Download, Pencil, RotateCcw, Settings2, SkipForward, Trash2, X } from 'lucide-svelte';
   import { Button } from "$lib/components/ui/button/index.js";
   import { Input } from "$lib/components/ui/input/index.js";
   import { Switch } from "$lib/components/ui/switch/index.js";
   import * as Tabs from '$lib/components/ui/tabs/index.js';
   import * as Card from '$lib/components/ui/card/index.js';
+  import { Dialog } from '$lib/components/ui/dialog/index.js';
   import ToolHeader from '#lib/components/ToolHeader.svelte';
   import { createWakeLockController } from '#lib/modules/pomodoro/wake-lock.ts';
   import ActivityView from '#lib/modules/pomodoro/components/ActivityView.svelte';
@@ -61,7 +62,7 @@
   } from '#lib/modules/pomodoro/persistence.ts';
 
   type PomodoroView = 'timer' | 'activity' | 'settings';
-  type SettingsPanel = 'main' | 'blocked-sites' | 'ringtone' | 'data';
+  type SettingsPanel = 'main' | 'data';
 
   type PomodoroPreferences = {
     autoStartBreaks: boolean;
@@ -133,6 +134,8 @@
   let activitySessions = $state<FocusActivitySession[]>([]);
   let legacyHistory = $state<LegacyFocusSession[]>([]);
   let settingsPanel = $state<SettingsPanel>('main');
+  let blockedSitesDialogOpen = $state(false);
+  let ringtoneDialogOpen = $state(false);
   let deleteConfirm = $state(false);
   let dataMessage = $state('');
   let hydrated = $state(false);
@@ -145,6 +148,8 @@
 
   $effect(() => {
     if (activeView !== 'settings') {
+      blockedSitesDialogOpen = false;
+      ringtoneDialogOpen = false;
       settingsPanel = 'main';
       deleteConfirm = false;
       dataMessage = '';
@@ -419,6 +424,8 @@
     settingsPanel = 'main';
     deleteConfirm = false;
     dataMessage = '';
+    blockedSitesDialogOpen = false;
+    ringtoneDialogOpen = false;
     activeView = 'settings';
   }
 
@@ -1159,13 +1166,7 @@
         {/if}
 
         <h2 class="m-0 truncate text-title font-semibold tracking-[-0.03em]">
-          {settingsPanel === 'main'
-            ? 'Settings'
-            : settingsPanel === 'blocked-sites'
-              ? 'Blocked websites'
-              : settingsPanel === 'ringtone'
-                ? 'Ringtone'
-                : 'Data'}
+          {settingsPanel === 'main' ? 'Settings' : 'Data'}
         </h2>
       </div>
 
@@ -1222,7 +1223,7 @@
                 errorMessage={focusProtectionError}
                 onToggle={toggleFocusProtection}
                 onBlocklistChange={updateBlockedDomains}
-                onManage={() => openSettingsPanel('blocked-sites')}
+                onManage={() => (blockedSitesDialogOpen = true)}
               />
             </Card.Root>
 
@@ -1235,7 +1236,7 @@
                 <span>Sound</span>
                 <Switch checked={soundEnabled} aria-label="Sound" onclick={toggleSound} />
               </div>
-              <Button variant="ghost" class="flex h-10 w-full items-center justify-between rounded-full px-1 text-ui font-normal" onclick={() => openSettingsPanel('ringtone')}>
+              <Button variant="ghost" class="flex h-10 w-full items-center justify-between rounded-lg px-3 text-ui font-normal text-foreground shadow-none hover:bg-muted/70 hover:text-foreground" onclick={() => (ringtoneDialogOpen = true)}>
                 <span>Ringtone</span>
                 <span class="inline-flex items-center gap-1 text-meta text-muted-foreground">
                   {RINGTONE_OPTIONS.find((option) => option.id === ringtone)?.label ?? 'Soft chime'}
@@ -1259,40 +1260,6 @@
                 Export & delete data <ChevronRight class="size-3.5" strokeWidth={1.7} />
               </Button>
             </Card.Root>
-          </div>
-        {:else if settingsPanel === 'blocked-sites'}
-          <FocusProtectionSettings
-            view="manager"
-            enabled={focusProtectionEnabled}
-            {blockedDomains}
-            connection={focusProtectionConnection}
-            errorMessage={focusProtectionError}
-            onToggle={toggleFocusProtection}
-            onBlocklistChange={updateBlockedDomains}
-          />
-        {:else if settingsPanel === 'ringtone'}
-          <div>
-            <p class="mb-3 mt-0 text-meta  text-muted-foreground">
-              Pick a short local tone for session completion. Selecting one also previews it.
-            </p>
-
-            <div class="divide-y">
-              {#each RINGTONE_OPTIONS as option}
-                <Button
-                  variant="ghost"
-                  class="flex h-auto min-h-12 w-full items-center justify-between gap-4 rounded-full px-2 py-2 text-left font-normal whitespace-normal shadow-none"
-                  onclick={() => selectRingtone(option.id)}
-                >
-                  <span class="min-w-0">
-                    <span class="block text-meta">{option.label}</span>
-                    <span class="mt-1 block text-meta text-muted-foreground">{option.description}</span>
-                  </span>
-                  {#if ringtone === option.id}
-                    <Check class="size-4 shrink-0 text-primary" strokeWidth={1.8} />
-                  {/if}
-                </Button>
-              {/each}
-            </div>
           </div>
         {:else}
           <div>
@@ -1360,3 +1327,83 @@
   {/if}
   </div>
 </section>
+
+{#if activeView === 'settings'}
+  <Dialog.Root bind:open={blockedSitesDialogOpen}>
+    <Dialog.Portal>
+      <Dialog.Overlay class="fixed inset-0 z-[110] bg-black/25 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0" />
+      <Dialog.Content
+        class="fixed left-1/2 top-1/2 z-[111] flex max-h-[calc(100vh-32px)] w-[calc(100%-32px)] max-w-[460px] -translate-x-1/2 -translate-y-1/2 flex-col rounded-[20px] border border-border bg-card p-5 text-left shadow-[0_24px_70px_rgba(25,25,25,0.18)] outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0"
+        aria-labelledby="pomodoro-blocked-title"
+        aria-describedby="pomodoro-blocked-description"
+      >
+        <div class="flex shrink-0 items-start justify-between gap-4">
+          <div>
+            <Dialog.Title id="pomodoro-blocked-title" class="text-title font-semibold">Blocked websites</Dialog.Title>
+            <Dialog.Description id="pomodoro-blocked-description" class="mt-1 text-ui text-muted-foreground">
+              Choose which websites to block during focus sessions.
+            </Dialog.Description>
+          </div>
+          <Dialog.Close class="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close blocked websites">
+            <X class="size-4" strokeWidth={1.7} />
+          </Dialog.Close>
+        </div>
+        <div class="mt-5 min-h-0 overflow-y-auto">
+          <FocusProtectionSettings
+            view="manager"
+            enabled={focusProtectionEnabled}
+            {blockedDomains}
+            connection={focusProtectionConnection}
+            errorMessage={focusProtectionError}
+            onToggle={toggleFocusProtection}
+            onBlocklistChange={updateBlockedDomains}
+          />
+        </div>
+      </Dialog.Content>
+    </Dialog.Portal>
+  </Dialog.Root>
+
+  <Dialog.Root bind:open={ringtoneDialogOpen}>
+    <Dialog.Portal>
+      <Dialog.Overlay class="fixed inset-0 z-[110] bg-black/25 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0" />
+      <Dialog.Content
+        class="fixed left-1/2 top-1/2 z-[111] w-[calc(100%-32px)] max-w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-[20px] border border-border bg-card p-5 text-left shadow-[0_24px_70px_rgba(25,25,25,0.18)] outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0"
+        aria-labelledby="pomodoro-ringtone-title"
+        aria-describedby="pomodoro-ringtone-description"
+      >
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <Dialog.Title id="pomodoro-ringtone-title" class="text-title font-semibold">Ringtone</Dialog.Title>
+            <Dialog.Description id="pomodoro-ringtone-description" class="mt-1 text-ui text-muted-foreground">
+              Select a tone to preview and use at the end of each session.
+            </Dialog.Description>
+          </div>
+          <Dialog.Close class="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close ringtone">
+            <X class="size-4" strokeWidth={1.7} />
+          </Dialog.Close>
+        </div>
+        <div class="mt-5 divide-y divide-border">
+          {#each RINGTONE_OPTIONS as option}
+            <Button
+              variant="ghost"
+              class="flex h-auto min-h-14 w-full items-center justify-between gap-4 rounded-lg px-3 py-3 text-left text-ui font-normal whitespace-normal text-foreground shadow-none hover:bg-muted/70 hover:text-foreground"
+              aria-pressed={ringtone === option.id}
+              onclick={() => {
+                selectRingtone(option.id);
+                ringtoneDialogOpen = false;
+              }}
+            >
+              <span class="min-w-0">
+                <span class="block text-ui font-medium">{option.label}</span>
+                <span class="mt-1 block text-meta text-muted-foreground">{option.description}</span>
+              </span>
+              {#if ringtone === option.id}
+                <Check class="size-4 shrink-0 text-primary" strokeWidth={1.8} />
+              {/if}
+            </Button>
+          {/each}
+        </div>
+      </Dialog.Content>
+    </Dialog.Portal>
+  </Dialog.Root>
+{/if}
