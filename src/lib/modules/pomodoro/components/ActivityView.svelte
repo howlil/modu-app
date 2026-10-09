@@ -247,20 +247,21 @@
         <span class="text-meta text-muted-foreground">Last 52 weeks · goal-relative intensity</span>
       </div>
       <div class="w-full overflow-x-auto pb-2 focus-visible:outline-2 focus-visible:outline-ring" role="region" aria-label="Focus activity by date" tabindex="0">
-        <div class="grid w-max grid-flow-col grid-rows-7 gap-1">
+        <div class="grid w-max grid-flow-col grid-rows-7 gap-0">
           {#each heatmapDays as day}
             <Button
               variant="ghost"
+              size="icon-xs"
               class={[
-                'flex size-6 min-w-0 items-center justify-center rounded-md border-0 p-0 shadow-none transition',
-                day.future ? 'cursor-default opacity-45' : 'hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring'
+                'relative flex size-4 min-w-0 items-center justify-center rounded-[3px] border-0 p-0 shadow-none transition-colors',
+                day.future ? 'cursor-default opacity-45' : 'hover:bg-muted focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring'
               ].join(' ')}
               title={heatmapTitle(day)}
               aria-label={heatmapTitle(day)}
               disabled={day.future}
               onclick={() => inspectDay(day)}
             >
-              <span class="size-3 rounded-[3px]" style:background={heatmapColor(day)} aria-hidden="true"></span>
+              <span class="size-3 rounded-[2px]" style:background={heatmapColor(day)} aria-hidden="true"></span>
             </Button>
           {/each}
         </div>
