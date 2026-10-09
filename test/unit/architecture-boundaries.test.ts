@@ -8,7 +8,7 @@ const sources = {
 };
 
 function read(path: string) {
-  const match = Object.entries(sources).find(([source]) => source.endsWith('/' + path));
+  const match = Object.entries(sources).find(([source]) => source === path || source.endsWith('/' + path));
   if (!match) throw new Error('Architecture test source missing: ' + path);
   return match[1];
 }
