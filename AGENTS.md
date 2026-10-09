@@ -69,6 +69,20 @@ Prefer deleting dead scaffold over preserving hypothetical architecture.
 
 ## Architecture
 
+**Mandatory:** Before developing or refactoring any feature, read [`.agents/architecture.md`](.agents/architecture.md), then follow its dependency rules and `DESIGN.md`. Treat them as code-review and CI contracts, not suggestions.
+
+Feature development checklist:
+
+1. Identify the owning domain and choose the smallest change.
+2. Keep `+page.svelte` and `+server.ts` focused on entrypoint/composition, not lengthy workflows.
+3. Put feature-specific views in `modules/<feature>/components`; per-instance Svelte 5 orchestration belongs in `controller/*.svelte.ts`.
+4. Keep pure logic deterministic and independent of UI/browser/server adapters. Never import another feature's private code.
+5. Centralize state types, maintain local-first storage/protocol compatibility, and test regressions before changing contracts.
+6. Add/update boundary tests for architectural changes; don't silence tests.
+7. Run `bun run check`, `bun run test`, and `bun run build`, and verify final CI.
+8. Update `.agents/architecture.md` and `DESIGN.md` when rules legitimately change.
+
+
 ```text
 routes (entry + composition)
   ↓
