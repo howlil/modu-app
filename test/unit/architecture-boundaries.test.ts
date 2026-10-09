@@ -1,15 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync, readdirSync } from 'node:fs';
-import { join, relative } from 'node:path';
 
-const read = (path: string) => readFileSync(join(process.cwd(), path), 'utf8');
+const sources = {
+  ...import.meta.glob<string>('../../src/lib/modules/**/*.{ts,svelte}', { eager: true, query: '?raw', import: 'default' }),
+  ...import.meta.glob<string>('../../src/lib/components/ui/**/*.{ts,svelte}', { eager: true, query: '?raw', import: 'default' }),
+  ...import.meta.glob<string>('../../src/routes/pomodoro/+page.svelte', { eager: true, query: '?raw', import: 'default' }),
+  ...import.meta.glob<string>('../../extension/content-bridge.js', { eager: true, query: '?raw', import: 'default' })
+};
 
-function sourceFiles(folder: string): string[] {
-  return readdirSync(folder, { withFileTypes: true }).flatMap((entry) => {
-    const path = join(folder, entry.name);
-    if (entry.isDirectory()) return sourceFiles(path);
-    return /\.(ts|svelte)$/.test(entry.name) ? [path] : [];
-  });
+function read(path: string) {
+  const match = Object.entries(sources).find(([source]) => source.endsWith('/' + path));
+  if (!match) throw new Error('Architecture test source missing: ' + path);
+  return match[1];
+}
+
+function sourceFiles(folder: string) {
+  return Object.keys(sources).filter((path) => path.includes('/' + folder + '/'));
 }
 
 function importedPaths(source: string): string[] {
@@ -40,7 +45,7 @@ describe('Module boundary rules', () => {
 
   it('disallows cross-feature and server imports from feature modules', () => {
     for (const file of sourceFiles('src/lib/modules')) {
-      const owner = relative('src/lib/modules', file).split(/[\\/]/)[0];
+      const owner = file.split('/src/lib/modules/')[1]?.split('/')[0];
       for (const imported of importedPaths(read(file))) {
         const found = imported.match(/(?:#lib|\$lib)\/modules\/([^/]+)/);
         if (found) expect(found[1], file + ' imports ' + imported).toBe(owner);
