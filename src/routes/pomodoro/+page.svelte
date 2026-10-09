@@ -118,7 +118,7 @@
   let focusText = $state('');
   let focusDraft = $state('');
   let focusEditing = $state(false);
-  let focusInput: HTMLInputElement | null = null;
+  let focusInput = $state<HTMLInputElement | null>(null);
   let soundEnabled = $state(true);
   let ringtone = $state<PomodoroRingtone>(DEFAULT_RINGTONE);
   let notificationsEnabled = $state(false);
@@ -1004,10 +1004,10 @@
             {#if timer.mode === 'focus'}
               {#if focusEditing}
                 <Input
-                  bind:this={focusInput}
+                  bind:ref={focusInput}
                   class="w-full max-w-[300px] rounded-none border-0 border-b border-border bg-transparent px-2 py-2 text-center text-ui font-normal shadow-none focus-visible:ring-0"
                   type="text"
-                  maxlength="80"
+                  maxlength={80}
                   bind:value={focusDraft}
                   placeholder="What are you focusing on?"
                   aria-label="Focus label"
