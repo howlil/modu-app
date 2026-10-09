@@ -260,6 +260,15 @@ SvelteKit 3 compatibility: Module restores `$lib -> src/lib` in `vite.config.ts`
 
 UIArc remains a visual/interaction reference while its official implementation is React-only. Do not manually port its React components into Svelte.
 
+### Implementation boundaries
+
+- `src/routes/pomodoro/+page.svelte` remains a minimal route entrypoint.
+- `src/lib/modules/pomodoro/PomodoroWorkspace.svelte` composes Timer, Activity, and Settings views.
+- `src/lib/modules/pomodoro/controller/pomodoro.svelte.ts` owns per-workspace Svelte 5 reactive state, session orchestration, local persistence, browser effects, and extension lifecycle. Never export a shared mutable instance.
+- `components/TimerView.svelte`, `ActivityView.svelte`, and `SettingsView.svelte` own presentation and user actions while retaining approved bento styling and accessible dialogs.
+- `timer.ts` and `activity.ts` remain pure feature domain functions. Storage and extension integrations remain feature-owned adapters; do not rewrite storage formats or protocol constants for folder cosmetics.
+- All future feature changes follow `.agents/architecture.md` and its enforced dependency rules.
+
 ## 6. Pomodoro module contract
 
 Pomodoro is a focus-first tool using a restrained responsive bento grid, not a productivity dashboard.
