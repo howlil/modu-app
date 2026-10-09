@@ -231,8 +231,8 @@ Module maps those tokens to its identity:
 
 Prefer semantic classes such as `bg-card`, `text-muted-foreground`, `border-border`, and `bg-primary` over one-off raw colors.
 
-- Action buttons use fully rounded pill geometry by default through the shared shadcn `Button` primitive.
-- Compact toggle actions may use the same pill geometry; structural rows, cards, fields, and visualization elements are not forced into pills.
+- Primary and standalone action buttons use fully rounded pill geometry by default through the shared shadcn `Button` primitive; cobalt buttons must use the contrasting `primary-foreground` text token, including on hover.
+- Compact toggle actions may use the same pill geometry; interactive settings list rows use a subtle `rounded-lg` hover surface (not `rounded-full`), while cards and fields retain their own structural radii.
 - The global navigation becomes a fully rounded floating capsule after scroll and keeps visible top breathing room from the viewport edge.
 
 Avoid:
@@ -321,9 +321,9 @@ Pomodoro module contract:
 - Pomodoro data management is centralized in Settings: export produces one full JSON backup of timer state, preferences, goals, blocked-site configuration, and activity history; delete removes all locally stored Pomodoro data
 - Activity is for inspection, not data administration; do not duplicate export/delete controls there
 - destructive data deletion uses inline confirmation inside the existing Settings drill-down rather than opening another modal
-- Pomodoro Settings is an in-page view; do not open it in a dialog or overlay
-- nested settings such as Blocked websites, Ringtone, and Data use in-page drill-down navigation with an explicit Back action
-- Escape may return from a nested settings drill-down to the main Settings view, but Settings itself behaves like normal page navigation
+- Pomodoro Settings remains an in-page view; only focused selections for Blocked websites and Ringtone open compact accessible dialogs above it.
+- Blocked websites opens a dialog for domain management, Ringtone opens a dialog for single-selection and sound preview, and Data remains an in-page drill-down with an explicit Back action.
+- Escape closes the Blocked websites/Ringtone dialogs; in the Data drill-down, Escape may return to the main Settings view. Settings itself behaves like normal page navigation.
 - scrollable surfaces may hide the visual scrollbar to preserve the quiet UI, but wheel, trackpad, touch, keyboard, and programmatic scrolling must remain functional
 - the focus label is optional: show `+ Add focus` until the user chooses to add one, then allow lightweight inline editing
 - overtime shows the elapsed extra time with a leading plus sign; do not reintroduce a circular progress ring
