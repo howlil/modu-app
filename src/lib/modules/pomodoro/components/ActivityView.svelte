@@ -230,7 +230,7 @@
             <div class="flex h-[76px] items-end justify-center">
               <span
                 class={day.isToday ? 'block w-full max-w-7 rounded-t-md bg-primary' : 'block w-full max-w-7 rounded-t-md bg-secondary'}
-                style:height={Math.max(6, Math.min(100, (day.focusedMs / goalMs) * 100)) + '%'}
+                style:height={day.focusedMs === 0 ? 0 : Math.max(6, Math.min(100, (day.focusedMs / goalMs) * 100)) + '%'}
                 title={formatFocusTotal(day.focusedMs)}
                 aria-label={day.label + ': ' + formatFocusTotal(day.focusedMs)}
               ></span>
