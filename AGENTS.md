@@ -8,10 +8,13 @@ Make the smallest correct change with the least ceremony.
 
 1. current user request
 2. `AGENTS.md`
-3. `DESIGN.md`
-4. relevant code/tests
+3. `.agents/architecture.md` (mandatory module boundaries)
+4. `DESIGN.md`
+5. relevant code/tests
 
 Do not create per-task planning documents.
+
+**No unsolicited refactoring:** A feature request authorizes implementation in its existing owner, not reorganization of unrelated code. Do not rename, relocate, split, or rewrite working modules for architectural cleanliness unless the user explicitly requests that refactor. Apply these boundaries correctly to every new feature from the first commit.
 
 ## Workflow
 
@@ -71,6 +74,19 @@ Prefer deleting dead scaffold over preserving hypothetical architecture.
 
 **Mandatory:** Before developing or refactoring any feature, read [`.agents/architecture.md`](.agents/architecture.md), then follow its dependency rules and `DESIGN.md`. Treat them as code-review and CI contracts, not suggestions.
 
+**Strict feature layout — REQUIRED for every implemented feature** (`src/lib/modules/<feature>/`):
+
+```text
+<feature>/
+├── <Feature>Workspace.svelte  # route-facing composition
+├── core/                     # pure TypeScript domain behavior
+├── adapters/                 # browser/external integrations
+├── controller/               # per-instance Svelte state + orchestration
+└── components/               # feature-specific UI
+```
+
+Do not put `trainer.ts`, `timer.ts`, `session.ts`, persistence, sound code, other business logic, or a feature controller at the feature root or inside a `+page.svelte` route. The root is reserved for the workspace entry component. No alternative `hooks/`, `services/`, `lib/`, `utils/`, or speculative layering that bypasses these ownership categories. A coming-soon placeholder is **not** an implemented feature; do not generate empty scaffolds for it.
+
 Feature development checklist:
 
 1. Identify the owning domain and choose the smallest change.
@@ -83,7 +99,9 @@ Feature development checklist:
 5. Centralize state types, maintain local-first storage/protocol compatibility, and test regressions before changing contracts.
 6. Add/update boundary tests for architectural changes; don't silence tests.
 7. Run `bun run check`, `bun run test`, and `bun run build`, and verify final CI.
-8. Update `.agents/architecture.md` and `DESIGN.md` when rules legitimately change.
+8. When implementing a new feature, use the prescribed folders from day one; no post-implementation "folder cleanup" phase.
+9. Do not refactor or relocate existing features without an explicit user request; keep each change within its feature boundary.
+10. Update `.agents/architecture.md` and `DESIGN.md` only when the user explicitly changes the architectural or visual contract.
 
 
 ```text

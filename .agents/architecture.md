@@ -2,6 +2,23 @@
 
 Mandatory for all feature development. Follow this file with `AGENTS.md` and `DESIGN.md`.
 
+## Non-negotiable feature folder contract
+
+For every **implemented** module under `src/lib/modules/<feature>/`, use this canonical layout from the start:
+
+```text
+<feature>/
+├── <Feature>Workspace.svelte      # the only root-level implementation file
+├── core/                         # pure domain algorithms, state transitions, types
+├── adapters/                     # browser storage, audio, file APIs and transports
+├── controller/                   # per-mounted-view *.svelte.ts state factory
+└── components/                   # feature-specific Svelte UI
+```
+
+All four directories must be used for an implemented module. Do not flatten a module, introduce alternate responsibility buckets or put feature business logic at the module root. The workspace is presentation composition, not a place for new business orchestration. Routes delegate to the workspace and stay thin. Reusable design primitives remain in `src/lib/components/ui/`. Placeholder routes (`coming-soon`) do **not** justify speculative modules or empty scaffolding.
+
+**No automatic refactoring:** When adding or updating a feature, use its established owners and only touch files necessary to deliver that feature. Do not reorganize existing code, split large files, rename modules or initiate cross-feature cleanup without the user's explicit refactoring request. Fix a boundary violation in newly written code before merging; if a legacy violation blocks a requested change, explain the smallest necessary adjustment rather than starting a broad refactor.
+
 ## Dependency direction
 
 ```text
@@ -25,7 +42,7 @@ Presentation triggers controller actions; controllers call pure functions and ad
 - `src/lib/modules/pomodoro/adapters/{persistence,activity-storage,focus-protection,sounds,wake-lock}.ts`: feature-owned browser/integration code. Adapters may import `../core/` for types and pure algorithms.
 - `src/lib/modules/typing/core/{trainer,session}.ts`: pure learning, keyboard statistics, drill text and scoring behavior.
 - `src/lib/modules/typing/adapters/{persistence,sounds}.ts`: localStorage and browser audio. Adapters may depend on `../core/` only, not UI or controller.
-- `src/lib/modules/<feature>/*.ts`: future small features may start flat, but use the same dependency direction; add `core/` and `adapters/` once boundaries exist rather than creating empty folders.
+- `src/lib/modules/<feature>/`: never place loose `.ts` or extra UI files at this root. Only `<Feature>Workspace.svelte` belongs here; implemented modules must already use `core/`, `adapters/`, `controller/`, and `components/`.
 - Pure domain modules: deterministic state transitions, calculations and validation. No `window`, `document`, `localStorage`, `indexedDB`, `chrome`, Svelte components or external API calls.
 - Feature-owned adapters: browser storage, audio, notifications and extension transport; no imports from controllers or views.
 - `src/lib/components/ui/**`: generic shadcn primitives. No domain or feature imports.
@@ -74,7 +91,8 @@ Typing key-event orchestration, session state, saving and audio lifecycle belong
 4. Do not change storage keys, snapshot formats, extension messages or APIs in structural refactors without migration/compatibility tests.
 5. Preserve accessibility, keyboard navigation, SSR correctness and local-first privacy.
 6. Add regression and architectural tests for observed risks. Never suppress CI failures to complete a refactor.
-7. Prefer gradual extraction over replacing an entire working feature.
+7. No drive-by refactoring or extraction. New code belongs in the correct boundary immediately; existing code remains in place unless an explicit refactor is requested.
+8. For any new implemented feature, add/update architecture tests to cover its structural and import boundaries; structural violations must fail CI.
 
 ## Mandatory workflow
 
@@ -91,4 +109,4 @@ bun run build
 
 Verify the latest GitHub Actions result before reporting success.
 
-Current boundary contract: Pomodoro and Typing both use feature-owned workspace + per-instance controller + pure core + browser adapters; small future features can start flat until they need explicit grouping.
+Current boundary contract: Pomodoro and Typing follow the same mandatory structure. Every new implemented module follows it immediately, with no later refactor phase. CI enforces layout and import direction for all modules, not just named legacy features.
