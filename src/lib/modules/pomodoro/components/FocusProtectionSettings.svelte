@@ -77,10 +77,10 @@
 </script>
 
 {#if view === 'summary'}
-  <div class="mt-4 border-t pt-4">
-    <div class="mb-1 text-meta font-medium text-muted-foreground">Focus protection</div>
+  <div class="min-w-0">
+    <h3 class="mb-2 text-ui font-medium">Focus protection</h3>
 
-    <div class="flex h-10 w-full items-center justify-between gap-4 px-1 text-meta">
+    <div class="flex min-h-10 w-full items-center justify-between gap-4 px-1 text-ui">
       <span>Block distracting websites</span>
       <Switch
         checked={enabled}
@@ -92,7 +92,7 @@
 
     <Button
       variant="ghost"
-      class="flex h-10 w-full items-center justify-between rounded-full px-1 text-meta font-normal"
+      class="flex h-10 w-full items-center justify-between rounded-full px-1 text-ui font-normal"
       onclick={onManage}
     >
       <span>Blocked websites</span>
