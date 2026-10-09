@@ -1142,7 +1142,9 @@
       onGoalChange={updateGoal}
     />
   {:else}
-    <div class="w-full min-w-0 text-left">
+    <div class={settingsPanel === 'main'
+      ? 'w-full min-w-0 text-left'
+      : 'mx-auto w-full max-w-[680px] min-w-0 rounded-[20px] border border-border bg-card p-5 text-left'}>
       <div class="mb-6 flex min-h-8 items-center gap-1">
         {#if settingsPanel !== 'main'}
           <Button
