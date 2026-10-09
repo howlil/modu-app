@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 const sources = {
   ...import.meta.glob<string>('../../src/lib/modules/**/*.{ts,svelte}', { eager: true, query: '?raw', import: 'default' }),
   ...import.meta.glob<string>('../../src/lib/components/ui/**/*.{ts,svelte}', { eager: true, query: '?raw', import: 'default' }),
-  ...import.meta.glob<string>('../../src/routes/pomodoro/+page.svelte', { eager: true, query: '?raw', import: 'default' }),
+  ...import.meta.glob<string>('../../src/routes/{pomodoro,typing}/+page.svelte', { eager: true, query: '?raw', import: 'default' }),
   ...import.meta.glob<string>('../../extension/content-bridge.js', { eager: true, query: '?raw', import: 'default' })
 };
 
@@ -30,12 +30,19 @@ describe('Module boundary rules', () => {
     expect(route).not.toMatch(/\$state\s*\(|\bonMount\s*\(|\blocalStorage\b|\bindexedDB\b/);
   });
 
+  it('keeps the Typing route thin and composed through its feature workspace', () => {
+    const route = read('src/routes/typing/+page.svelte');
+    expect(route).toContain('TypingWorkspace');
+    expect(route.split('\n').length).toBeLessThan(35);
+    expect(route).not.toMatch(/\$state\s*\(|\bonMount\s*\(|\blocalStorage\b|\baddEventListener\b/);
+  });
+
   it('keeps pure domain transitions browser-free', () => {
     for (const file of [
       'src/lib/modules/pomodoro/core/timer.ts',
       'src/lib/modules/pomodoro/core/activity.ts',
-      'src/lib/modules/typing/trainer.ts',
-      'src/lib/modules/typing/session.ts'
+      'src/lib/modules/typing/core/trainer.ts',
+      'src/lib/modules/typing/core/session.ts'
     ]) {
       const source = read(file);
       expect(source, file).not.toMatch(/\b(localStorage|indexedDB|window|document|AudioContext|chrome)\b/);
@@ -94,6 +101,45 @@ describe('Module boundary rules', () => {
     }
     expect(read('src/lib/modules/pomodoro/controller/pomodoro.svelte.ts'))
       .toContain('#lib/modules/pomodoro/adapters/activity-storage.ts');
+  });
+
+  it('keeps Typing domain, adapters, and presentation separated', () => {
+    const core = [
+      'src/lib/modules/typing/core/trainer.ts',
+      'src/lib/modules/typing/core/session.ts'
+    ];
+    const adapters = [
+      'src/lib/modules/typing/adapters/persistence.ts',
+      'src/lib/modules/typing/adapters/sounds.ts'
+    ];
+    const oldPaths = ['trainer', 'session', 'persistence', 'sounds']
+      .map((name) => 'src/lib/modules/typing/' + name + '.ts');
+
+    for (const file of [...core, ...adapters]) expect(read(file), file).toBeTruthy();
+    for (const file of oldPaths) {
+      expect(sourceFiles('src/lib/modules/typing').some((source) => source.endsWith('/' + file)), file).toBe(false);
+    }
+
+    for (const file of core) {
+      const text = read(file);
+      expect(importedPaths(text), file).not.toContainEqual(expect.stringMatching(/adapters|controller|components|server|routes/));
+      expect(text, file).not.toMatch(/\b(localStorage|indexedDB|window|document|AudioContext|chrome)\b/);
+    }
+    for (const file of adapters) {
+      expect(importedPaths(read(file)), file).not.toContainEqual(expect.stringMatching(/\/components\/|\/controller\/|\.svelte(?:\.ts)?$/));
+    }
+
+    const controller = read('src/lib/modules/typing/controller/typing.svelte.ts');
+    const workspace = read('src/lib/modules/typing/TypingWorkspace.svelte');
+    expect(controller).toContain('export function createTypingController()');
+    expect(controller).not.toMatch(/export const controller\s*=|import .*\.svelte['"]/);
+    expect(workspace).toContain('const controller = createTypingController()');
+    expect(workspace).toContain('bind:value={controller.primaryTab}');
+    expect(workspace).toContain('bind:this={controller.trainingSurface}');
+    expect(controller).toContain("window.addEventListener('keydown', handleKeyDown)");
+    for (const file of sourceFiles('src/lib/modules/typing')) {
+      expect(importedPaths(read(file)), file).not.toContainEqual(expect.stringMatching(/\.\.\/(?:trainer|session|sounds|persistence)\.ts$/));
+    }
   });
 
   it('keeps browser and extension bridge message labels aligned', () => {

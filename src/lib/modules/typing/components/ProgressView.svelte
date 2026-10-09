@@ -5,7 +5,7 @@
     weakTransitions,
     type TypingLearningState,
     type TypingPreferences
-  } from '../trainer.ts';
+  } from '../core/trainer.ts';
 
   let { learningState, preferences }: {
     learningState: TypingLearningState;

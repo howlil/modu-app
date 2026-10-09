@@ -1,4 +1,4 @@
-import type { TypingLearningState, TypingPreferences } from './trainer.ts';
+import type { TypingLearningState, TypingPreferences } from '../core/trainer.ts';
 
 const STATE_KEY = 'module-typing-state-v1';
 const PREFERENCES_KEY = 'module-typing-preferences-v1';

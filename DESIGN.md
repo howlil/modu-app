@@ -345,6 +345,14 @@ Pomodoro module contract:
 - Do not add a footer beneath the Timer cards repeating the focus/rest cycle or today's total (such as `Focus → Rest → Repeat · 2h 15m recorded today`)
 - keep the interface light-weight and free of task-management or heavy analytics scope
 
+### Typing implementation boundaries
+
+- `src/routes/typing/+page.svelte` is a thin route entrypoint delegating to `TypingWorkspace.svelte`.
+- `src/lib/modules/typing/TypingWorkspace.svelte` owns tab composition and typing/drill presentation, reusing `components/ProgressView.svelte` and `components/SettingsView.svelte`.
+- `controller/typing.svelte.ts` creates state per workspace and orchestrates keyboard input, training transitions, persistence, sound and cleanup. No global mutable Svelte 5 controller instance.
+- `core/trainer.ts` and `core/session.ts` own pure learning algorithms, evaluation and metrics; `adapters/persistence.ts` and `adapters/sounds.ts` own browser side effects. Never have core import adapter or presentation code.
+- Preserve persisted v1 keys, drill generation and strict-correction semantics when changing boundaries. The Pomodoro/Typing separation is enforced by architecture tests and `.agents/architecture.md`.
+
 ## 7. Typing module contract
 
 Typing is an adaptive muscle-memory trainer, not only a WPM test.

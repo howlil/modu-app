@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   disposeTypingAudio,
   playTypingKeySound
-} from '../../../src/lib/modules/typing/sounds.ts';
+} from '../../../src/lib/modules/typing/adapters/sounds.ts';
 
 class FakeAudioContext {
   static instances: FakeAudioContext[] = [];

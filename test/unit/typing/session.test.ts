@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateTypingMetrics, evaluateTypingInput } from '../../../src/lib/modules/typing/session.ts';
+import { calculateTypingMetrics, evaluateTypingInput } from '../../../src/lib/modules/typing/core/session.ts';
 
 describe('typing session boundary', () => {
   it('does not advance on a wrong character in strict mode', () => {

@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   loadTypingSnapshot,
   saveTypingSnapshot
-} from '../../../src/lib/modules/typing/persistence.ts';
-import { DEFAULT_TYPING_PREFERENCES, createInitialTypingState } from '../../../src/lib/modules/typing/trainer.ts';
+} from '../../../src/lib/modules/typing/adapters/persistence.ts';
+import { DEFAULT_TYPING_PREFERENCES, createInitialTypingState } from '../../../src/lib/modules/typing/core/trainer.ts';
 
 afterEach(() => vi.unstubAllGlobals());
 

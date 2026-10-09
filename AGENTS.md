@@ -77,7 +77,9 @@ Feature development checklist:
 2. Keep `+page.svelte` and `+server.ts` focused on entrypoint/composition, not lengthy workflows.
 3. Put feature-specific views in `modules/<feature>/components`; per-instance Svelte 5 orchestration belongs in `controller/*.svelte.ts`.
 4. Keep pure logic deterministic and independent of UI/browser/server adapters. Never import another feature's private code.
-   - Pomodoro explicitly uses `core/` (timer/activity), `adapters/` (persistence/storage/focus-protection/sound/wake-lock), `controller/` and `components/`; do not move integration code back into `core/` or the feature root.
+   - Pomodoro uses `core/` (timer/activity), `adapters/` (persistence/storage/protection/audio/wake-lock), `controller/` and `components/`.
+   - Typing uses `core/` (trainer/session), `adapters/` (persistence/sounds), `controller/` and `components/`.
+   - Do not restore former root-level feature files, move adapters into `core/`, or move workflow logic into `+page.svelte`.
 5. Centralize state types, maintain local-first storage/protocol compatibility, and test regressions before changing contracts.
 6. Add/update boundary tests for architectural changes; don't silence tests.
 7. Run `bun run check`, `bun run test`, and `bun run build`, and verify final CI.

@@ -10,7 +10,7 @@ import {
   syncRetention,
   weakKeys,
   weakTransitions
-} from '../../../src/lib/modules/typing/trainer.ts';
+} from '../../../src/lib/modules/typing/core/trainer.ts';
 
 describe('typing learner', () => {
   it('tracks key accuracy, latency and adjacent transitions', () => {

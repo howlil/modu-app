@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button/index.js';
   import { Switch } from '$lib/components/ui/switch/index.js';
-  import type { TypingPreferences } from '../trainer.ts';
+  import type { TypingPreferences } from '../core/trainer.ts';
 
   let { preferences, audioUnavailable, onTogglePreference, onPreviewSound }: {
     preferences: TypingPreferences;

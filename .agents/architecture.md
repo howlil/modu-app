@@ -23,7 +23,9 @@ Presentation triggers controller actions; controllers call pure functions and ad
 - `src/lib/modules/<feature>/controller/*.svelte.ts`: Svelte 5 factory invoked once per mounted workspace. Do not export singleton mutable `$state` (SSR/shared state hazard). Own session orchestration and side-effect coordination.
 - `src/lib/modules/pomodoro/core/{timer,activity}.ts`: deterministic state machines, aggregations and calculations. This folder never re-exports storage or imports browser adapters.
 - `src/lib/modules/pomodoro/adapters/{persistence,activity-storage,focus-protection,sounds,wake-lock}.ts`: feature-owned browser/integration code. Adapters may import `../core/` for types and pure algorithms.
-- `src/lib/modules/<feature>/*.ts`: other small features may stay flat; create `core/` and `adapters/` only when the boundary already exists in the feature.
+- `src/lib/modules/typing/core/{trainer,session}.ts`: pure learning, keyboard statistics, drill text and scoring behavior.
+- `src/lib/modules/typing/adapters/{persistence,sounds}.ts`: localStorage and browser audio. Adapters may depend on `../core/` only, not UI or controller.
+- `src/lib/modules/<feature>/*.ts`: future small features may start flat, but use the same dependency direction; add `core/` and `adapters/` once boundaries exist rather than creating empty folders.
 - Pure domain modules: deterministic state transitions, calculations and validation. No `window`, `document`, `localStorage`, `indexedDB`, `chrome`, Svelte components or external API calls.
 - Feature-owned adapters: browser storage, audio, notifications and extension transport; no imports from controllers or views.
 - `src/lib/components/ui/**`: generic shadcn primitives. No domain or feature imports.
@@ -48,6 +50,21 @@ core -> (no adapters or UI)
 ```
 
 When editing Pomodoro: never recreate root-level `timer.ts`, `activity.ts`, `persistence.ts`, `activity-storage.ts`, `focus-protection.ts`, `sounds.ts`, or `wake-lock.ts`. Update imports and the architecture test when making a deliberate boundary adjustment.
+
+## Typing dependency map
+
+```text
+routes/typing/+page.svelte
+  -> TypingWorkspace.svelte
+     -> components/ProgressView, SettingsView
+     -> controller/typing.svelte.ts
+        -> core/trainer.ts, core/session.ts
+        -> adapters/persistence.ts, sounds.ts
+adapters -> core
+core -> (no adapters or UI)
+```
+
+Typing key-event orchestration, session state, saving and audio lifecycle belong in the per-workspace controller. Character, keyboard and feedback rendering stay in the workspace/components. Preserve `module-typing-*-v1` storage keys, strict correction, lesson selection, drill progression, audio disposal and keyboard shortcuts. Do not recreate root-level `trainer.ts`, `session.ts`, `persistence.ts` or `sounds.ts`.
 
 ## Code quality
 
@@ -74,4 +91,4 @@ bun run build
 
 Verify the latest GitHub Actions result before reporting success.
 
-Current known debt: the Typing route still owns presentation and workflow state; extract its feature controller when changing that subsystem, without rewriting the algorithm just to satisfy a directory template.
+Current boundary contract: Pomodoro and Typing both use feature-owned workspace + per-instance controller + pure core + browser adapters; small future features can start flat until they need explicit grouping.
