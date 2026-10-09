@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizePomodoroSnapshot } from '../../../src/lib/modules/pomodoro/persistence.ts';
+import { normalizePomodoroSnapshot } from '../../../src/lib/modules/pomodoro/adapters/persistence.ts';
 
 describe('pomodoro snapshot restoration', () => {
   it('restores saved preferences and clamps out-of-range values', () => {

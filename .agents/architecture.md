@@ -21,13 +21,33 @@ Presentation triggers controller actions; controllers call pure functions and ad
 - `src/routes/**`: SvelteKit URL and API entrypoints. Do not implement feature state machines, browser persistence, or long interaction workflows in page routes.
 - `src/lib/modules/<feature>/components/**`: feature-only UI; no cross-feature private imports. Use shared UI primitives from `src/lib/components/ui/**`.
 - `src/lib/modules/<feature>/controller/*.svelte.ts`: Svelte 5 factory invoked once per mounted workspace. Do not export singleton mutable `$state` (SSR/shared state hazard). Own session orchestration and side-effect coordination.
-- `src/lib/modules/<feature>/*.ts`: keep small features flat. Introduce `core/` and `adapters/` only when the existing module genuinely benefits.
+- `src/lib/modules/pomodoro/core/{timer,activity}.ts`: deterministic state machines, aggregations and calculations. This folder never re-exports storage or imports browser adapters.
+- `src/lib/modules/pomodoro/adapters/{persistence,activity-storage,focus-protection,sounds,wake-lock}.ts`: feature-owned browser/integration code. Adapters may import `../core/` for types and pure algorithms.
+- `src/lib/modules/<feature>/*.ts`: other small features may stay flat; create `core/` and `adapters/` only when the boundary already exists in the feature.
 - Pure domain modules: deterministic state transitions, calculations and validation. No `window`, `document`, `localStorage`, `indexedDB`, `chrome`, Svelte components or external API calls.
 - Feature-owned adapters: browser storage, audio, notifications and extension transport; no imports from controllers or views.
 - `src/lib/components/ui/**`: generic shadcn primitives. No domain or feature imports.
 - `src/lib/platform/registry/**`: tool availability metadata only.
 - `src/lib/server/**`: server-only security, secrets, and service integrations. No client-side imports.
 - `extension/**`: separate Chromium runtime. Its messaging contract must be compatible with the web bridge.
+
+## Pomodoro dependency map
+
+```text
+routes/pomodoro/+page.svelte
+  -> PomodoroWorkspace.svelte
+     -> components/TimerView, ActivityView, SettingsView
+     -> controller/pomodoro.svelte.ts
+        -> core/timer.ts, core/activity.ts
+        -> adapters/persistence.ts, activity-storage.ts,
+           focus-protection.ts, sounds.ts, wake-lock.ts
+     -> components can import core types/calculations and adapter types
+        only when needed to render settings
+adapters -> core
+core -> (no adapters or UI)
+```
+
+When editing Pomodoro: never recreate root-level `timer.ts`, `activity.ts`, `persistence.ts`, `activity-storage.ts`, `focus-protection.ts`, `sounds.ts`, or `wake-lock.ts`. Update imports and the architecture test when making a deliberate boundary adjustment.
 
 ## Code quality
 

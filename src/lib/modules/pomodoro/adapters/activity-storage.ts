@@ -1,4 +1,4 @@
-import type { FocusActivitySession } from './activity.ts';
+import type { FocusActivitySession } from '../core/activity.ts';
 
 const DB_NAME = 'module-pomodoro-activity';
 const STORE_NAME = 'sessions';

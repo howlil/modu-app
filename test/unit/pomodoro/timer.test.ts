@@ -10,7 +10,7 @@ import {
   startTimer,
   switchMode,
   syncTimer
-} from '../../../src/lib/modules/pomodoro/timer.ts';
+} from '../../../src/lib/modules/pomodoro/core/timer.ts';
 
 describe('pomodoro timer', () => {
   it('derives running time from endsAt rather than decrementing state', () => {

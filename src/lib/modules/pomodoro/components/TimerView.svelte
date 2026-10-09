@@ -3,7 +3,7 @@
   import { Button } from '$lib/components/ui/button/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
   import * as Card from '$lib/components/ui/card/index.js';
-  import { getNextMode, type PomodoroMode } from '../timer.ts';
+  import { getNextMode, type PomodoroMode } from '../core/timer.ts';
   import { MODE_META, type PomodoroController } from '../controller/pomodoro.svelte.ts';
 
   let { controller }: { controller: PomodoroController } = $props();

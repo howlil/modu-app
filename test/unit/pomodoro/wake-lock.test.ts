@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createWakeLockController } from '../../../src/lib/modules/pomodoro/wake-lock.ts';
-import type { TimerStatus } from '../../../src/lib/modules/pomodoro/timer.ts';
+import { createWakeLockController } from '../../../src/lib/modules/pomodoro/adapters/wake-lock.ts';
+import type { TimerStatus } from '../../../src/lib/modules/pomodoro/core/timer.ts';
 
 afterEach(() => vi.unstubAllGlobals());
 

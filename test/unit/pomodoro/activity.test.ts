@@ -11,7 +11,7 @@ import {
   sessionsForDate,
   sessionsToCsv,
   type FocusActivitySession
-} from '../../../src/lib/modules/pomodoro/activity.ts';
+} from '../../../src/lib/modules/pomodoro/core/activity.ts';
 
 function session(
   id: string,

@@ -1,4 +1,4 @@
-import type { TimerStatus } from './timer.ts';
+import type { TimerStatus } from '../core/timer.ts';
 
 /** Browser lifecycle integration; the Pomodoro route owns the policy callbacks. */
 export function createWakeLockController(

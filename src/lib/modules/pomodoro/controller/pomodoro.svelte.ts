@@ -1,16 +1,13 @@
 import { onMount, tick } from 'svelte';
-  import { createWakeLockController } from '#lib/modules/pomodoro/wake-lock.ts';
+  import { createWakeLockController } from '#lib/modules/pomodoro/adapters/wake-lock.ts';
+  import { clearFocusSessions, loadFocusSessions, saveFocusSession, saveFocusSessions } from '#lib/modules/pomodoro/adapters/activity-storage.ts';
   import {
-    clearFocusSessions,
-    loadFocusSessions,
     localDateKey,
     migrateLegacySessions,
-    saveFocusSession,
-    saveFocusSessions,
     type FocusActivitySession,
     type GoalSchedule,
     type LegacyFocusSession
-  } from '#lib/modules/pomodoro/activity.ts';
+  } from '#lib/modules/pomodoro/core/activity.ts';
   import {
     normalizeBlocklist,
     pingFocusProtection,
@@ -20,14 +17,14 @@ import { onMount, tick } from 'svelte';
     syncFocusProtectionBlocklist,
     type FocusProtectionConnection,
     type FocusProtectionExtensionStatus
-  } from '#lib/modules/pomodoro/focus-protection.ts';
+  } from '#lib/modules/pomodoro/adapters/focus-protection.ts';
   import {
     DEFAULT_RINGTONE,
     RINGTONE_OPTIONS,
     isPomodoroRingtone,
     playPomodoroRingtone,
     type PomodoroRingtone
-  } from '#lib/modules/pomodoro/sounds.ts';
+  } from '#lib/modules/pomodoro/adapters/sounds.ts';
   import {
     createTimer,
     getNextMode,
@@ -39,7 +36,7 @@ import { onMount, tick } from 'svelte';
     syncTimer,
     type PomodoroMode,
     type TimerState
-  } from '#lib/modules/pomodoro/timer.ts';
+  } from '#lib/modules/pomodoro/core/timer.ts';
 
   import {
     readPomodoroSnapshot,
@@ -49,7 +46,7 @@ import { onMount, tick } from 'svelte';
     clampMinutes,
     clampGoalHours,
     type PomodoroPreferences
-  } from '#lib/modules/pomodoro/persistence.ts';
+  } from '#lib/modules/pomodoro/adapters/persistence.ts';
 
   type PomodoroView = 'timer' | 'activity' | 'settings';
   type SettingsPanel = 'main' | 'data';

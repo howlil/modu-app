@@ -42,14 +42,6 @@ export interface WeekSummary {
   scheduledGoalDays: number;
 }
 
-// Storage is feature-owned; keep these named exports for existing consumers.
-export {
-  saveFocusSession,
-  saveFocusSessions,
-  loadFocusSessions,
-  clearFocusSessions
-} from './activity-storage.ts';
-
 export function migrateLegacySessions(
   sessions: LegacyFocusSession[],
   goalMs: number

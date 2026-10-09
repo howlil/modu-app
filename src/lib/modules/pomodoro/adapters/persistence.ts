@@ -1,8 +1,8 @@
-import type { GoalSchedule, LegacyFocusSession } from './activity.ts';
-import type { PomodoroMode, TimerState } from './timer.ts';
+import type { GoalSchedule, LegacyFocusSession } from '../core/activity.ts';
+import type { PomodoroMode, TimerState } from '../core/timer.ts';
 import { DEFAULT_RINGTONE, isPomodoroRingtone, type PomodoroRingtone } from './sounds.ts';
 import { normalizeBlocklist } from './focus-protection.ts';
-import { createTimer, syncTimer } from './timer.ts';
+import { createTimer, syncTimer } from '../core/timer.ts';
 
 
 export const POMODORO_STORAGE_KEY = 'module-pomodoro-v2';

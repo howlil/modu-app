@@ -5,9 +5,9 @@
   import { Switch } from '$lib/components/ui/switch/index.js';
   import { Dialog } from '$lib/components/ui/dialog/index.js';
   import * as Card from '$lib/components/ui/card/index.js';
-  import { RINGTONE_OPTIONS } from '../sounds.ts';
-  import type { PomodoroMode } from '../timer.ts';
-  import type { PomodoroPreferences } from '../persistence.ts';
+  import { RINGTONE_OPTIONS } from '../adapters/sounds.ts';
+  import type { PomodoroMode } from '../core/timer.ts';
+  import type { PomodoroPreferences } from '../adapters/persistence.ts';
   import type { PomodoroController } from '../controller/pomodoro.svelte.ts';
   import FocusProtectionSettings from './FocusProtectionSettings.svelte';
 

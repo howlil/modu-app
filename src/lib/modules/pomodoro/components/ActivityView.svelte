@@ -14,7 +14,7 @@
     type FocusActivitySession,
     type GoalSchedule,
     type HeatmapDay
-  } from '#lib/modules/pomodoro/activity.ts';
+  } from '#lib/modules/pomodoro/core/activity.ts';
 
   type Props = {
     sessions: FocusActivitySession[];

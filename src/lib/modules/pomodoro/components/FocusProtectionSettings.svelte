@@ -6,7 +6,7 @@
   import {
     normalizeBlockedDomain,
     type FocusProtectionConnection
-  } from '#lib/modules/pomodoro/focus-protection.ts';
+  } from '#lib/modules/pomodoro/adapters/focus-protection.ts';
 
   type Props = {
     view?: 'summary' | 'manager';

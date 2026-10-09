@@ -3,7 +3,7 @@ import {
   clearPomodoroSnapshot,
   readPomodoroSnapshot,
   savePomodoroSnapshot
-} from '../../../src/lib/modules/pomodoro/persistence.ts';
+} from '../../../src/lib/modules/pomodoro/adapters/persistence.ts';
 
 afterEach(() => vi.unstubAllGlobals());
 

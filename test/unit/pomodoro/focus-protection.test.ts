@@ -4,7 +4,7 @@ import {
   isProtectedDomain,
   normalizeBlockedDomain,
   normalizeBlocklist
-} from '../../../src/lib/modules/pomodoro/focus-protection.ts';
+} from '../../../src/lib/modules/pomodoro/adapters/focus-protection.ts';
 
 describe('focus protection domains', () => {
   it('normalizes URLs to hostnames', () => {

@@ -266,7 +266,8 @@ UIArc remains a visual/interaction reference while its official implementation i
 - `src/lib/modules/pomodoro/PomodoroWorkspace.svelte` composes Timer, Activity, and Settings views.
 - `src/lib/modules/pomodoro/controller/pomodoro.svelte.ts` owns per-workspace Svelte 5 reactive state, session orchestration, local persistence, browser effects, and extension lifecycle. Never export a shared mutable instance.
 - `components/TimerView.svelte`, `ActivityView.svelte`, and `SettingsView.svelte` own presentation and user actions while retaining approved bento styling and accessible dialogs.
-- `timer.ts` and `activity.ts` remain pure feature domain functions. Storage and extension integrations remain feature-owned adapters; do not rewrite storage formats or protocol constants for folder cosmetics.
+- `core/timer.ts` and `core/activity.ts` are pure feature domain logic. `adapters/persistence.ts`, `adapters/activity-storage.ts`, `adapters/focus-protection.ts`, `adapters/sounds.ts`, and `adapters/wake-lock.ts` own browser integrations; the core must not re-export adapter functions.
+- Controller composes core and adapters; feature views use core types/calculations and controller APIs. Keep existing storage formats and extension protocol stable during structural refactors.
 - All future feature changes follow `.agents/architecture.md` and its enforced dependency rules.
 
 ## 6. Pomodoro module contract

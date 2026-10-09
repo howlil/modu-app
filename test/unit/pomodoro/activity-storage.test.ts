@@ -4,8 +4,8 @@ import {
   loadFocusSessions,
   saveFocusSession,
   saveFocusSessions
-} from '../../../src/lib/modules/pomodoro/activity-storage.ts';
-import type { FocusActivitySession } from '../../../src/lib/modules/pomodoro/activity.ts';
+} from '../../../src/lib/modules/pomodoro/adapters/activity-storage.ts';
+import type { FocusActivitySession } from '../../../src/lib/modules/pomodoro/core/activity.ts';
 
 function session(id: string, endedAt: number): FocusActivitySession {
   return {

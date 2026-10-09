@@ -4,7 +4,7 @@ import {
   DEFAULT_RINGTONE,
   RINGTONE_OPTIONS,
   isPomodoroRingtone
-} from '../../../src/lib/modules/pomodoro/sounds.ts';
+} from '../../../src/lib/modules/pomodoro/adapters/sounds.ts';
 
 describe('pomodoro ringtone options', () => {
   it('keeps the default ringtone valid', () => {
