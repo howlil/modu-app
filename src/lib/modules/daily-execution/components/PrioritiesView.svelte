@@ -2,7 +2,7 @@
   import { Plus, Play } from 'lucide-svelte';
   import { Button } from '$lib/components/ui/button/index.js';
   import { WORKSTREAM_NAMES, type Impact, type Workstream } from '../core/planning.ts';
-  import type { DailyExecutionController } from '../controller/daily-execution.svelte';
+  import type { DailyExecutionController } from '../controller/daily-execution.svelte.ts';
   let { controller }: { controller: DailyExecutionController } = $props();
   let showForm = $state(false);
   let title = $state('');
