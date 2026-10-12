@@ -1,7 +1,7 @@
 import { encodeImageToTarget, inspectImage, type EncodedImage, type ImageInfo } from '../adapters/browser-encoder.ts';
 import { MAX_TARGET_KB, MIN_TARGET_KB, targetBytesFromKB, type ImageOutputFormat } from '../core/target-size.ts';
 
-type CompressionStatus = 'idle' | 'inspecting' | 'ready' | 'processing' | 'complete' | 'over-target' | 'error';
+type CompressionStatus = 'idle' | 'inspecting' | 'ready' | 'processing' | 'complete' | 'quality-limited' | 'error';
 
 export function createImageCompressController() {
   let file = $state<File | null>(null);
@@ -112,7 +112,7 @@ export function createImageCompressController() {
       if (run !== revision) return;
       output = encoded;
       outputUrl = URL.createObjectURL(encoded.blob);
-      status = encoded.status === 'within-target' ? 'complete' : 'over-target';
+      status = encoded.status === 'within-target' ? 'complete' : 'quality-limited';
     } catch (cause) {
       if (run !== revision) return;
       error = cause instanceof Error ? cause.message : 'Compression failed.';

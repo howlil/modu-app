@@ -1,5 +1,8 @@
 export type ImageOutputFormat = 'image/jpeg' | 'image/webp';
 
+// A conservative encoder-parameter guardrail; NOT a validated visual quality metric.
+// Never use quality=0 as an automatic fallback for an impossible byte budget.
+export const MIN_ENCODER_QUALITY = 0.7;
 export const MIN_TARGET_KB = 10;
 export const MAX_TARGET_KB = 20_480;
 export const MAX_INPUT_BYTES = 100 * 1024 * 1024;
@@ -11,7 +14,7 @@ export interface EncodingCandidate {
 }
 
 export interface TargetSizeResult extends EncodingCandidate {
-  status: 'within-target' | 'over-target';
+  status: 'within-target' | 'quality-limited';
   attempts: number;
 }
 
@@ -35,10 +38,15 @@ export function formatBytes(bytes: number): string {
 export async function findTargetSize(
   encode: (quality: number) => Promise<Blob>,
   targetBytes: number,
-  onAttempt?: (attempts: number) => void
+  onAttempt?: (attempts: number) => void,
+  minimumQuality = MIN_ENCODER_QUALITY
 ): Promise<TargetSizeResult> {
   if (!Number.isSafeInteger(targetBytes) || targetBytes <= 0) {
     throw new Error('Invalid target size.');
+  }
+
+  if (!Number.isFinite(minimumQuality) || minimumQuality <= 0 || minimumQuality > 1) {
+    throw new Error('Invalid minimum encoder quality.');
   }
 
   let attempts = 0;
@@ -55,12 +63,12 @@ export async function findTargetSize(
     return { ...highest, attempts, status: 'within-target' };
   }
 
-  let best = await measure(0);
+  let best = await measure(minimumQuality);
   if (best.blob.size > targetBytes) {
-    return { ...best, attempts, status: 'over-target' };
+    return { ...best, attempts, status: 'quality-limited' };
   }
 
-  let low = 0;
+  let low = minimumQuality;
   let high = 1;
 
   for (let pass = 0; pass < 10 && high - low > 0.001; pass++) {

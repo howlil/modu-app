@@ -24,20 +24,34 @@ describe('image target-size controller', () => {
     const result = await findTargetSize(async (quality) => {
       calls++;
       return sizedBlob(4_000 + Math.floor(quality * 100_000));
-    }, 54_000);
+    }, 84_000);
     expect(result.status).toBe('within-target');
-    expect(result.blob.size).toBeLessThanOrEqual(54_000);
-    expect(result.quality).toBeGreaterThan(0.49);
-    expect(result.quality).toBeLessThanOrEqual(0.5);
+    expect(result.blob.size).toBeLessThanOrEqual(84_000);
+    expect(result.quality).toBeGreaterThan(0.79);
+    expect(result.quality).toBeLessThanOrEqual(0.8);
     expect(result.attempts).toBe(calls);
     expect(result.attempts).toBeLessThanOrEqual(12);
   });
 
-  it('reports an unreachable target instead of claiming success', async () => {
-    const result = await findTargetSize(async (quality) => sizedBlob(80_000 + Math.floor(quality * 10_000)), 50_000);
-    expect(result.status).toBe('over-target');
-    expect(result.blob.size).toBe(80_000);
-    expect(result.quality).toBe(0);
+  it('never drops below the quality safeguard for unreachable targets', async () => {
+    const tried: number[] = [];
+    const result = await findTargetSize(async (quality) => {
+      tried.push(quality);
+      return sizedBlob(80_000 + Math.floor(quality * 10_000));
+    }, 50_000);
+    expect(result.status).toBe('quality-limited');
+    expect(result.blob.size).toBe(87_000);
+    expect(result.quality).toBe(0.7);
+    expect(tried.every((quality) => quality >= 0.7)).toBe(true);
+  });
+
+  it('supports a stricter custom quality safeguard', async () => {
+    const result = await findTargetSize(
+      async (quality) => sizedBlob(10_000 + Math.floor(quality * 100_000)),
+      80_000, undefined, 0.8
+    );
+    expect(result.status).toBe('quality-limited');
+    expect(result.quality).toBe(0.8);
   });
 
   it('rejects invalid budgets and encoder failures', async () => {

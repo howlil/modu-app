@@ -167,11 +167,12 @@
             {formatBytes(controller.output.blob.size)} · Quality setting {Math.round(controller.output.quality * 100)}%
             · {controller.output.width} × {controller.output.height} px
           </p>
-        {:else if controller.status === 'over-target' && controller.output}
-          <p class="text-ui font-medium text-destructive">Target cannot be reached without resizing</p>
+        {:else if controller.status === 'quality-limited' && controller.output}
+          <p class="text-ui font-medium text-destructive">Target too small for the quality safeguard</p>
           <p class="mt-1 text-meta text-muted-foreground">
-            Smallest result at minimum encoder quality: {formatBytes(controller.output.blob.size)}.
-            Your dimensions are unchanged. You can use a larger target or download this result.
+            The encoder stopped before severe quality reduction. Result: {formatBytes(controller.output.blob.size)} at
+            quality setting {Math.round(controller.output.quality * 100)}%. Your resolution is unchanged.
+            Try a larger target or download this alternative.
           </p>
         {:else if controller.error}
           <p role="alert" class="text-ui text-destructive">{controller.error}</p>
@@ -184,7 +185,7 @@
         <div class="mt-5 border-t border-border pt-5">
           <Button class="w-full" onclick={controller.download}>
             <Download class="size-4" strokeWidth={1.8} />
-            {controller.status === 'over-target' ? 'Download best effort' : 'Download image'}
+            {controller.status === 'over-target' ? 'Download larger result' : 'Download image'}
           </Button>
         </div>
       {/if}
