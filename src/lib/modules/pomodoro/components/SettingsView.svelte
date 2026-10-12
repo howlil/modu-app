@@ -12,6 +12,7 @@
   import FocusProtectionSettings from './FocusProtectionSettings.svelte';
 
   let { controller }: { controller: PomodoroController } = $props();
+  let floatingExcludeDraft = $state('');
   const settingsPanel = $derived(controller.settingsPanel);
   const durations = $derived(controller.durations);
   const preferences = $derived(controller.preferences);
@@ -130,6 +131,55 @@
               <div class="flex min-h-9 items-center justify-between gap-2 border-t border-border pt-2 text-ui">
                 <span>Keep screen awake {#if !wakeLockSupported}<span class="text-meta text-muted-foreground">Unavailable</span>{/if}</span>
                 <Switch checked={preferences.keepAwake} aria-label="Keep screen awake" disabled={!wakeLockSupported} onclick={() => togglePreference('keepAwake')} />
+              </div>
+            </Card.Root>
+
+            <Card.Root class="col-span-12 gap-3 rounded-[20px] p-5 shadow-none">
+              <div>
+                <h3 class="m-0 text-ui font-medium">Floating focus</h3>
+                <p class="mt-1 text-meta text-muted-foreground">Keep your timer visible on websites while working.</p>
+              </div>
+              <div class="flex min-h-9 items-center justify-between gap-3 border-t border-border pt-2 text-ui">
+                <span>Show floating widget</span>
+                <Switch checked={controller.floatingSettings.enabled}
+                  disabled={!controller.companionConnected}
+                  aria-label="Show floating focus widget"
+                  onclick={() => controller.updateFloatingFocus({ enabled: !controller.floatingSettings.enabled })} />
+              </div>
+              <div class="flex min-h-9 items-center justify-between gap-3 border-t border-border pt-2 text-ui">
+                <span>Show active task</span>
+                <Switch checked={controller.floatingSettings.showTask}
+                  disabled={!controller.companionConnected}
+                  aria-label="Show active task on websites"
+                  onclick={() => controller.updateFloatingFocus({ showTask: !controller.floatingSettings.showTask })} />
+              </div>
+              {#if !controller.companionConnected}
+                <p class="text-meta text-muted-foreground">Install or reload the Modu extension to enable floating focus.</p>
+              {/if}
+              {#if controller.floatingError}
+                <p class="text-meta text-destructive">{controller.floatingError}</p>
+              {/if}
+              <div class="border-t border-border pt-3">
+                <label for="floating-exclusion" class="text-ui font-medium">Excluded websites</label>
+                <p class="mt-1 text-meta text-muted-foreground">The widget stays hidden on these domains.</p>
+                <div class="mt-3 flex items-center gap-2">
+                  <Input id="floating-exclusion" class="h-9 min-w-0 flex-1 rounded-lg"
+                    placeholder="example.com" bind:value={floatingExcludeDraft} />
+                  <Button size="sm" variant="outline" class="rounded-full"
+                    disabled={!controller.companionConnected || !floatingExcludeDraft.trim()}
+                    onclick={() => {
+                      const domain = floatingExcludeDraft.trim();
+                      controller.updateFloatingFocus({ excludedDomains: [...controller.floatingSettings.excludedDomains, domain] });
+                      floatingExcludeDraft = '';
+                    }}>Add</Button>
+                </div>
+                {#each controller.floatingSettings.excludedDomains as domain}
+                  <div class="mt-2 flex items-center justify-between gap-2 text-meta">
+                    <span class="truncate">{domain}</span>
+                    <Button size="icon-xs" variant="ghost" class="rounded-full" aria-label={'Remove ' + domain}
+                      onclick={() => controller.updateFloatingFocus({ excludedDomains: controller.floatingSettings.excludedDomains.filter((entry) => entry !== domain) })}><X class="size-3.5" /></Button>
+                  </div>
+                {/each}
               </div>
             </Card.Root>
 
