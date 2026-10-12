@@ -1,4 +1,5 @@
 import type { FocusTaskContext } from '#lib/shared/focus-sessions/types.ts';
+import { emptyFocusAccounting, restoreFocusAccounting, type FocusAccounting } from '../core/focus-accounting.ts';
 import type { GoalSchedule, LegacyFocusSession } from '../core/activity.ts';
 import type { PomodoroMode, TimerState } from '../core/timer.ts';
 import { DEFAULT_RINGTONE, isPomodoroRingtone, type PomodoroRingtone } from './sounds.ts';
@@ -27,6 +28,7 @@ export type PersistedPomodoroState = {
     blockedDomains?: string[];
   };
   sessionStartedAt?: number | null;
+  focusAccounting?: FocusAccounting;
   dailyGoalHours?: number;
   goalSchedule?: GoalSchedule;
   history?: LegacyFocusSession[];
@@ -78,6 +80,7 @@ export type RestoredPomodoroState = {
   goalSchedule: GoalSchedule;
   timer: TimerState;
   sessionStartedAt: number | null;
+  focusAccounting: FocusAccounting;
   focusText: string;
   linkedTask: FocusTaskContext | null;
   soundEnabled: boolean;
@@ -161,6 +164,14 @@ export function normalizePomodoroSnapshot(
     goalSchedule,
     timer,
     sessionStartedAt,
+    focusAccounting: restoreFocusAccounting(saved.focusAccounting) ?? (
+      timer.mode === 'focus' && ['running', 'paused', 'overtime'].includes(timer.status)
+        ? {
+            accumulatedMs: Math.max(0, Math.min(timer.durationMs, timer.durationMs - timer.remainingMs)),
+            runningSince: timer.status === 'running' ? now : null
+          }
+        : emptyFocusAccounting()
+    ),
     focusText: typeof saved.focusText === 'string' ? saved.focusText.slice(0, 80) : '',
     linkedTask: saved.linkedTask && typeof saved.linkedTask.id === 'string' && typeof saved.linkedTask.title === 'string' ? { id: saved.linkedTask.id, title: saved.linkedTask.title.slice(0, 120) } : null,
     soundEnabled: saved.soundEnabled !== false,
