@@ -50,6 +50,12 @@ Presentation triggers controller actions; controllers call pure functions and ad
 - `src/lib/server/**`: server-only security, secrets, and service integrations. No client-side imports.
 - `extension/**`: separate Chromium runtime. Its messaging contract must be compatible with the web bridge.
 
+## Daily Execution integration boundary
+
+`src/lib/modules/daily-execution/` follows the canonical workspace/core/adapters/controller/components layout. It owns the goal, tasks, capacity plan, completion evidence and review. It does not own focus timers.
+
+`src/lib/shared/focus-sessions/` owns the existing `module-pomodoro-activity` session storage contract, optional task IDs, and one-shot same-tab task handoff. Pomodoro retains the exclusive timer state machine and exposes its legacy activity-storage import as a compatibility facade. Daily Execution imports the shared session repository, never Pomodoro's private controllers/components or timer adapters. Do not add another focus-session collection, timer implementation, or heatmap to Daily Execution.
+
 ## Pomodoro dependency map
 
 ```text
