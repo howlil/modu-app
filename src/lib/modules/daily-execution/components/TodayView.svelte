@@ -41,7 +41,7 @@
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div>
         <div class="text-meta text-muted-foreground">DAILY CAPACITY</div>
-        <div class="mt-1 text-title-lg font-semibold">{controller.plannedMinutes / 60}h <span class="text-meta font-normal text-muted-foreground">work budget</span></div>
+        <div class="mt-1 text-title-lg font-semibold">{controller.minutesLabel(controller.plannedMinutes)} <span class="text-meta font-normal text-muted-foreground">work budget</span></div>
       </div>
       <div class="flex flex-wrap gap-1 rounded-full bg-muted p-1" role="group" aria-label="Daily capacity">
         {#each ['low','medium','high'] as mode}
