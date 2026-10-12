@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button/index.js';
   import * as Card from '$lib/components/ui/card/index.js';
-  import { WORKSTREAM_NAMES, type Workstream } from '../core/planning.ts';
+  import { WORKSTREAM_NAMES, localDayKey, type Workstream } from '../core/planning.ts';
   import type { DailyExecutionController } from '../controller/daily-execution.svelte.ts';
 
   let { controller }: { controller: DailyExecutionController } = $props();
@@ -16,10 +16,10 @@
     const date = new Date(session.endedAt);
     return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-') === controller.dayKey;
   }));
-  const todayDone = $derived(controller.state.tasks.filter((t) => t.status === 'done' && t.completedAt && new Date(t.completedAt).toLocaleDateString('en-CA') === controller.dayKey));
+  const todayDone = $derived(controller.state.tasks.filter((t) => t.status === 'done' && t.completedAt && localDayKey(t.completedAt) === controller.dayKey));
   const unassigned = $derived(controller.sessions.filter((s) => !s.taskId || !controller.state.tasks.some((t) => t.id === s.taskId)));
   $effect(() => {
-    if (controller.weekStart !== lastLoadedWeek) {
+    if (!controller.loading && controller.weekStart !== lastLoadedWeek) {
       lastLoadedWeek = controller.weekStart;
       const reflection = controller.state.reflections[controller.weekStart];
       outcome = reflection?.outcome ?? '';
