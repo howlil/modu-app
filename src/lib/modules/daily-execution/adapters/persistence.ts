@@ -29,7 +29,17 @@ export function readExecutionState(): ExecutionState {
       goal: typeof raw.goal === 'string' ? raw.goal : '',
       successCriteria: typeof raw.successCriteria === 'string' ? raw.successCriteria : '',
       tasks: validTasks,
-      plans: raw.plans && typeof raw.plans === 'object' ? raw.plans : {},
+      plans: raw.plans && typeof raw.plans === 'object'
+        ? Object.fromEntries(Object.entries(raw.plans).filter(([, plan]) => !!plan && typeof plan === 'object' && !!plan.allocations)
+          .map(([date, plan]) => [date, {
+            ...plan,
+            allocations: { ...plan.allocations, general: plan.allocations.general ?? 0 },
+            ...(plan.revision ? { revision: {
+              ...plan.revision,
+              remainingAllocations: { ...plan.revision.remainingAllocations, general: plan.revision.remainingAllocations.general ?? 0 }
+            } } : {})
+          }]))
+        : {},
       reflections: raw.reflections && typeof raw.reflections === 'object' ? raw.reflections : {},
       manualEntries: Array.isArray(raw.manualEntries) ? raw.manualEntries.filter((entry): entry is ManualWorkEntry => !!entry && typeof entry.id === 'string' && (entry.taskId === null || typeof entry.taskId === 'string') && Number.isFinite(entry.startedAt) && Number.isFinite(entry.endedAt) && entry.endedAt > entry.startedAt) : [],
       habit: raw.habit && typeof raw.habit === 'object' &&
