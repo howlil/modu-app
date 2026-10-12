@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 const sources = {
   ...import.meta.glob<string>('../../src/lib/modules/**/*.{ts,svelte}', { eager: true, query: '?raw', import: 'default' }),
   ...import.meta.glob<string>('../../src/lib/components/ui/**/*.{ts,svelte}', { eager: true, query: '?raw', import: 'default' }),
-  ...import.meta.glob<string>('../../src/routes/{pomodoro,typing}/+page.svelte', { eager: true, query: '?raw', import: 'default' }),
+  ...import.meta.glob<string>('../../src/routes/{pomodoro,typing,daily}/+page.svelte', { eager: true, query: '?raw', import: 'default' }),
   ...import.meta.glob<string>('../../extension/content-bridge.js', { eager: true, query: '?raw', import: 'default' })
 };
 
@@ -81,6 +81,13 @@ describe('Module boundary rules', () => {
     expect(route).toContain('PomodoroWorkspace');
     expect(route.split('\n').length).toBeLessThan(35);
     expect(route).not.toMatch(/\$state\s*\(|\bonMount\s*\(|\blocalStorage\b|\bindexedDB\b/);
+  });
+
+  it('keeps Daily Execution route thin and feature-owned', () => {
+    const route = read('src/routes/daily/+page.svelte');
+    expect(route).toContain('DailyExecutionWorkspace');
+    expect(route.split('\\n').length).toBeLessThan(35);
+    expect(route).not.toMatch(/\\$state\\s*\\(|\\bonMount\\s*\\(|\\blocalStorage\\b|\\bindexedDB\\b/);
   });
 
   it('keeps the Typing route thin and composed through its feature workspace', () => {
