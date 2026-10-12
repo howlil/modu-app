@@ -71,7 +71,7 @@ export function weeklyRecommendation(
       title: 'Practice ' + topic,
       reason: distinct.length + ' distinct assessment records identified ' + topic + ' as needing practice.',
       evidenceIds: ids, taskIds: distinct.flatMap((record) => record.taskId ? [record.taskId] : []),
-      sessionIds: [], workstream: 'interview', suggestedMinutes: 60,
+      sessionIds: [], workstream: distinct.map(record => tasks.find(task => task.id === record.taskId)?.workstream).find((stream): stream is Workstream => !!stream) ?? 'general', suggestedMinutes: 60,
       dataLimitations: 'Assessments are interpreted as recorded by their sources. No skill-mastery claim is inferred.',
       priority: 70
     });
