@@ -297,7 +297,7 @@ export function createDailyExecutionController() {
   function openFocus(task: ExecutionTask) {
     if (task.status !== 'ready') return;
     try {
-      writePendingFocusTask({ id: task.id, title: task.title });
+      writePendingFocusTask({ id: task.id, title: task.title, nextAction: task.checkpoint?.nextAction || task.nextAction });
       window.location.assign('/pomodoro?taskId=' + encodeURIComponent(task.id));
     } catch {
       error = 'Unable to open Pomodoro. Check browser storage permissions.';
