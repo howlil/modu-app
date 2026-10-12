@@ -11,7 +11,7 @@
   const snapshot = $derived(controller.intelligenceSnapshot(horizon));
   const insight = $derived(controller.weeklyInsight);
   const habit = $derived(controller.habitProgress);
-  const areas = Object.keys(WORKSTREAM_NAMES) as Workstream[];
+  const areas = $derived((Object.keys(WORKSTREAM_NAMES) as Workstream[]).filter(stream => snapshot.workstreamMs[stream] > 0));
   const fmt = (ms: number) => controller.minutesLabel(ms / 60_000);
   const chart = $derived.by(() => {
     const chunk = Math.ceil(snapshot.daily.length / 7);
@@ -72,6 +72,7 @@
       {/each}
     {/if}
   </section>
+  {#if areas.length > 0}
   <section class="rounded-[20px] border border-border bg-card p-5">
     <h3 class="text-title font-medium">Workstream distribution</h3>
     <div class="mt-4 grid gap-3">
@@ -86,6 +87,7 @@
     {#if snapshot.unassignedSessions}<p class="mt-3 text-meta text-muted-foreground">{snapshot.unassignedSessions} focus sessions are unassigned; their time remains in the overall total.</p>{/if}
     <p class="mt-3 text-meta text-muted-foreground">Attribution follows each task's current workstream; past workstream edits are not versioned.</p>
   </section>
+  {/if}
   {#if controller.state.habit.qualifyingWorkstreams.length > 0}
   <section class="rounded-[20px] border border-border bg-card p-5">
     <div class="flex items-center justify-between"><h3 class="text-title font-medium">Consistency</h3><Activity class="size-4 text-muted-foreground" /></div>
