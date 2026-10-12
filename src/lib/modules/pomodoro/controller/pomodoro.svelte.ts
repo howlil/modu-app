@@ -1,4 +1,5 @@
 import { onMount, tick } from 'svelte';
+import { elapsedFocus, emptyFocusAccounting, pauseFocus, resumeFocus, type FocusAccounting } from '../core/focus-accounting.ts';
 import { consumePendingFocusTask } from '#lib/shared/focus-sessions/context.ts';
 import type { FocusTaskContext } from '#lib/shared/focus-sessions/types.ts';
   import { createWakeLockController } from '#lib/modules/pomodoro/adapters/wake-lock.ts';
@@ -99,6 +100,10 @@ export function createPomodoroController() {
   let preferences = $state<PomodoroPreferences>({ ...DEFAULT_PREFERENCES });
   let timer = $state<TimerState>(createTimer('focus', DEFAULT_DURATIONS.focus * 60_000));
   let sessionStartedAt = $state<number | null>(null);
+  let focusAccounting = $state<FocusAccounting>(emptyFocusAccounting());
+  let partialDialogOpen = $state(false);
+  let partialIntent = $state<'reset' | 'switch' | 'skip'>('reset');
+  let partialTargetMode = $state<PomodoroMode>('focus');
   let focusText = $state('');
   let linkedTask = $state<FocusTaskContext | null>(null);
   let contextNotice = $state('');
@@ -221,6 +226,7 @@ export function createPomodoroController() {
         blockedDomains
       },
       sessionStartedAt,
+      focusAccounting,
       dailyGoalHours,
       goalSchedule
     });
@@ -238,6 +244,7 @@ export function createPomodoroController() {
       goalSchedule = restored.goalSchedule;
       timer = restored.timer;
       sessionStartedAt = restored.sessionStartedAt;
+      focusAccounting = restored.focusAccounting;
       focusText = restored.focusText;
       linkedTask = restored.linkedTask;
       focusDraft = restored.focusText;
@@ -462,7 +469,7 @@ export function createPomodoroController() {
       startedAt: sessionStartedAt ?? endedAt - actualDurationMs,
       endedAt,
       plannedDurationMs,
-      actualDurationMs: Math.max(plannedDurationMs, actualDurationMs),
+      actualDurationMs: Math.max(0, actualDurationMs),
       overtimeMs: Math.max(0, overtimeDurationMs),
       label: focusText.trim(),
       taskId: linkedTask?.id ?? null,
@@ -471,7 +478,8 @@ export function createPomodoroController() {
     };
 
     sessionStartedAt = null;
-    activitySessions = [session, ...activitySessions].sort((a, b) => b.endedAt - a.endedAt);
+    focusAccounting = emptyFocusAccounting();
+    activitySessions = [session, ...activitySessions.filter((item) => item.id !== session.id)].sort((a, b) => b.endedAt - a.endedAt);
     void saveFocusSession(session);
     persist();
   }
@@ -482,18 +490,56 @@ export function createPomodoroController() {
     const overtimeDurationMs = getOvertimeMs(timer);
     recordFocusSession(
       timer.durationMs,
-      timer.durationMs + overtimeDurationMs,
+      Math.max(timer.durationMs, focusAccounting.accumulatedMs) + overtimeDurationMs,
       overtimeDurationMs
     );
   }
 
-  function switchPomodoroMode(mode: PomodoroMode) {
-    finalizeOvertimeSession();
-    timer = switchMode(timer, mode, durationMs(mode));
+  function applyTimerExit(mode: PomodoroMode | null) {
+    if (timer.status === 'overtime') finalizeOvertimeSession();
+    timer = mode === null ? resetTimer(timer) : switchMode(timer, mode, durationMs(mode));
     sessionStartedAt = null;
+    focusAccounting = emptyFocusAccounting();
+    partialDialogOpen = false;
     void syncWakeLock();
     void syncFocusProtection(timer);
     persist();
+  }
+
+  function hasPartialFocus() {
+    if (timer.mode !== 'focus' || !['running', 'paused'].includes(timer.status)) return false;
+    return elapsedFocus(focusAccounting, Date.now(), timer.status === 'running' ? timer.endsAt : null) >= 1000;
+  }
+
+  function requestExit(intent: 'reset' | 'switch' | 'skip', mode: PomodoroMode = 'focus') {
+    if (hasPartialFocus()) {
+      if (timer.status === 'running') pause();
+      partialIntent = intent;
+      partialTargetMode = mode;
+      partialDialogOpen = true;
+      return;
+    }
+    applyTimerExit(intent === 'reset' ? null : intent === 'skip' ? getNextMode(timer) : mode);
+  }
+
+  function resolvePartial(save: boolean) {
+    if (!partialDialogOpen) return;
+    if (save && timer.mode === 'focus') {
+      const active = elapsedFocus(focusAccounting, Date.now());
+      if (active >= 1000) recordFocusSession(timer.durationMs, active, 0);
+    }
+    const target = partialIntent === 'reset' ? null
+      : partialIntent === 'skip' ? getNextMode(timer) : partialTargetMode;
+    applyTimerExit(target);
+    contextNotice = save ? 'Partial focus saved. You can add a checkpoint in Daily Execution.' : 'Partial focus discarded.';
+  }
+
+  function cancelPartial() {
+    partialDialogOpen = false;
+  }
+
+  function switchPomodoroMode(mode: PomodoroMode) {
+    requestExit('switch', mode);
   }
 
   function start() {
@@ -501,14 +547,18 @@ export function createPomodoroController() {
       sessionStartedAt = Date.now();
     }
 
-    timer = startTimer(timer, Date.now());
+    const now = Date.now();
+    if (timer.mode === 'focus') focusAccounting = resumeFocus(focusAccounting, now);
+    timer = startTimer(timer, now);
     void syncWakeLock();
     void syncFocusProtection(timer);
     persist();
   }
 
   function pause() {
-    timer = pauseTimer(timer, Date.now());
+    const now = Date.now();
+    if (timer.mode === 'focus') focusAccounting = pauseFocus(focusAccounting, now, timer.endsAt);
+    timer = pauseTimer(timer, now);
     void syncWakeLock();
     void syncFocusProtection(timer);
     persist();
@@ -517,8 +567,10 @@ export function createPomodoroController() {
   function startNextMode() {
     const nextMode = getNextMode(timer);
     timer = switchMode(timer, nextMode, durationMs(nextMode));
-    sessionStartedAt = nextMode === 'focus' ? Date.now() : null;
-    timer = startTimer(timer, Date.now());
+    const now = Date.now();
+    sessionStartedAt = nextMode === 'focus' ? now : null;
+    focusAccounting = nextMode === 'focus' ? resumeFocus(emptyFocusAccounting(), now) : emptyFocusAccounting();
+    timer = startTimer(timer, now);
     void syncWakeLock();
     void syncFocusProtection(timer);
     persist();
@@ -545,16 +597,11 @@ export function createPomodoroController() {
   }
 
   function handleReset() {
-    finalizeOvertimeSession();
-    timer = resetTimer(timer);
-    sessionStartedAt = null;
-    void syncWakeLock();
-    void syncFocusProtection(timer);
-    persist();
+    requestExit('reset');
   }
 
   function handleSkip() {
-    switchPomodoroMode(getNextMode(timer));
+    requestExit('skip');
   }
 
   function handleTick() {
@@ -572,6 +619,7 @@ export function createPomodoroController() {
     timer = nextTimer;
 
     if (previousTimer.status === 'running' && nextTimer.status === 'overtime') {
+      if (previousTimer.mode === 'focus') focusAccounting = pauseFocus(focusAccounting, clockNow, previousTimer.endsAt);
       announceCompletion();
       void syncWakeLock();
       void syncFocusProtection(nextTimer);
@@ -581,7 +629,8 @@ export function createPomodoroController() {
 
     if (previousTimer.status === 'running' && nextTimer.status === 'complete') {
       if (previousTimer.mode === 'focus') {
-        recordFocusSession(previousTimer.durationMs, previousTimer.durationMs, 0);
+        focusAccounting = pauseFocus(focusAccounting, clockNow, previousTimer.endsAt);
+        recordFocusSession(previousTimer.durationMs, focusAccounting.accumulatedMs, 0);
       }
 
       announceCompletion();
@@ -717,6 +766,7 @@ export function createPomodoroController() {
     preferences = { ...DEFAULT_PREFERENCES };
     timer = createTimer('focus', DEFAULT_DURATIONS.focus * 60_000);
     sessionStartedAt = null;
+    focusAccounting = emptyFocusAccounting();
     focusText = '';
     focusDraft = '';
     focusEditing = false;
@@ -925,6 +975,9 @@ export function createPomodoroController() {
     get focusText() { return focusText; },
     get linkedTask() { return linkedTask; },
     get contextNotice() { return contextNotice; },
+    get partialDialogOpen() { return partialDialogOpen; },
+    resolvePartial,
+    cancelPartial,
     get focusDraft() { return focusDraft; },
     set focusDraft(value: string) { focusDraft = value; },
     get focusEditing() { return focusEditing; },
