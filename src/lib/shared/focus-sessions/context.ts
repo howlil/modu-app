@@ -16,6 +16,6 @@ export function consumePendingFocusTask(expectedId: string): FocusTaskContext | 
     if (!value || typeof value !== 'object') return null;
     const task = value as Partial<FocusTaskContext>;
     if (task.id !== expectedId || typeof task.title !== 'string' || task.title.length > 120) return null;
-    return { id: task.id, title: task.title };
+    return { id: task.id, title: task.title, nextAction: typeof task.nextAction === 'string' ? task.nextAction.slice(0, 240) : undefined };
   } catch { return null; }
 }
