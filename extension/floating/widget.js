@@ -17,10 +17,12 @@
   let host = null;
   let shadow = null;
   let lastMarkupKind = '';
+  let tickId = null;
   const isExcluded = () => (settings.excludedDomains || []).some(
     (domain) => location.hostname === domain || location.hostname.endsWith('.' + domain)
   );
   const active = () => Boolean(settings.enabled && !isExcluded() && snapshot &&
+    Number.isFinite(snapshot.updatedAt) && Date.now() - snapshot.updatedAt < 24 * 60 * 60 * 1000 &&
     snapshot.timer && snapshot.timer.status !== 'idle' && snapshot.sessionId !== dismissedId);
   const fmt = (ms) => {
     const total = Math.max(0, Math.ceil(ms / 1000));
@@ -46,6 +48,7 @@
     return { label, text, progress };
   };
   function unmount() {
+    if (tickId !== null) { clearInterval(tickId); tickId = null; }
     host?.remove();
     host = null; shadow = null; lastMarkupKind = '';
   }
@@ -55,7 +58,7 @@
     unmount();
     host = document.createElement('div');
     host.id = HOST_ID;
-    host.style.cssText = 'all:initial!important;position:fixed!important;right:24px!important;bottom:24px!important;z-index:2147483000!important;display:block!important;pointer-events:auto!important;';
+    host.style.cssText = 'all:initial!important;position:fixed!important;right:min(24px,5vw)!important;bottom:24px!important;z-index:2147483000!important;display:block!important;pointer-events:auto!important;';
     shadow = host.attachShadow({ mode: 'closed' });
     const link = document.createElement('link');
     link.rel = 'stylesheet';
@@ -84,6 +87,7 @@
   function render() {
     if (!active()) { unmount(); return; }
     mount();
+    if (tickId === null) tickId = setInterval(render, 1000);
     const kind = mini ? 'mini' : 'expanded';
     if (lastMarkupKind !== kind) rebuild(kind);
     const values = timerValues();
@@ -91,7 +95,7 @@
     panel.querySelector('#time').textContent = values.text;
     panel.querySelector('#state').textContent = values.label;
     if (!mini) {
-      const taskVisible = settings.showTask && snapshot.task?.title;
+      const taskVisible = settings.showTask && snapshot.timer.mode === 'focus' && snapshot.task?.title;
       panel.querySelector('#heading').textContent = snapshot.timer.mode === 'focus' ? 'CURRENT FOCUS' : 'BREAK';
       panel.querySelector('#task').textContent = taskVisible ? snapshot.task.title :
         snapshot.timer.mode === 'focus' ? 'Focus session' : 'Take a short break';
@@ -114,5 +118,4 @@
     snapshot = state[SNAPSHOT_KEY] || null;
     render();
   }).catch(() => {});
-  setInterval(() => { if (host || active()) render(); }, 1000);
 })();
