@@ -1,16 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import widgetStyles from '../../extension/floating/widget.css?raw';
-import appStyles from '../../src/app.css?raw';
+// @ts-expect-error Node built-in typings are not part of this browser app's tsconfig.
+import { readFileSync } from 'node:fs';
 import { consumePendingFocusTask, writePendingFocusTask } from '../../src/lib/shared/focus-sessions/context.ts';
 import { normalizePomodoroSnapshot } from '../../src/lib/modules/pomodoro/adapters/persistence.ts';
 
-const sources = import.meta.glob<string>(
-  ['../../extension/service-worker.js', '../../extension/floating/widget.js',
-    '../../extension/floating/widget.css', '../../src/app.css'],
-  { eager: true, query: '?raw', import: 'default' }
-);
-const workerSource = sources['../../extension/service-worker.js'];
-const widgetSource = sources['../../extension/floating/widget.js'];
+const workerSource = readFileSync(new URL('../../extension/service-worker.js', import.meta.url), 'utf8');
+const widgetSource = readFileSync(new URL('../../extension/floating/widget.js', import.meta.url), 'utf8');
+const widgetStyles = readFileSync(new URL('../../extension/floating/widget.css', import.meta.url), 'utf8');
+const appStyles = readFileSync(new URL('../../src/app.css', import.meta.url), 'utf8');
 
 type ExtensionResponse = { ok: boolean; data?: Record<string, unknown>; error?: string };
 type MessageHandler = (message: Record<string, unknown>, sender: { url: string }, send: (value: ExtensionResponse) => void) => boolean;
