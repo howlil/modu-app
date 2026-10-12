@@ -86,6 +86,7 @@
     {#if snapshot.unassignedSessions}<p class="mt-3 text-meta text-muted-foreground">{snapshot.unassignedSessions} focus sessions are unassigned; their time remains in the overall total.</p>{/if}
     <p class="mt-3 text-meta text-muted-foreground">Attribution follows each task's current workstream; past workstream edits are not versioned.</p>
   </section>
+  {#if controller.state.habit.qualifyingWorkstreams.length > 0}
   <section class="rounded-[20px] border border-border bg-card p-5">
     <div class="flex items-center justify-between"><h3 class="text-title font-medium">Consistency</h3><Activity class="size-4 text-muted-foreground" /></div>
     <p class="mt-1 text-meta text-muted-foreground">Practice frequency derived from linked focus sessions.</p>
@@ -101,6 +102,7 @@
     </label>
     <p class="mt-3 text-meta text-muted-foreground">Multiple sessions on one day count as one practice day. No extra habit checkbox.</p>
   </section>
+  {/if}
   <section class="rounded-[20px] border border-border bg-card p-5">
     <div class="flex items-center gap-2"><Lightbulb class="size-4 text-primary" /><h3 class="text-title font-medium">Weekly recommendation</h3></div>
     {#if insight}
