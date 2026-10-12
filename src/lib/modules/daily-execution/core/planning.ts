@@ -2,7 +2,7 @@ import type { HabitDefinition } from './consistency.ts';
 import type { RecommendationDecision } from './recommendations.ts';
 
 export type CapacityMode = 'low' | 'medium' | 'high';
-export type Workstream = 'build' | 'interview' | 'apply' | 'english' | 'review';
+export type Workstream = 'build' | 'interview' | 'apply' | 'english' | 'review' | 'general';
 export type Impact = 'high' | 'medium' | 'low';
 export type TaskStatus = 'ready' | 'blocked' | 'done' | 'archived';
 
@@ -11,13 +11,14 @@ export const WORKSTREAM_NAMES: Record<Workstream, string> = {
   interview: 'Technical practice',
   apply: 'Job acquisition',
   english: 'Communication',
-  review: 'Review'
+  review: 'Review',
+  general: 'Uncategorized'
 };
 
 export const CAPACITY_PRESETS: Record<CapacityMode, Record<Workstream, number>> = {
-  low: { build: 150, interview: 90, apply: 60, english: 30, review: 30 },
-  medium: { build: 210, interview: 120, apply: 60, english: 60, review: 30 },
-  high: { build: 360, interview: 180, apply: 90, english: 60, review: 30 }
+  low: { build: 150, interview: 90, apply: 60, english: 30, review: 30, general: 0 },
+  medium: { build: 210, interview: 120, apply: 60, english: 60, review: 30, general: 0 },
+  high: { build: 360, interview: 180, apply: 90, english: 60, review: 30, general: 0 }
 };
 
 export interface TaskCheckpoint {
@@ -47,6 +48,7 @@ export interface ExecutionTask {
   completedAt?: number;
   checkpoint?: TaskCheckpoint;
   createdAt: number;
+  context?: string;
 }
 
 export interface PlanRevision {
@@ -68,7 +70,10 @@ export interface WeeklyReflection {
   nextPriority: string;
 }
 
+export interface DaySelection {taskIds: string[]; selectedTaskId?: string}
 export interface ExecutionState {
+  days: Record<string,DaySelection>;
+  dayNotes: Record<string,string>;
   goal: string;
   successCriteria: string;
   tasks: ExecutionTask[];
@@ -80,7 +85,7 @@ export interface ExecutionState {
 }
 
 export function emptyExecutionState(): ExecutionState {
-  return { goal: '', successCriteria: '', tasks: [], plans: {}, reflections: {}, manualEntries: [], habit: { id: 'technical-practice', name: 'Technical practice', qualifyingWorkstreams: ['build','interview'], targetDaysPerWeek: 3, minimumSessionMinutes: 15 }, recommendationDecisions: [] };
+  return { goal: '', successCriteria: '', tasks: [], days: {}, dayNotes: {}, plans: {}, reflections: {}, manualEntries: [], habit: { id: 'technical-practice', name: 'Technical practice', qualifyingWorkstreams: ['build','interview'], targetDaysPerWeek: 3, minimumSessionMinutes: 15 }, recommendationDecisions: [] };
 }
 
 export function localDayKey(now: number): string {
@@ -117,6 +122,42 @@ export function nextTask(tasks: ExecutionTask[], nowKey: string): ExecutionTask 
     })[0] ?? null;
 }
 
+
+export function tasksForDay(state:ExecutionState,key:string):ExecutionTask[]{
+  const map=new Map(state.tasks.map(t=>[t.id,t]));
+  return (state.days[key]?.taskIds??[]).map(id=>map.get(id))
+    .filter((t):t is ExecutionTask=>!!t&&t.status!=='archived');
+}
+export function currentForDay(state:ExecutionState,key:string):ExecutionTask|null{
+  const ready=tasksForDay(state,key).filter(t=>t.status==='ready');
+  return ready.find(t=>t.id===state.days[key]?.selectedTaskId)??ready[0]??null;
+}
+export function selectForDay(state:ExecutionState,id:string,key:string):ExecutionState{
+  if(!state.tasks.some(t=>t.id===id&&t.status!=='archived'))return state;
+  const day=state.days[key]??{taskIds:[]};
+  if(day.taskIds.includes(id))return state;
+  return {...state,days:{...state.days,[key]:{...day,taskIds:[...day.taskIds,id]}}};
+}
+export function removeFromDay(state:ExecutionState,id:string,key:string):ExecutionState{
+  const day=state.days[key];
+  if(!day?.taskIds.includes(id))return state;
+  return {...state,days:{...state.days,[key]:{taskIds:day.taskIds.filter(x=>x!==id),selectedTaskId:day.selectedTaskId===id?undefined:day.selectedTaskId}}};
+}
+export function setNextForDay(state:ExecutionState,id:string,key:string):ExecutionState{
+  const day=state.days[key];
+  if(!day?.taskIds.includes(id)||!state.tasks.some(t=>t.id===id&&t.status==='ready'))return state;
+  return {...state,days:{...state.days,[key]:{...day,selectedTaskId:id}}};
+}
+export function completeSimply(state:ExecutionState,id:string,at:number):ExecutionState{
+  return {...state,tasks:state.tasks.map(t=>t.id===id&&t.status==='ready'?{...t,status:'done' as const,completedAt:at}:t)};
+}
+export function reopenSimply(state:ExecutionState,id:string):ExecutionState{
+  return {...state,tasks:state.tasks.map(t=>{
+    if(t.id!==id||t.status!=='done')return t;
+    const {completedAt: _completedAt,...rest}=t;
+    return {...rest,status:'ready' as const};
+  })};
+}
 export function minutesLabel(value: number): string {
   const total = Math.max(0, Math.round(value));
   return total < 60 ? total + 'm' : Math.floor(total / 60) + 'h' + (total % 60 ? ' ' + total % 60 + 'm' : '');
