@@ -1,13 +1,14 @@
 {
   "manifest_version": 3,
-  "name": "Module Focus Protection",
+  "name": "Modu Focus Companion",
   "version": "0.1.0",
-  "description": "Block user-selected distracting websites while a Module Pomodoro focus session is active.",
+  "description": "An optional floating focus timer and website protection for Modu.",
   "permissions": [
     "storage",
     "alarms",
     "webNavigation",
-    "declarativeNetRequestWithHostAccess"
+    "declarativeNetRequestWithHostAccess",
+    "scripting"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -22,7 +23,9 @@
         "http://localhost/*",
         "http://127.0.0.1/*"
       ],
-      "js": ["content-bridge.js"],
+      "js": [
+        "content-bridge.js"
+      ],
       "run_at": "document_start"
     }
   ],
@@ -33,7 +36,18 @@
         "blocked/style.css",
         "blocked/blocked.js"
       ],
-      "matches": ["<all_urls>"]
+      "matches": [
+        "<all_urls>"
+      ]
+    },
+    {
+      "resources": [
+        "floating/widget.css"
+      ],
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ]
     }
   ]
 }
