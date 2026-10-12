@@ -2,7 +2,7 @@
   import { Play, Check, ArrowRight, Target } from 'lucide-svelte';
   import { Button } from '$lib/components/ui/button/index.js';
   import * as Card from '$lib/components/ui/card/index.js';
-  import { CAPACITY_PRESETS, WORKSTREAM_NAMES, type CapacityMode, type Workstream } from '../core/planning.ts';
+  import { WORKSTREAM_NAMES, type CapacityMode, type Workstream } from '../core/planning.ts';
   import type { DailyExecutionController } from '../controller/daily-execution.svelte.ts';
 
   let { controller }: { controller: DailyExecutionController } = $props();
@@ -13,7 +13,6 @@
   let evidenceDraft = $state('');
   let showAllocations = $state(false);
   const workstreams = Object.keys(WORKSTREAM_NAMES) as Workstream[];
-  const budgets = { low: 360, medium: 480, high: 720 };
   const recordedMinutes = $derived(controller.recordedMs / 60_000);
   const suggested = $derived(controller.recommendation);
   const remaining = $derived(Math.max(0, controller.plannedMinutes - recordedMinutes));
