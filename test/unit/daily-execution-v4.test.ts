@@ -37,11 +37,13 @@ describe('Daily v4', () => {
       removeItem: (key:string) => data.delete(key)
     });
     const record = { ...emptyExecutionState(), days:undefined, dayNotes:undefined,
+      plans:{'2026-10-12':{dateKey:'2026-10-12',mode:'medium',allocations:{build:210,interview:120,apply:60,english:60,review:30}}},
       tasks:[{...task('legacy'),workstream:'interview',
         checkpoint:{lastCompleted:'Done',blocker:'',nextAction:'Continue',updatedAt:10}}] };
     data.set('modu-daily-execution-v1',JSON.stringify(record));
     const restored = readExecutionState();
     expect(restored.days).toEqual({});
+    expect(restored.plans['2026-10-12'].allocations.general).toBe(0);
     expect(restored.tasks[0].checkpoint?.nextAction).toBe('Continue');
     saveExecutionState(selectForDay(restored,'legacy','2026-10-13'));
     expect(readExecutionState().days['2026-10-13'].taskIds).toEqual(['legacy']);
