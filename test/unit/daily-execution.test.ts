@@ -22,6 +22,10 @@ describe('Daily Execution: deterministic planning', () => {
     expect(nextTask([t('a', 'high'), t('b', 'medium', 'ready', '2026-10-12')], '2026-10-12')?.id).toBe('b');
   });
 
+  it('makes tomorrow’s deadline the next action before undated high-impact work', () => {
+    expect(nextTask([t('a', 'high'), t('b', 'medium', 'ready', '2026-10-13')], '2026-10-12')?.id).toBe('b');
+  });
+
   it('does not mutate presets when editing a plan', () => {
     const plan = makePlan('2026-10-12', 'medium');
     plan.allocations.build = 15;
