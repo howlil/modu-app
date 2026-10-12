@@ -462,3 +462,16 @@ If there is no concrete answer, do not add it yet.
 ## Daily Execution × Pomodoro contract
 
 Daily Execution is the owner of goal, task, capacity budget (Low 6h, Medium 8h, High 12h), task evidence, and review. Pomodoro remains the exclusive focus timer, break controller, and focus-protection owner. Completed focus sessions are persisted once in the existing `module-pomodoro-activity` database by the shared session repository. A focus session may optionally refer to a task ID. A task does not become Done merely because a focus session completes. Daily Execution estimates/work budgets are not automatically actual hours worked: Review labels recorded Pomodoro focus time explicitly. Legacy unassigned sessions must remain valid. Focus time remains available in Pomodoro Activity; no duplicate activity heatmap or timer is allowed in Daily Execution.
+
+
+### Floating Focus Companion (Chromium extension)
+
+- The opt-in floating widget is a presentation surface, not a second Pomodoro timer or a Daily task manager.
+- Daily owns tasks and next actions; Pomodoro owns timer state, session completion and activity recording.
+- The extension receives a versioned read-only snapshot through the existing trusted bridge and never counts a session as completed merely because the deadline passed.
+- Floating visibility is independent of website blocking. Disabled is the initial setting. Users may hide task text and exclude website hostnames.
+- The floating widget starts collapsed (~190px wide), expands into a single white 300px card, anchors bottom-right with 24px gutter where possible, and respects narrow viewports and reduced-motion settings.
+- Shadow DOM styles mirror Modu app.css: white card, #252525 ink, #2468f2 primary, #eaf1ff secondary, #7a7a7a muted, #e7e7e2 border, 12/14px semantic text, 4px spacing rhythm, 20px expanded radius.
+- One card presents task, next action, mode, countdown, optional quiet progress, expand/minimize and Open Modu. No streaks, dashboards, timer rings or intrusive prompts.
+- Content scripts are registered only when enabled, do not inject on Modu control pages, unmount on disable, and hide stale snapshots.
+- Never collect visited URLs, page content, page titles or browsing history. Do not use host page text or scripts to drive widget state.
