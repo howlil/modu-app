@@ -10,7 +10,7 @@ export const modules: ModuleDefinition[] = [
   },
   {
     id: 'daily-execution',
-    name: 'Daily Execution',
+    name: 'Daily',
     route: '/daily',
     layout: 'focus',
     status: 'available'
