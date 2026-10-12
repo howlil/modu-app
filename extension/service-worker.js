@@ -290,7 +290,7 @@ async function handleMessage(message, sender) {
   switch (message?.type) {
     case 'PING':
     case 'GET_STATUS':
-      return statusFromState(state);
+      return { ...statusFromState(state), floating: await readFloatingSettings() };
 
     case 'SET_ENABLED': {
       const nextState = {
@@ -376,9 +376,110 @@ async function handleMessage(message, sender) {
       );
       return statusFromState(state);
 
+    case 'SET_FLOATING_SETTINGS':
+      return { floating: await updateFloatingSettings(message.settings || {}) };
+
+    case 'SET_FLOATING_SNAPSHOT':
+      return await saveFloatingSnapshot(message.snapshot);
+
+    case 'CLEAR_FLOATING_CONTEXT':
+      await chrome.storage.local.remove(FLOATING_SNAPSHOT_KEY);
+      return { cleared: true };
+
     default:
       throw new Error('Unknown focus protection command.');
   }
+}
+
+
+const FLOATING_SETTINGS_KEY = 'module-floating-settings-v1';
+const FLOATING_SNAPSHOT_KEY = 'module-floating-focus-v1';
+const FLOATING_SCRIPT_ID = 'modu-floating-focus';
+const DEFAULT_FLOATING_SETTINGS = { enabled: false, showTask: true, excludedDomains: [] };
+
+function floatingSettings(raw) {
+  const domains = Array.isArray(raw?.excludedDomains) ? raw.excludedDomains : [];
+  return {
+    enabled: raw?.enabled === true,
+    showTask: raw?.showTask !== false,
+    excludedDomains: normalizeBlocklist(domains)
+  };
+}
+async function readFloatingSettings() {
+  const saved = await chrome.storage.local.get(FLOATING_SETTINGS_KEY);
+  return floatingSettings(saved[FLOATING_SETTINGS_KEY]);
+}
+function validateFloatingSnapshot(raw) {
+  if (!raw || raw.version !== 1 || !Number.isFinite(raw.updatedAt) ||
+      !['focus','short','long'].includes(raw.timer?.mode) ||
+      !['idle','running','paused','complete','overtime'].includes(raw.timer?.status) ||
+      !Number.isFinite(raw.timer.durationMs) || raw.timer.durationMs < 0 ||
+      raw.timer.durationMs > 24 * 60 * 60 * 1000 ||
+      !Number.isFinite(raw.timer.remainingMs) || raw.timer.remainingMs < 0 ||
+      raw.timer.remainingMs > 24 * 60 * 60 * 1000 ||
+      (raw.timer.endsAt !== null && !Number.isFinite(raw.timer.endsAt)) ||
+      (raw.timer.overtimeStartedAt !== null && !Number.isFinite(raw.timer.overtimeStartedAt)) ||
+      (raw.sessionId !== null && (typeof raw.sessionId !== 'string' || raw.sessionId.length > 120)) ||
+      raw.updatedAt > Date.now() + 60_000) {
+    throw new Error('Invalid floating focus snapshot.');
+  }
+  const task = raw.task && typeof raw.task.title === 'string'
+    ? { id: typeof raw.task.id === 'string' ? raw.task.id.slice(0, 120) : null,
+        title: raw.task.title.slice(0, 120),
+        nextAction: typeof raw.task.nextAction === 'string' ? raw.task.nextAction.slice(0, 240) : '' }
+    : null;
+  return {
+    version: 1, sessionId: raw.sessionId, updatedAt: raw.updatedAt, task,
+    timer: {
+      mode: raw.timer.mode, status: raw.timer.status,
+      durationMs: raw.timer.durationMs, remainingMs: raw.timer.remainingMs,
+      endsAt: raw.timer.endsAt, overtimeStartedAt: raw.timer.overtimeStartedAt
+    }
+  };
+}
+async function syncFloatingScripts(enabled) {
+  const existing = await chrome.scripting.getRegisteredContentScripts({ ids: [FLOATING_SCRIPT_ID] });
+  if (!enabled) {
+    if (existing.length) await chrome.scripting.unregisterContentScripts({ ids: [FLOATING_SCRIPT_ID] });
+    return;
+  }
+  if (!existing.length) {
+    await chrome.scripting.registerContentScripts([{
+      id: FLOATING_SCRIPT_ID,
+      matches: ['http://*/*', 'https://*/*'],
+      excludeMatches: ['https://modu.howlil.site/*', 'http://localhost/*', 'http://127.0.0.1/*'],
+      js: ['floating/widget.js'],
+      runAt: 'document_idle',
+      persistAcrossSessions: true
+    }]);
+  }
+  // Registration affects new navigations; inject also into existing tabs.
+  const tabs = await chrome.tabs.query({});
+  await Promise.allSettled(tabs.filter((tab) =>
+    typeof tab.id === 'number' && /^https?:\/\//.test(tab.url || '') &&
+    !/^https?:\/\/(modu\.howlil\.site|localhost|127\.0\.0\.1)(?::\d+)?(?:\/|$)/.test(tab.url)
+  ).map((tab) => chrome.scripting.executeScript({
+    target: { tabId: tab.id }, files: ['floating/widget.js']
+  })));
+}
+async function updateFloatingSettings(input) {
+  const previous = await readFloatingSettings();
+  const next = floatingSettings({ ...previous, ...input });
+  await chrome.storage.local.set({ [FLOATING_SETTINGS_KEY]: next });
+  await syncFloatingScripts(next.enabled);
+  return next;
+}
+async function saveFloatingSnapshot(input) {
+  const next = validateFloatingSnapshot(input);
+  const existing = (await chrome.storage.local.get(FLOATING_SNAPSHOT_KEY))[FLOATING_SNAPSHOT_KEY];
+  if (!existing || existing.updatedAt <= next.updatedAt) {
+    await chrome.storage.local.set({ [FLOATING_SNAPSHOT_KEY]: next });
+  }
+  return { stored: true };
+}
+async function reconcileFloatingScripts() {
+  const settings = await readFloatingSettings();
+  await syncFloatingScripts(settings.enabled);
 }
 
 let commandQueue = Promise.resolve();
@@ -427,11 +528,15 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 });
 
 chrome.runtime.onInstalled.addListener(() => {
+  void reconcileFloatingScripts().catch(() => {});
   void reconcileState();
 });
 
 chrome.runtime.onStartup.addListener(() => {
+  void reconcileFloatingScripts().catch(() => {});
   void reconcileState();
 });
 
 void reconcileState();
+
+void reconcileFloatingScripts().catch(() => {});
