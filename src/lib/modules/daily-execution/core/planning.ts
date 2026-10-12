@@ -85,7 +85,7 @@ export interface ExecutionState {
 }
 
 export function emptyExecutionState(): ExecutionState {
-  return { goal: '', successCriteria: '', tasks: [], days: {}, dayNotes: {}, plans: {}, reflections: {}, manualEntries: [], habit: { id: 'technical-practice', name: 'Technical practice', qualifyingWorkstreams: ['build','interview'], targetDaysPerWeek: 3, minimumSessionMinutes: 15 }, recommendationDecisions: [] };
+  return { goal: '', successCriteria: '', tasks: [], days: {}, dayNotes: {}, plans: {}, reflections: {}, manualEntries: [], habit: { id: 'optional-routine', name: 'Optional routine', qualifyingWorkstreams: [], targetDaysPerWeek: 3, minimumSessionMinutes: 15 }, recommendationDecisions: [] };
 }
 
 export function localDayKey(now: number): string {
