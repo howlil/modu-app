@@ -126,7 +126,7 @@ export function createPomodoroController() {
   let focusProtectionError = $state('');
   let floatingSettings = $state<FloatingFocusSettings>({ enabled: false, showTask: true, excludedDomains: [] });
   let floatingError = $state('');
-  let companionConnected = false;
+  let companionConnected = $state(false);
   let lastFloatingPayload = '';
   let floatingRevision = Date.now();
   let dailyGoalHours = $state(8);
