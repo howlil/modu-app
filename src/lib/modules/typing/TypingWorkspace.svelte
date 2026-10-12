@@ -238,10 +238,7 @@
             </Button>
           </div>
         </div>
-      </Tabs.Content>
-
-
-              </Card.Content>
+</Card.Content>
             </Card.Root>
             {#if runComplete}
               <Card.Root class="gap-0 rounded-[20px] border-primary/15 py-5 shadow-none">
@@ -390,10 +387,7 @@
             Restart
           </Button>
         </div>
-      </Tabs.Content>
-
-
-              </Card.Content>
+</Card.Content>
             </Card.Root>
             {#if runComplete}
               <Card.Root class="gap-0 rounded-[20px] py-5 shadow-none">
