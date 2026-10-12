@@ -5,6 +5,9 @@
   import type { DailyExecutionController } from '../controller/daily-execution.svelte.ts';
   let { controller }: { controller: DailyExecutionController } = $props();
   let showForm = $state(false);
+  let editGoal = $state(false);
+  let goalDraft = $state('');
+  let criteriaDraft = $state('');
   let title = $state('');
   let nextAction = $state('');
   let workstream = $state<Workstream>('build');
@@ -47,6 +50,17 @@
   }
 </script>
 <div class="mb-5 flex items-center justify-between gap-3"><div><h2 class="text-title-lg font-semibold">Priorities</h2><p class="mt-1 text-meta text-muted-foreground">Concrete actions, ordered by value.</p></div><Button variant="outline" class="rounded-full" onclick={() => showForm = !showForm}><Plus class="mr-1 size-4" /> Add task</Button></div>
+<div class="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card px-4 py-3">
+  <div><div class="text-meta text-muted-foreground">PRIMARY GOAL</div><div class="text-ui font-medium">{controller.state.goal || 'No goal configured'}</div>{#if controller.state.successCriteria}<div class="text-meta text-muted-foreground">{controller.state.successCriteria}</div>{/if}</div>
+  <Button variant="ghost" size="sm" class="rounded-full" onclick={() => { goalDraft = controller.state.goal; criteriaDraft = controller.state.successCriteria; editGoal = !editGoal; }}>Edit goal</Button>
+</div>
+{#if editGoal}
+  <form class="mb-4 grid gap-3 rounded-xl border border-border bg-card p-4" onsubmit={(e) => {e.preventDefault(); controller.setGoal(goalDraft, criteriaDraft); editGoal = false;}}>
+    <label class="grid gap-1 text-meta font-medium">Goal<input class="h-10 rounded-lg border border-input px-3 text-ui" required maxlength="120" bind:value={goalDraft} /></label>
+    <label class="grid gap-1 text-meta font-medium">Success criteria<input class="h-10 rounded-lg border border-input px-3 text-ui" maxlength="240" bind:value={criteriaDraft} /></label>
+    <div class="flex justify-end gap-2"><Button type="button" variant="ghost" onclick={() => editGoal = false}>Cancel</Button><Button type="submit" disabled={!goalDraft.trim()}>Save goal</Button></div>
+  </form>
+{/if}
 
 {#if showForm}
   <form class="mb-4 grid gap-3 rounded-[20px] border border-border bg-card p-5" onsubmit={(e) => {e.preventDefault(); create();}}>
