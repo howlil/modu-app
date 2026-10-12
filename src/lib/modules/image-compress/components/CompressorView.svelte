@@ -185,7 +185,7 @@
         <div class="mt-5 border-t border-border pt-5">
           <Button class="w-full" onclick={controller.download}>
             <Download class="size-4" strokeWidth={1.8} />
-            {controller.status === 'over-target' ? 'Download larger result' : 'Download image'}
+            {controller.status === 'quality-limited' ? 'Download larger result' : 'Download image'}
           </Button>
         </div>
       {/if}
