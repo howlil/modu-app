@@ -213,7 +213,10 @@ describe('Module boundary rules', () => {
     expect(controller).not.toMatch(/export const controller\s*=|import .*\.svelte['"]/);
     expect(workspace).toContain('const controller = createTypingController()');
     expect(workspace).toContain('bind:value={controller.primaryTab}');
-    expect(workspace).toContain('bind:this={controller.trainingSurface}');
+    expect(workspace).toContain('<TypingCanvas {controller} mode="train" />');
+    const canvas = read('src/lib/modules/typing/components/TypingCanvas.svelte');
+    expect(canvas).toContain('bind:this={controller.trainingSurface}');
+    expect(canvas).toContain('<KeyboardGuide');
     expect(controller).toContain("window.addEventListener('keydown', handleKeyDown)");
     for (const file of sourceFiles('src/lib/modules/typing')) {
       expect(importedPaths(read(file)), file).not.toContainEqual(expect.stringMatching(/\.\.\/(?:trainer|session|sounds|persistence)\.ts$/));

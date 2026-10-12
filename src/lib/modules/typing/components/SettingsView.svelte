@@ -70,6 +70,26 @@
 
   <div class="flex items-center justify-between gap-5 py-4">
     <div class="min-w-0">
+      <strong class="block text-meta font-medium">Opposite-hand Shift</strong>
+      <span class="mt-1 block text-meta text-muted-foreground">Guide the opposite pinky on uppercase keys.</span>
+    </div>
+    <Switch checked={preferences.oppositeHandShift}
+      aria-label="Opposite-hand Shift"
+      onclick={() => onTogglePreference('oppositeHandShift')} />
+  </div>
+
+  <div class="flex items-center justify-between gap-5 py-4">
+    <div class="min-w-0">
+      <strong class="block text-meta font-medium">Finger shadow</strong>
+      <span class="mt-1 block text-meta text-muted-foreground">Animate finger reach from the resting position.</span>
+    </div>
+    <Switch checked={preferences.fingerShadow}
+      aria-label="Finger shadow"
+      onclick={() => onTogglePreference('fingerShadow')} />
+  </div>
+
+  <div class="flex items-center justify-between gap-5 py-4">
+    <div class="min-w-0">
       <strong class="block text-meta font-medium">Mastery</strong>
       <span class="mt-1 block text-meta text-muted-foreground">
         {preferences.minSamples}+ samples · ≤ {preferences.masteryLatency}ms

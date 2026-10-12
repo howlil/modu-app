@@ -392,6 +392,11 @@ Typing module contract:
 - Progress shows only actionable signals: recent performance, weak keys/transitions, and due review
 - all learning state and preferences stay local to the browser; no account is required
 - keep the primary training surface focused: current block, text, accuracy, target, restrained WPM, keyboard guide, and session progress
+- Typing uses the approved Focus Canvas composition: centered typing text is the primary focal point; inline completion, live accuracy and secondary WPM appear below it rather than beside it in competing cards
+- Train, Lesson drills and Test share the same responsive typing canvas; Lessons, Progress and Settings remain sibling in-page views with consistent module navigation
+- The keyboard guide pairs a physical-key highlight with independently animated two-hand SVG finger silhouettes; a ghost outline indicates the resting position and opposite-hand Shift is highlighted when enabled
+- Visual guide levels remain 0 full keyboard and hands, 1 hands only, and 2 hidden; the demo animation must never mutate typing attempts, mastery, WPM, or session history
+- Preserve reduced-motion handling, mobile keyboard text input without duplicate desktop keystrokes, and the existing local-first v1 persistence keys
 - do not turn Typing into an XP, streak, achievement, or analytics dashboard
 
 ## 8. Local-first contract
