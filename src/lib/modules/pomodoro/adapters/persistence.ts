@@ -173,7 +173,7 @@ export function normalizePomodoroSnapshot(
         : emptyFocusAccounting()
     ),
     focusText: typeof saved.focusText === 'string' ? saved.focusText.slice(0, 80) : '',
-    linkedTask: saved.linkedTask && typeof saved.linkedTask.id === 'string' && typeof saved.linkedTask.title === 'string' ? { id: saved.linkedTask.id, title: saved.linkedTask.title.slice(0, 120) } : null,
+    linkedTask: saved.linkedTask && typeof saved.linkedTask.id === 'string' && typeof saved.linkedTask.title === 'string' ? { id: saved.linkedTask.id, title: saved.linkedTask.title.slice(0, 120), nextAction: typeof saved.linkedTask.nextAction === 'string' ? saved.linkedTask.nextAction.slice(0, 240) : undefined } : null,
     soundEnabled: saved.soundEnabled !== false,
     ringtone: isPomodoroRingtone(saved.ringtone) ? saved.ringtone : DEFAULT_RINGTONE,
     notificationsEnabled: saved.notificationsEnabled === true,
