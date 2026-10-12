@@ -15,13 +15,13 @@ export function proposeReplan(plan: DailyPlan, tasks: ExecutionTask[], recordedM
   tomorrow.setDate(tomorrow.getDate() + 1);
   const tomorrowKey = [tomorrow.getFullYear(), String(tomorrow.getMonth() + 1).padStart(2, '0'), String(tomorrow.getDate()).padStart(2, '0')].join('-');
   const urgent = available.filter((task) => !!task.dueDate && task.dueDate <= tomorrowKey);
-  const weights: WorkAllocation = { build: 0, interview: 0, apply: 0, english: 0, review: 0 };
+  const weights: WorkAllocation = { build: 0, interview: 0, apply: 0, english: 0, review: 0, general: 0 };
   for (const task of available) {
     const urgency = task.dueDate && task.dueDate <= tomorrowKey ? 4 : 1;
     const impact = task.impact === 'high' ? 2 : task.impact === 'medium' ? 1.3 : 1;
     weights[task.workstream] += urgency * impact * Math.max(1, plan.allocations[task.workstream]);
   }
-  const allocations: WorkAllocation = { build: 0, interview: 0, apply: 0, english: 0, review: 0 };
+  const allocations: WorkAllocation = { build: 0, interview: 0, apply: 0, english: 0, review: 0, general: 0 };
   const totalWeight = Object.values(weights).reduce((sum, weight) => sum + weight, 0);
   if (totalWeight > 0 && remainingMinutes > 0) {
     let allocated = 0;
