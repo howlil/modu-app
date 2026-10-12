@@ -467,7 +467,8 @@ export function createPomodoroController() {
   function recordFocusSession(
     plannedDurationMs: number,
     actualDurationMs: number,
-    overtimeDurationMs: number
+    overtimeDurationMs: number,
+    partial = false
   ) {
     const endedAt = Date.now();
     const session: FocusActivitySession = {
@@ -479,6 +480,7 @@ export function createPomodoroController() {
       overtimeMs: Math.max(0, overtimeDurationMs),
       label: focusText.trim(),
       taskId: linkedTask?.id ?? null,
+      completionKind: partial ? 'partial' : 'full',
       goalMs,
       status: 'completed'
     };
@@ -532,7 +534,7 @@ export function createPomodoroController() {
     if (!partialDialogOpen) return;
     if (save && timer.mode === 'focus') {
       const active = elapsedFocus(focusAccounting, Date.now());
-      if (active >= 1000) recordFocusSession(timer.durationMs, active, 0);
+      if (active >= 1000) recordFocusSession(timer.durationMs, active, 0, true);
     }
     const target = partialIntent === 'reset' ? null
       : partialIntent === 'skip' ? getNextMode(timer) : partialTargetMode;
