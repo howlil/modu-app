@@ -18,6 +18,7 @@ export interface EvidenceRecord {
   topic?: string;
   assessmentResult?: 'needs-practice' | 'passed' | 'informational';
   verification: EvidenceVerification;
+  archivedAt?: number;
 }
 
 export function projectTaskOutcomes(tasks: ExecutionTask[]): EvidenceRecord[] {
@@ -51,7 +52,7 @@ export function uniqueEvidence(records: EvidenceRecord[]): EvidenceRecord[] {
 }
 
 export function combineEvidence(stored: EvidenceRecord[], tasks: ExecutionTask[]): EvidenceRecord[] {
-  return uniqueEvidence([...projectTaskOutcomes(tasks), ...stored]).sort((a, b) => b.occurredAt - a.occurredAt);
+  return uniqueEvidence([...projectTaskOutcomes(tasks), ...stored.filter((record) => !record.archivedAt)]).sort((a, b) => b.occurredAt - a.occurredAt);
 }
 
 export function isEvidenceKind(value: unknown): value is EvidenceKind {
