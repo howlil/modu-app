@@ -84,6 +84,7 @@
       {/each}
     </div>
     {#if snapshot.unassignedSessions}<p class="mt-3 text-meta text-muted-foreground">{snapshot.unassignedSessions} focus sessions are unassigned; their time remains in the overall total.</p>{/if}
+    <p class="mt-3 text-meta text-muted-foreground">Attribution follows each task's current workstream; past workstream edits are not versioned.</p>
   </section>
   <section class="rounded-[20px] border border-border bg-card p-5">
     <div class="flex items-center justify-between"><h3 class="text-title font-medium">Consistency</h3><Activity class="size-4 text-muted-foreground" /></div>
