@@ -468,11 +468,22 @@ async function updateFloatingSettings(input) {
   const previous = await readFloatingSettings();
   const next = floatingSettings({ ...previous, ...input });
   await chrome.storage.local.set({ [FLOATING_SETTINGS_KEY]: next });
+  if (!next.enabled) {
+    await chrome.storage.local.remove(FLOATING_SNAPSHOT_KEY);
+  } else if (!next.showTask) {
+    const saved = (await chrome.storage.local.get(FLOATING_SNAPSHOT_KEY))[FLOATING_SNAPSHOT_KEY];
+    if (saved?.task) {
+      await chrome.storage.local.set({ [FLOATING_SNAPSHOT_KEY]: { ...saved, task: null } });
+    }
+  }
   await syncFloatingScripts(next.enabled, !previous.enabled && next.enabled);
   return next;
 }
 async function saveFloatingSnapshot(input) {
+  const settings = await readFloatingSettings();
+  if (!settings.enabled) return { stored: false };
   const next = validateFloatingSnapshot(input);
+  if (!settings.showTask) next.task = null;
   const existing = (await chrome.storage.local.get(FLOATING_SNAPSHOT_KEY))[FLOATING_SNAPSHOT_KEY];
   if (!existing || existing.updatedAt <= next.updatedAt) {
     await chrome.storage.local.set({ [FLOATING_SNAPSHOT_KEY]: next });
