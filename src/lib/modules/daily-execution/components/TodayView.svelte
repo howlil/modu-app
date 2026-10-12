@@ -1,181 +1,130 @@
 <script lang="ts">
-  import { Play, Check, ArrowRight, Target } from 'lucide-svelte';
-  import { Button } from '$lib/components/ui/button/index.js';
-  import * as Card from '$lib/components/ui/card/index.js';
-  import CheckpointEditor from './CheckpointEditor.svelte';
-  import { WORKSTREAM_NAMES, type CapacityMode, type Workstream } from '../core/planning.ts';
-  import type { DailyExecutionController } from '../controller/daily-execution.svelte.ts';
+ import { Play, Check, ChevronRight, ChevronDown, PanelRightClose, PanelRightOpen, Plus, Search } from 'lucide-svelte';
+ import { Button } from '$lib/components/ui/button/index.js';
+ import QuickCapture from './QuickCapture.svelte';
+ import TaskDetailDrawer from './TaskDetailDrawer.svelte';
+ import type { ExecutionTask } from '../core/planning.ts';
+ import type { DailyExecutionController } from '../controller/daily-execution.svelte.ts';
 
-  let { controller }: { controller: DailyExecutionController } = $props();
-  let goalDraft = $state('');
-  let criteriaDraft = $state('');
-  let completingId = $state<string | null>(null);
-  let outcomeDraft = $state('');
-  let evidenceDraft = $state('');
-  let showAllocations = $state(false);
-  let showReplan = $state(false);
-  let editingCheckpointId = $state<string | null>(null);
-  const workstreams = Object.keys(WORKSTREAM_NAMES) as Workstream[];
-  const recordedMinutes = $derived(controller.recordedMs / 60_000);
-  const suggested = $derived(controller.recommendation);
-  const remaining = $derived(Math.max(0, controller.plannedMinutes - recordedMinutes));
-  const checkpointId = $derived(editingCheckpointId ?? controller.checkpointPromptId);
-  const checkpointTask = $derived(controller.state.tasks.find((t) => t.id === checkpointId) ?? null);
-
-  function saveOutcome() {
-    if (!completingId || !outcomeDraft.trim()) return;
-    controller.completeTask(completingId, outcomeDraft, evidenceDraft);
-    completingId = null;
-    outcomeDraft = '';
-    evidenceDraft = '';
-  }
+ let { controller }: { controller: DailyExecutionController } = $props();
+ let showShelf = $state(true);
+ let mobileShelf = $state(false);
+ let showDone = $state(false);
+ let query = $state('');
+ let editing = $state<ExecutionTask | null>(null);
+ const planned = $derived(controller.todayTasks);
+ const ready = $derived(planned.filter(task => task.status === 'ready'));
+ const completed = $derived(planned.filter(task => task.status === 'done'));
+ const current = $derived(controller.selectedTodayTask);
+ const available = $derived(controller.availableTasks.filter(task => (task.title + ' ' + (task.context ?? '')).toLowerCase().includes(query.toLowerCase())));
+ function meta(task: ExecutionTask) {
+   return [task.context ?? (task.workstream !== 'general' ? task.workstream : ''),
+     task.dueDate === controller.dayKey ? 'Due today' : task.dueDate,
+     task.estimateMinutes ? controller.minutesLabel(task.estimateMinutes) : ''].filter(Boolean).join(' · ');
+ }
 </script>
-
-{#if !controller.state.goal}
-  <section class="mx-auto max-w-[560px] rounded-[20px] border border-border bg-card p-6">
-    <div class="mb-5 flex items-center gap-2 text-title font-semibold"><Target class="size-5 text-primary" /> Start with one goal</div>
-    <label class="mb-2 block text-meta font-medium" for="daily-goal">What are you working toward?</label>
-    <input id="daily-goal" class="mb-4 h-11 w-full rounded-lg border border-input bg-card px-3 text-ui" bind:value={goalDraft} maxlength="120" placeholder="e.g. Get hired as Backend Engineer" />
-    <label class="mb-2 block text-meta font-medium" for="daily-criteria">What would success look like? (optional)</label>
-    <input id="daily-criteria" class="mb-5 h-11 w-full rounded-lg border border-input bg-card px-3 text-ui" bind:value={criteriaDraft} maxlength="240" placeholder="e.g. Accept a backend offer" />
-    <Button class="rounded-full" disabled={!goalDraft.trim()} onclick={() => controller.setGoal(goalDraft, criteriaDraft)}>Create goal <ArrowRight class="ml-1 size-4" /></Button>
-  </section>
-{:else}
-  <div class="mb-5 text-meta text-muted-foreground">PRIMARY GOAL <span class="ml-2 font-medium text-foreground">{controller.state.goal}</span></div>
-  <Card.Root class="mb-3 gap-3 rounded-[20px] p-5 shadow-none">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <div class="text-meta text-muted-foreground">DAILY CAPACITY</div>
-        <div class="mt-1 text-title-lg font-semibold">{controller.minutesLabel(controller.plannedMinutes)} <span class="text-meta font-normal text-muted-foreground">work budget</span></div>
-      </div>
-      <div class="flex flex-wrap gap-1 rounded-full bg-muted p-1" role="group" aria-label="Daily capacity">
-        {#each ['low','medium','high'] as mode}
-          {@const selectedMode = mode as CapacityMode}
-          <Button size="sm" variant="ghost" aria-pressed={controller.plan.mode === selectedMode}
-            class={controller.plan.mode === selectedMode ? 'h-8 rounded-full bg-card px-3 text-meta text-primary shadow-sm hover:bg-card' : 'h-8 rounded-full px-3 text-meta text-muted-foreground shadow-none'}
-            onclick={() => controller.setMode(selectedMode)}>{mode === 'low' ? 'Low · 6h' : mode === 'medium' ? 'Medium · 8h' : 'High · 12h'}</Button>
-        {/each}
-      </div>
-    </div>
-    <div class="h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label="Recorded work relative to work budget" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.min(100, Math.round(100 * recordedMinutes / Math.max(1, controller.plannedMinutes)))}>
-      <div class="h-full rounded-full bg-primary" style:width={Math.min(100, 100 * recordedMinutes / Math.max(1, controller.plannedMinutes)) + '%'}></div>
-    </div>
-    <div class="flex justify-between gap-2 text-meta text-muted-foreground">
-      <span><strong class="font-medium text-foreground">{controller.minutesLabel(recordedMinutes)}</strong> recorded ({controller.minutesLabel(controller.focusRecordedMs / 60_000)} focus + {controller.minutesLabel(controller.manualRecordedMs / 60_000)} manual)</span>
-      <span>{controller.minutesLabel(remaining)} budget not recorded</span>
-    </div>
-    <div class="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
-      <span class="text-meta text-muted-foreground">Remaining work can be reallocated without changing past activity.</span>
-      <Button size="sm" variant="outline" class="rounded-full" onclick={() => showReplan = !showReplan}>{showReplan ? 'Close replan' : 'Replan remaining time'}</Button>
-    </div>
-    {#if showReplan}
-      <div class="rounded-xl border border-border bg-muted/35 p-4">
-        <div class="text-meta font-semibold">SUGGESTED REMAINING ALLOCATION</div>
-        <p class="mt-2 text-meta text-muted-foreground">{controller.replanProposal.reason}</p>
-        <div class="mt-4 grid gap-3">
-          {#each workstreams as workstream}
-            <div>
-              <div class="mb-1 flex justify-between text-meta"><span>{WORKSTREAM_NAMES[workstream]}</span><span>{controller.minutesLabel(controller.replanProposal.allocations[workstream])}</span></div>
-              <div class="h-1.5 overflow-hidden rounded-full bg-muted"><div class="h-full rounded-full bg-primary" style:width={controller.replanProposal.remainingMinutes ? Math.min(100, 100 * controller.replanProposal.allocations[workstream] / controller.replanProposal.remainingMinutes) + '%' : '0%'}></div></div>
-            </div>
-          {/each}
-        </div>
-        <div class="mt-4 flex justify-end gap-2">
-          <Button variant="ghost" size="sm" class="rounded-full" onclick={() => showReplan = false}>Keep plan</Button>
-          <Button size="sm" class="rounded-full" onclick={() => { controller.acceptReplan(); showReplan = false; }}>Accept replan</Button>
-        </div>
-      </div>
-    {:else if controller.plan.revision}
-      <div class="text-meta text-muted-foreground">Accepted replan: {controller.plan.revision.reason}</div>
-    {/if}
-    <button class="w-fit text-meta text-muted-foreground underline-offset-4 hover:underline" onclick={() => showAllocations = !showAllocations} aria-expanded={showAllocations}>Edit workstream allocations {showAllocations ? '−' : '+'}</button>
-    {#if showAllocations}
-      <div class="grid gap-3 border-t border-border pt-3 sm:grid-cols-2">
-        {#each workstreams as workstream}
-          <label class="flex items-center justify-between gap-2 text-meta">
-            <span>{WORKSTREAM_NAMES[workstream]}</span>
-            <input class="h-9 w-20 rounded-lg border border-input bg-card px-2 text-right tabular-nums" type="number" min="0" max="720" step="5" value={controller.plan.allocations[workstream]}
-              aria-label={WORKSTREAM_NAMES[workstream] + ' allocation minutes'} onchange={(e) => controller.setAllocation(workstream, Number(e.currentTarget.value))} />
-          </label>
-        {/each}
-      </div>
-      <p class="text-meta text-muted-foreground">Minutes per workstream. Adjusting allocations changes the planned budget, not past sessions.</p>
-    {/if}
-  </Card.Root>
-
-  {#if suggested}
-    <section class="mb-3 rounded-[20px] border border-[#DCE7FF] bg-[linear-gradient(125deg,#F5F8FF,#EAF1FF)] p-6">
-      <div class="text-meta font-semibold text-secondary-foreground">NEXT VALUABLE ACTION</div>
-      <h2 class="mt-4 text-title-lg font-semibold tracking-[-0.03em]">{suggested.title}</h2>
-      <p class="mt-2 text-ui text-[#596678]">{suggested.checkpoint?.nextAction || suggested.nextAction}</p>
-      {#if suggested.checkpoint}
-        <div class="mt-4 grid gap-2 border-t border-[#DCE7FF] pt-4 text-meta">
-          <div><span class="font-medium text-secondary-foreground">Last completed:</span> {suggested.checkpoint.lastCompleted || 'Not set'}</div>
-          {#if suggested.checkpoint.blocker}<div><span class="font-medium text-secondary-foreground">Blocker:</span> {suggested.checkpoint.blocker}</div>{/if}
-          <div><span class="font-medium text-secondary-foreground">Resume:</span> {suggested.checkpoint.nextAction}</div>
-        </div>
-      {/if}
-      <div class="mt-4 text-meta text-muted-foreground">{WORKSTREAM_NAMES[suggested.workstream]} · {suggested.impact} impact · {controller.minutesLabel(suggested.estimateMinutes)} estimated · {controller.minutesLabel(controller.focusMsForTask(suggested.id) / 60_000)} recorded</div>
-      <div class="mt-5 flex flex-wrap items-center gap-2">
-        <Button class="rounded-full" onclick={() => controller.openFocus(suggested)}><Play class="mr-1 size-4" /> Focus in Pomodoro</Button>
-        <Button variant="ghost" class="rounded-full text-muted-foreground" onclick={() => { editingCheckpointId = suggested.id; controller.checkpointPromptId = null; }}>Checkpoint</Button>
-        <Button variant="ghost" class="rounded-full text-muted-foreground" onclick={() => { completingId = suggested.id; outcomeDraft = ''; evidenceDraft = ''; }}><Check class="mr-1 size-4" /> Mark done</Button>
-      </div>
-      {#if checkpointTask && checkpointTask.id === suggested.id}
-        {#key checkpointTask.id}
-          <CheckpointEditor task={checkpointTask}
-            onSave={(last, blocker, next) => { controller.saveCheckpoint(checkpointTask?.id ?? '', last, blocker, next); editingCheckpointId = null; }}
-            onCancel={() => { editingCheckpointId = null; controller.checkpointPromptId = null; }}/>
-        {/key}
-      {/if}
-      {#if completingId === suggested.id}
-        <form class="mt-5 grid gap-3 rounded-xl border border-border bg-card p-4" onsubmit={(e) => { e.preventDefault(); saveOutcome(); }}>
-          <label class="text-meta font-medium" for="outcome">What did you accomplish?</label>
-          <textarea id="outcome" class="min-h-20 w-full rounded-lg border border-input p-3 text-ui" maxlength="1000" required bind:value={outcomeDraft} placeholder="Concrete output or learning evidence"></textarea>
-          <input class="h-10 rounded-lg border border-input px-3 text-ui" aria-label="Evidence URL optional" type="url" maxlength="400" bind:value={evidenceDraft} placeholder="Evidence URL (optional)" />
-          <div class="flex justify-end gap-2"><Button type="button" variant="ghost" onclick={() => completingId = null}>Cancel</Button><Button type="submit" disabled={!outcomeDraft.trim()}>Save outcome</Button></div>
-        </form>
-      {/if}
-    </section>
-  {:else}
-    <Card.Root class="mb-3 rounded-[20px] p-6 shadow-none">
-      <h2 class="text-title-lg font-medium">No ready tasks</h2>
-      <p class="text-ui text-muted-foreground">Add your first actionable task in Priorities.</p>
-      <Button variant="outline" class="mt-3 w-fit rounded-full" onclick={() => controller.view = 'priorities'}>Open priorities</Button>
-    </Card.Root>
-  {/if}
-
-  {#if checkpointTask && checkpointTask.id !== suggested?.id}
-    <section class="mb-3 rounded-[20px] border border-border bg-card p-4">
-      <CheckpointEditor task={checkpointTask}
-        onSave={(last, blocker, next) => { controller.saveCheckpoint(checkpointTask?.id ?? '', last, blocker, next); editingCheckpointId = null; }}
-        onCancel={() => { editingCheckpointId = null; controller.checkpointPromptId = null; }}/>
-    </section>
-  {/if}
-  {#if controller.weeklyInsight}
-    <section class="mb-3 flex items-start gap-3 rounded-[20px] border border-border bg-card p-5">
-      <div class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-secondary text-secondary-foreground">
-        <ArrowRight class="size-4" strokeWidth={1.8} />
-      </div>
-      <div class="min-w-0 flex-1">
-        <div class="text-meta font-medium text-muted-foreground">WEEKLY INSIGHT</div>
-        <div class="mt-1 text-ui font-medium">{controller.weeklyInsight.title}</div>
-        <p class="mt-2 text-meta text-muted-foreground">{controller.weeklyInsight.reason}</p>
-        <Button variant="ghost" size="sm" class="mt-2 h-8 rounded-full px-2 text-meta text-primary" onclick={() => { controller.reviewSubview = 'intelligence'; controller.view = 'review'; }}>View recommendation <ArrowRight class="ml-1 size-3.5" /></Button>
-      </div>
-    </section>
-  {/if}
-    <section class="overflow-hidden rounded-[20px] border border-border bg-card">
-    <div class="flex items-center justify-between p-4"><h3 class="text-title font-medium">Up next</h3><Button variant="ghost" size="sm" class="rounded-full text-meta text-muted-foreground" onclick={() => controller.view = 'priorities'}>Manage priorities <ArrowRight class="ml-1 size-3.5" /></Button></div>
-    {#each controller.queue.filter((task) => task.id !== suggested?.id).slice(0, 3) as task}
-      <div class="flex items-center gap-3 border-t border-border px-4 py-3">
-        <span class="size-2 rounded-full border border-muted-foreground"></span>
-        <div class="min-w-0 flex-1"><div class="truncate text-ui font-medium">{task.title}</div><div class="text-meta text-muted-foreground">{WORKSTREAM_NAMES[task.workstream]} · {controller.minutesLabel(task.estimateMinutes)}</div></div>
-        <Button variant="ghost" size="sm" class="rounded-full text-meta text-primary" onclick={() => controller.openFocus(task)}>Focus →</Button>
-      </div>
-    {:else}
-      <p class="border-t border-border p-5 text-meta text-muted-foreground">No additional ready tasks.</p>
-    {/each}
-  </section>
-  <p class="mt-4 text-meta text-muted-foreground">Work budget is tracked only where focus sessions or manual entries have been recorded; breaks are excluded.</p>
+<header class="mb-5 flex flex-wrap items-start justify-between gap-3">
+ <div>
+   <p class="text-meta text-muted-foreground">{new Date(controller.dayKey + 'T12:00:00').toLocaleDateString(undefined, {weekday:'long',month:'long',day:'numeric'})}</p>
+   <h1 class="mt-1 text-page-title font-semibold">Today</h1>
+   <p class="mt-1 text-meta text-muted-foreground">Only what you choose to do today.</p>
+ </div>
+ <Button size="sm" variant="ghost" class="hidden rounded-lg text-muted-foreground min-[760px]:inline-flex" onclick={() => showShelf = !showShelf}>
+   {#if showShelf}<PanelRightClose class="mr-1 size-4"/> Hide list{:else}<PanelRightOpen class="mr-1 size-4"/> Browse list{/if}
+ </Button>
+</header>
+<div class={showShelf ? 'grid gap-3 min-[760px]:grid-cols-[minmax(0,1fr)_272px]' : 'grid gap-3'}>
+ <section class="min-w-0 rounded-[20px] border border-border bg-card p-4 sm:p-5">
+   <div class="flex items-center justify-between gap-2">
+     <h2 class="text-title font-medium">Your day</h2>
+     <span class="text-meta text-muted-foreground">{completed.length} / {planned.length} completed</span>
+   </div>
+   <QuickCapture onAdd={title => controller.quickAdd(title, 'today')}/>
+   <p class="mb-2 mt-6 text-meta font-semibold uppercase tracking-wider text-muted-foreground">Planned for today</p>
+   <div class="divide-y divide-border border-t border-border">
+     {#each ready as task (task.id)}
+       <div class={current?.id === task.id ? 'flex min-h-14 items-center gap-2 rounded-lg bg-secondary/50 px-2 py-2' : 'flex min-h-14 items-center gap-2 py-2'}>
+         <button type="button" class="flex size-7 shrink-0 items-center justify-center rounded-full" aria-label={'Complete ' + task.title} onclick={() => controller.completeQuick(task.id)}>
+           <span class="size-[18px] rounded-full border border-muted-foreground/50"></span>
+         </button>
+         <button type="button" class="min-w-0 flex-1 py-1 text-left" onclick={() => editing = task}>
+           <span class="block truncate text-ui font-medium">{task.title}</span>
+           {#if meta(task)}<span class="block text-meta text-muted-foreground">{meta(task)}</span>{/if}
+         </button>
+         {#if current?.id === task.id}
+           <span class="px-2 text-meta font-medium text-primary">Next</span>
+         {:else}
+           <Button size="sm" variant="ghost" class="h-8 rounded-lg px-2 text-meta text-muted-foreground" onclick={() => controller.chooseNext(task.id)}>Next</Button>
+         {/if}
+       </div>
+     {:else}
+       <p class="py-6 text-meta text-muted-foreground">Nothing planned. Add an activity or choose one from your list.</p>
+     {/each}
+     {#each planned.filter(task => task.status === 'blocked') as task (task.id)}
+       <div class="flex min-h-12 items-center py-2">
+         <button type="button" class="truncate text-ui text-muted-foreground" onclick={() => editing = task}>{task.title} · Blocked</button>
+       </div>
+     {/each}
+   </div>
+   <button type="button" class="mt-3 flex items-center gap-2 text-meta text-muted-foreground hover:text-foreground" aria-expanded={showDone} onclick={() => showDone = !showDone}>
+     {#if showDone}<ChevronDown class="size-4"/>{:else}<ChevronRight class="size-4"/>{/if} Completed ({completed.length})
+   </button>
+   {#if showDone}
+     <div class="mt-2 divide-y divide-border">
+       {#each completed as task (task.id)}
+         <div class="flex min-h-12 items-center gap-2 py-2">
+           <button type="button" class="flex size-7 shrink-0 items-center justify-center text-primary" aria-label={'Reopen ' + task.title} onclick={() => controller.reopenQuick(task.id)}><Check class="size-4"/></button>
+           <span class="min-w-0 flex-1 truncate text-ui text-muted-foreground line-through">{task.title}</span>
+         </div>
+       {/each}
+     </div>
+   {/if}
+   <div class="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#DCE7FF] bg-secondary/60 p-3">
+     {#if current}
+       <div class="min-w-0"><p class="text-meta font-medium text-primary">READY WHEN YOU ARE</p><p class="truncate text-ui font-medium">{current.title}</p></div>
+       <Button class="rounded-lg" onclick={() => controller.openFocus(current)}><Play class="mr-1 size-4"/> Start focus</Button>
+     {:else}
+       <p class="text-meta text-muted-foreground">Your day is clear.</p>
+       <Button size="sm" variant="outline" class="rounded-lg" onclick={() => { mobileShelf = true; showShelf = true; }}>Browse list</Button>
+     {/if}
+   </div>
+   <button type="button" class="mt-4 flex items-center gap-2 text-meta text-muted-foreground min-[760px]:hidden" aria-expanded={mobileShelf} onclick={() => mobileShelf = !mobileShelf}>
+     {#if mobileShelf}<ChevronDown class="size-4"/>{:else}<ChevronRight class="size-4"/>{/if} From your list ({controller.availableTasks.length})
+   </button>
+ </section>
+ {#if showShelf || mobileShelf}
+   <aside class={mobileShelf ? 'block' : 'hidden min-[760px]:block'}>
+     <section class="rounded-[20px] border border-border bg-card p-4">
+       <div class="flex items-start justify-between gap-2">
+         <div><h2 class="text-title font-medium">From your list</h2><p class="mt-1 text-meta text-muted-foreground">Add existing activities</p></div>
+         <span class="text-meta text-muted-foreground">{controller.availableTasks.length}</span>
+       </div>
+       <div class="relative mt-4">
+         <Search class="absolute left-3 top-3 size-4 text-muted-foreground"/>
+         <input bind:value={query} aria-label="Search available activities" placeholder="Search activities..."
+           class="h-10 w-full rounded-lg border border-input bg-muted/25 pl-9 pr-3 text-ui outline-none focus:border-primary"/>
+       </div>
+       <div class="mt-2 divide-y divide-border">
+         {#each available as task (task.id)}
+           <div class="flex min-h-14 items-center gap-2 py-2">
+             <div class="min-w-0 flex-1">
+               <p class="truncate text-ui font-medium">{task.title}</p>
+               {#if task.context}<p class="text-meta text-muted-foreground">{task.context}</p>{/if}
+             </div>
+             <Button variant="ghost" size="icon" class="size-8 rounded-lg" aria-label={'Add ' + task.title + ' to Today'} onclick={() => controller.addToToday(task.id)}><Plus class="size-4"/></Button>
+           </div>
+         {:else}
+           <p class="py-5 text-meta text-muted-foreground">No activities to add.</p>
+         {/each}
+       </div>
+     </section>
+   </aside>
+ {/if}
+</div>
+{#if editing}
+ {#key editing.id}
+   <TaskDetailDrawer task={editing} onClose={() => editing = null}
+     onSave={fields => controller.editSimple(editing?.id ?? '', fields)}
+     onArchive={() => { controller.archiveSimple(editing?.id ?? ''); editing = null; }}/>
+ {/key}
 {/if}
