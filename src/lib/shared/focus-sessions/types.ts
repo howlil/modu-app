@@ -9,6 +9,7 @@ export interface FocusActivitySession {
   goalMs: number;
   status: 'completed';
   taskId?: string | null;
+  completionKind?: 'full' | 'partial';
 }
 
 export type FocusTaskContext = { id: string; title: string };
