@@ -86,8 +86,8 @@ describe('Module boundary rules', () => {
   it('keeps Daily Execution route thin and feature-owned', () => {
     const route = read('src/routes/daily/+page.svelte');
     expect(route).toContain('DailyExecutionWorkspace');
-    expect(route.split('\\n').length).toBeLessThan(35);
-    expect(route).not.toMatch(/\\$state\\s*\\(|\\bonMount\\s*\\(|\\blocalStorage\\b|\\bindexedDB\\b/);
+    expect(route.split('\n').length).toBeLessThan(35);
+    expect(route).not.toMatch(/\$state\s*\(|\bonMount\s*\(|\blocalStorage\b|\bindexedDB\b/);
   });
 
   it('keeps the Typing route thin and composed through its feature workspace', () => {
