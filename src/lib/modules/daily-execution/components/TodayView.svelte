@@ -124,7 +124,7 @@
       {#if checkpointTask && checkpointTask.id === suggested.id}
         {#key checkpointTask.id}
           <CheckpointEditor task={checkpointTask}
-            onSave={(last, blocker, next) => { controller.saveCheckpoint(checkpointTask.id, last, blocker, next); editingCheckpointId = null; }}
+            onSave={(last, blocker, next) => { controller.saveCheckpoint(checkpointTask?.id ?? '', last, blocker, next); editingCheckpointId = null; }}
             onCancel={() => { editingCheckpointId = null; controller.checkpointPromptId = null; }}/>
         {/key}
       {/if}
@@ -148,7 +148,7 @@
   {#if checkpointTask && checkpointTask.id !== suggested?.id}
     <section class="mb-3 rounded-[20px] border border-border bg-card p-4">
       <CheckpointEditor task={checkpointTask}
-        onSave={(last, blocker, next) => { controller.saveCheckpoint(checkpointTask.id, last, blocker, next); editingCheckpointId = null; }}
+        onSave={(last, blocker, next) => { controller.saveCheckpoint(checkpointTask?.id ?? '', last, blocker, next); editingCheckpointId = null; }}
         onCancel={() => { editingCheckpointId = null; controller.checkpointPromptId = null; }}/>
     </section>
   {/if}
