@@ -8,7 +8,7 @@
 }
 *, *::before, *::after { box-sizing: border-box; }
 .modu-widget {
-  width: 300px;
+  width: min(300px, calc(100vw - 32px));
   padding: 16px;
   color: #252525;
   background: #ffffff;
@@ -18,7 +18,7 @@
   font: 400 14px/20px -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
   overflow: hidden;
 }
-.modu-widget.mini { width: 190px; padding: 8px; border-radius: 16px; }
+.modu-widget.mini { width: min(190px, calc(100vw - 32px)); padding: 8px; border-radius: 16px; }
 .modu-head,.modu-row,.modu-controls,.modu-mini { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .modu-brand { display:flex; align-items:center; gap:8px; font-weight:600; }
 .modu-mark { width:28px; height:28px; border-radius:9px; background:#eaf1ff; color:#174fcb; display:grid; place-items:center; font-weight:600; font-size:16px; }
