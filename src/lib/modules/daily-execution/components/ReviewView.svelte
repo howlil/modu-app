@@ -1,6 +1,9 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button/index.js';
   import * as Card from '$lib/components/ui/card/index.js';
+  import IntelligenceView from './IntelligenceView.svelte';
+  import EvidenceView from './EvidenceView.svelte';
+  import SourcesView from './SourcesView.svelte';
   import { WORKSTREAM_NAMES, localDayKey, type Workstream } from '../core/planning.ts';
   import type { DailyExecutionController } from '../controller/daily-execution.svelte.ts';
 
@@ -50,6 +53,16 @@
   });
 </script>
 
+<nav class="mb-5 flex max-w-full flex-wrap items-center gap-1 rounded-xl bg-muted/65 p-1" aria-label="Review sections">
+  {#each [['summary','Summary'],['intelligence','Intelligence'],['evidence','Evidence'],['sources','Sources']] as option}
+    {@const pane = option[0] as 'summary' | 'intelligence' | 'evidence' | 'sources'}
+    <button
+      class={controller.reviewSubview === pane ? 'h-8 rounded-full bg-background px-3 text-meta font-medium text-foreground shadow-sm' : 'h-8 rounded-full px-3 text-meta text-muted-foreground hover:text-foreground'}
+      aria-current={controller.reviewSubview === pane ? 'page' : undefined}
+      onclick={() => controller.reviewSubview = pane}>{option[1]}</button>
+  {/each}
+</nav>
+{#if controller.reviewSubview === 'summary'}
 <h2 class="text-title-lg font-semibold">Daily review</h2>
 <p class="mt-1 text-meta text-muted-foreground">Focus time and completed outcomes stay separate.</p>
 <div class="my-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -144,3 +157,11 @@
     <div class="flex items-center justify-between"><span class="text-meta text-muted-foreground">{saved ? 'Reflection saved locally' : ''}</span><Button type="submit" class="rounded-full">Save reflection</Button></div>
   </form>
 </Card.Root>
+
+{:else if controller.reviewSubview === 'intelligence'}
+  <IntelligenceView {controller} />
+{:else if controller.reviewSubview === 'evidence'}
+  <EvidenceView {controller} />
+{:else}
+  <SourcesView {controller} />
+{/if}
