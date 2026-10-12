@@ -6,16 +6,19 @@ Local-first browser utilities built with SvelteKit, Tailwind CSS, shadcn-svelte,
 
 - Merge PDF
 - Pomodoro
+- Daily Execution (linked to Pomodoro focus sessions)
 - Typing Practice
 
-Do not expand the tool catalog until one current module is implemented end-to-end.
+New modules require an end-to-end user workflow and must reuse existing capabilities rather than duplicate them.
 
 ## Architecture
 
 ```text
 src/routes/                   route composition and API entry points
 src/lib/components/ui/        shared shadcn-svelte primitives
-src/lib/modules/pomodoro/     timer rules, activity, persistence, browser adapters, feature views
+src/lib/modules/pomodoro/     timer rules, activity, preferences, feature views
+src/lib/modules/daily-execution/ planning, priorities, outcomes, reviews
+src/lib/shared/focus-sessions/ shared session repository and task handoff
 src/lib/modules/typing/       adaptive learner, typing session, persistence, feature views
 src/lib/platform/registry/    tool metadata and availability
 extension/                    independent Chromium permission/enforcement boundary
