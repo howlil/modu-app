@@ -299,6 +299,7 @@
                   <div class="truncate text-ui font-medium">{session.label || 'Focus session'}</div>
                   <div class="mt-1 text-meta text-muted-foreground">
                     {formatFocusTotal(session.plannedDurationMs)} target
+                     {#if session.completionKind === 'partial'} · Partial focus{/if}
                     {#if session.overtimeMs > 0}
                       + {formatFocusTotal(session.overtimeMs)} overtime
                     {/if}
