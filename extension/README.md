@@ -1,51 +1,39 @@
-# Module Focus Protection
+# Modu Focus Companion
 
-Chromium Manifest V3 companion extension for the Module Pomodoro timer.
+Chromium Manifest V3 extension for Modu Pomodoro and Daily Execution. Two independent, opt-in features:
 
-## What it does
+- **Floating focus widget** — an optional countdown and linked task in a Shadow DOM. Starts collapsed, expands to show the next action, and is injected only when enabled.
+- **Focus Protection** — blocks user-selected distracting sites during Focus, including SPA navigations and already-open tabs. Blocking continues during Pause/Overtime and ends on Break/Reset/Skip.
 
-- Blocks every route under websites the user explicitly adds, including SPA route changes such as `x.com/home`.
-- Immediately redirects already-open blocked tabs when Focus Protection starts.
-- Activates during Focus sessions.
-- Stays active while Focus is paused or in overtime.
-- Releases blocking on Break, Reset, or Skip.
-- Keeps enforcement running when the Module tab is backgrounded or closed.
-- Stores only the blocklist and active focus-session metadata locally.
+The web app owns timer transitions and recorded session history; the extension never automatically creates completed sessions.
 
-It does not collect visited URLs, page content, page titles, or browsing history.
+## Install and validate
 
-## Local development
+1. Visit chrome://extensions, enable Developer mode, and Load unpacked using this extension/ folder.
+2. Reload the extension after pulling a manifest update.
+3. Visit https://modu.howlil.site/pomodoro or the local development server.
+4. Open Settings → Floating focus. Enable it, then start a Focus session or launch one from Daily.
+5. Switch to another HTTP(S) website. Expand the floating timer to see the task and optional next action.
+6. Pause and resume in the Pomodoro web app. The countdown must freeze and resume.
+7. Disable Floating focus; the overlay must disappear without changing Focus Protection.
+8. Exclude a hostname and verify the widget stays hidden there. Test existing blocked-site navigation separately.
 
-1. Open `chrome://extensions` in Chrome, Edge, or Brave.
-2. Enable **Developer mode**.
-3. Choose **Load unpacked**.
-4. Select this `extension/` directory.
-5. After pulling extension changes, press **Reload** on the extension card so manifest/service-worker changes take effect.
-6. Open Module at `https://modu.howlil.site/pomodoro` or the local dev server.
-7. Open Pomodoro settings. **Module extension** should show **Connected**.
+## Privacy and permissions
 
-The extension requests host access because user-defined blocklists can contain arbitrary websites.
+- storage: persists the user’s floating preferences, latest task/timer snapshot, blocklist, and focus protection state in the browser.
+- scripting + host_permissions: enables injection on ordinary websites only after the user opts into Floating focus. The existing host permissions also support user-defined blocklists.
+- webNavigation + declarativeNetRequestWithHostAccess: supports website blocking.
+- No visited URLs, page contents, page titles or browsing history are collected. Current hostname is examined locally for exclusions; no browsing data is recorded.
+- Task title and next action can be visible on the website. Avoid confidential task names or disable Show active task / exclude sensitive websites.
 
 ## Architecture
 
-```
-Module Pomodoro
-      |
-window.postMessage
-      |
-content-bridge.js
-      |
-chrome.runtime messaging
-      |
-service-worker.js
-      |
-declarativeNetRequest session rules
-      |
-blocked/index.html
-```
+Daily task → Pomodoro controller (single timer owner) → trusted Modu extension bridge → MV3 service worker → extension local storage → Shadow DOM floating widget.
 
-The web app controls intent. The extension owns enforcement.
+The widget is read-only. The displayed clock is derived from absolute timestamps; after the deadline it says Time reached until the authoritative Pomodoro state is reconciled. Snapshots older than 24 hours are hidden.
 
-## Recovery
+Dynamically registered content scripts are unregistered when Floating is disabled; already-running scripts listen to settings and remove the overlay. Widget styles mirror Modu app.css tokens rather than adopting host-page styles.
 
-Session rules are browser-session scoped. On browser startup the extension reads the saved active focus session and recreates rules when the session is still valid. Stale protection is automatically discarded after 24 hours as a safety limit.
+## Verification
+
+Run bun run check, bun run test, and bun run build from the repository root. Also perform Chromium browser smoke tests for permissions, injection, style isolation, and Focus Protection regression.
