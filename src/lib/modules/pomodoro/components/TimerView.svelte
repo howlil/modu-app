@@ -28,6 +28,7 @@
         <span>{timer.status === 'paused' ? 'Paused' : timer.status === 'overtime' ? 'Overtime' : timer.status === 'complete' ? 'Complete' : timer.status === 'idle' ? '' : modeMeta.label}</span>
         {#if controller.protectionTimerLabel}<span>· {controller.protectionTimerLabel}</span>{/if}
       </div>
+      {#if controller.contextNotice}<p class="mt-2 text-meta text-destructive">{controller.contextNotice}</p>{/if}
       <div class="mt-1 flex h-14 w-full max-w-[330px] items-center justify-center">
         {#if timer.mode === 'focus'}
           {#if controller.focusEditing}
@@ -38,6 +39,13 @@
                 if (event.key === 'Enter') { event.preventDefault(); controller.commitFocusEdit(); }
                 else if (event.key === 'Escape') { event.preventDefault(); controller.cancelFocusEdit(); }
               }} />
+          {:else if controller.linkedTask}
+            <div class="flex max-w-full items-center gap-1">
+              <span class="truncate text-meta font-medium text-secondary-foreground">{controller.linkedTask.title}</span>
+              {#if timer.status === 'idle'}
+                <Button variant="ghost" size="icon-xs" class="size-6 rounded-full text-muted-foreground" aria-label="Unlink task" title="Unlink task" onclick={controller.unlinkTask}>×</Button>
+              {/if}
+            </div>
           {:else}
             <Button variant="ghost" size="sm" class="h-auto max-w-full rounded-full px-3 py-2 text-meta font-normal text-muted-foreground shadow-none" onclick={controller.beginFocusEdit}>
               <span class="truncate">{controller.focusText || '+ Add focus'}</span>
