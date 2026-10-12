@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadFocusSessions, saveFocusSession, assignFocusSession, clearFocusSessions } from '../../src/lib/shared/focus-sessions/repository.ts';
 import { consumePendingFocusTask, writePendingFocusTask } from '../../src/lib/shared/focus-sessions/context.ts';
 import type { FocusActivitySession } from '../../src/lib/shared/focus-sessions/types.ts';
+import { normalizePomodoroSnapshot } from '../../src/lib/modules/pomodoro/adapters/persistence.ts';
 
 function memoryStorage() {
   const entries = new Map<string, string>();
@@ -54,6 +55,14 @@ describe('Daily Execution ↔ Pomodoro session integration', () => {
     vi.stubGlobal('indexedDB', undefined);
     vi.stubGlobal('localStorage', memoryStorage());
     await expect(assignFocusSession('missing', 't')).rejects.toThrow();
+  });
+
+  it('restores the linked task from the existing Pomodoro snapshot without breaking legacy snapshots', () => {
+    const restored = normalizePomodoroSnapshot({
+      linkedTask: { id: 'task-123', title: 'Verify duplicate callbacks' }
+    }, 100_000);
+    expect(restored.linkedTask).toEqual({ id: 'task-123', title: 'Verify duplicate callbacks' });
+    expect(normalizePomodoroSnapshot({}, 100_000).linkedTask).toBeNull();
   });
 
   it('uses a one-shot validated task handoff', () => {
