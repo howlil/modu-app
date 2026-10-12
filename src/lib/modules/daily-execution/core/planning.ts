@@ -1,3 +1,6 @@
+import type { HabitDefinition } from './consistency.ts';
+import type { RecommendationDecision } from './recommendations.ts';
+
 export type CapacityMode = 'low' | 'medium' | 'high';
 export type Workstream = 'build' | 'interview' | 'apply' | 'english' | 'review';
 export type Impact = 'high' | 'medium' | 'low';
@@ -72,10 +75,12 @@ export interface ExecutionState {
   plans: Record<string, DailyPlan>;
   reflections: Record<string, WeeklyReflection>;
   manualEntries: ManualWorkEntry[];
+  habit: HabitDefinition;
+  recommendationDecisions: RecommendationDecision[];
 }
 
 export function emptyExecutionState(): ExecutionState {
-  return { goal: '', successCriteria: '', tasks: [], plans: {}, reflections: {}, manualEntries: [] };
+  return { goal: '', successCriteria: '', tasks: [], plans: {}, reflections: {}, manualEntries: [], habit: { id: 'technical-practice', name: 'Technical practice', qualifyingWorkstreams: ['build','interview'], targetDaysPerWeek: 3, minimumSessionMinutes: 15 }, recommendationDecisions: [] };
 }
 
 export function localDayKey(now: number): string {
