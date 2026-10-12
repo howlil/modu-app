@@ -272,9 +272,8 @@ export function createDailyExecutionController() {
   }
   function archiveSimple(id:string){
     if(!state.tasks.some(t=>t.id===id))return false;
-    let next:ExecutionState={...state,tasks:state.tasks.map(t=>t.id===id?{...t,status:'archived' as const}:t)};
-    for(const key of Object.keys(next.days))next=removeFromDay(next,id,key);
-    return commit(next);
+    // Preserve historical day membership; the view filters archived tasks.
+    return commit({...state,tasks:state.tasks.map(t=>t.id===id?{...t,status:'archived' as const}:t)});
   }
   function saveDayNote(note:string){return commit({...state,dayNotes:{...state.dayNotes,[dayKey]:note.slice(0,1000)}});}
   function setGoal(goal: string, successCriteria: string) {
