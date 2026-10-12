@@ -12,6 +12,7 @@ import { proposeReplan, overlapsExistingWork } from '../core/adaptive.ts';
 import { readExecutionState, saveExecutionState } from '../adapters/persistence.ts';
 import {
   CAPACITY_PRESETS, emptyExecutionState, localDayKey, makePlan, minutesLabel, nextTask, plannedMinutes, weekKey,
+  tasksForDay, currentForDay, selectForDay, removeFromDay, setNextForDay, completeSimply, reopenSimply,
   type CapacityMode, type DailyPlan, type ExecutionState, type ExecutionTask, type Impact, type TaskStatus, type Workstream,
   type WeeklyReflection
 } from '../core/planning.ts';
@@ -33,6 +34,9 @@ export function createDailyExecutionController() {
   let refreshVersion = 0;
 
   const plan = $derived(state.plans[dayKey] ?? makePlan(dayKey, 'medium'));
+  const todayTasks = $derived(tasksForDay(state,dayKey));
+  const availableTasks = $derived(state.tasks.filter(t=>t.status==='ready'&&!todayTasks.some(x=>x.id===t.id)));
+  const selectedTodayTask = $derived(currentForDay(state,dayKey));
   const focusRecordedMs = $derived(sessions.filter((s) => localDayKey(s.endedAt) === dayKey).reduce((sum, s) => sum + s.actualDurationMs, 0));
   const manualRecordedMs = $derived(state.manualEntries.filter((entry) => localDayKey(entry.endedAt) === dayKey).reduce((sum, entry) => sum + entry.endedAt - entry.startedAt, 0));
   const recordedMs = $derived(focusRecordedMs + manualRecordedMs);
@@ -247,6 +251,32 @@ export function createDailyExecutionController() {
     return commit({ ...latestState, manualEntries: [...latestState.manualEntries, entry] });
   }
 
+
+  function quickAdd(title:string,placement:'today'|'all'):boolean{
+    const clean=title.trim().slice(0,120);
+    if(!clean)return false;
+    const task:ExecutionTask={id:crypto.randomUUID(),title:clean,nextAction:'',workstream:'general',impact:'medium',estimateMinutes:0,status:'ready',createdAt:Date.now()};
+    const next={...state,tasks:[...state.tasks,task]};
+    return commit(placement==='today'?selectForDay(next,task.id,dayKey):next);
+  }
+  function addToToday(id:string){return commit(selectForDay(state,id,dayKey));}
+  function removeFromToday(id:string){return commit(removeFromDay(state,id,dayKey));}
+  function chooseNext(id:string){return commit(setNextForDay(state,id,dayKey));}
+  function completeQuick(id:string){return commit(completeSimply(state,id,Date.now()));}
+  function reopenQuick(id:string){return commit(reopenSimply(state,id));}
+  function editSimple(id:string,fields:{title:string;context?:string;nextAction?:string;estimateMinutes?:number;dueDate?:string}):boolean{
+    if(!fields.title.trim()||!state.tasks.some(t=>t.id===id))return false;
+    const minutes=fields.estimateMinutes??0;
+    if(!Number.isFinite(minutes)||minutes<0||minutes>720)return false;
+    return commit({...state,tasks:state.tasks.map(t=>t.id===id?{...t,title:fields.title.trim().slice(0,120),context:fields.context?.trim().slice(0,60)||undefined,nextAction:fields.nextAction?.trim().slice(0,240)??t.nextAction,estimateMinutes:Math.round(minutes),dueDate:fields.dueDate||undefined}:t)});
+  }
+  function archiveSimple(id:string){
+    if(!state.tasks.some(t=>t.id===id))return false;
+    let next:ExecutionState={...state,tasks:state.tasks.map(t=>t.id===id?{...t,status:'archived' as const}:t)};
+    for(const key of Object.keys(next.days))next=removeFromDay(next,id,key);
+    return commit(next);
+  }
+  function saveDayNote(note:string){return commit({...state,dayNotes:{...state.dayNotes,[dayKey]:note.slice(0,1000)}});}
   function setGoal(goal: string, successCriteria: string) {
     if (!goal.trim()) return;
     commit({ ...state, goal: goal.trim().slice(0, 120), successCriteria: successCriteria.trim().slice(0, 240) });
@@ -297,7 +327,7 @@ export function createDailyExecutionController() {
   function openFocus(task: ExecutionTask) {
     if (task.status !== 'ready') return;
     try {
-      writePendingFocusTask({ id: task.id, title: task.title, nextAction: task.checkpoint?.nextAction || task.nextAction });
+      writePendingFocusTask({ id: task.id, title: task.title, nextAction: task.checkpoint?.nextAction || task.nextAction, autoStart: true });
       window.location.assign('/pomodoro?taskId=' + encodeURIComponent(task.id));
     } catch {
       error = 'Unable to open Pomodoro. Check browser storage permissions.';
@@ -361,6 +391,10 @@ export function createDailyExecutionController() {
 
   return {
     get state() { return state; },
+    get todayTasks(){return todayTasks;},
+    get availableTasks(){return availableTasks;},
+    get selectedTodayTask(){return selectedTodayTask;},
+    get dayNote(){return state.dayNotes[dayKey]??'';},
     get sessions() { return sessions; },
     get evidenceRecords() { return evidenceRecords; },
     get combinedEvidence() { return combinedEvidence; },
@@ -386,6 +420,7 @@ export function createDailyExecutionController() {
     get recommendation() { return recommendation; },
     get loading() { return loading; },
     get error() { return error; },
+    quickAdd,addToToday,removeFromToday,chooseNext,completeQuick,reopenQuick,editSimple,archiveSimple,saveDayNote,
     setGoal, setMode, setAllocation, addTask, updateTask, setTaskStatus, completeTask,
     openFocus, assignSession, saveReflection, refreshSessions, focusMsForTask, focusMsForWorkstream, workMsForWorkstream,
     saveCheckpoint, acceptReplan, logManualWork,
