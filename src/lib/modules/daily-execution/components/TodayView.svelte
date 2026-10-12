@@ -2,6 +2,7 @@
   import { Play, Check, ArrowRight, Target } from 'lucide-svelte';
   import { Button } from '$lib/components/ui/button/index.js';
   import * as Card from '$lib/components/ui/card/index.js';
+  import CheckpointEditor from './CheckpointEditor.svelte';
   import { WORKSTREAM_NAMES, type CapacityMode, type Workstream } from '../core/planning.ts';
   import type { DailyExecutionController } from '../controller/daily-execution.svelte.ts';
 
@@ -12,10 +13,14 @@
   let outcomeDraft = $state('');
   let evidenceDraft = $state('');
   let showAllocations = $state(false);
+  let showReplan = $state(false);
+  let editingCheckpointId = $state<string | null>(null);
   const workstreams = Object.keys(WORKSTREAM_NAMES) as Workstream[];
   const recordedMinutes = $derived(controller.recordedMs / 60_000);
   const suggested = $derived(controller.recommendation);
   const remaining = $derived(Math.max(0, controller.plannedMinutes - recordedMinutes));
+  const checkpointId = $derived(editingCheckpointId ?? controller.checkpointPromptId);
+  const checkpointTask = $derived(controller.state.tasks.find((t) => t.id === checkpointId) ?? null);
 
   function saveOutcome() {
     if (!completingId || !outcomeDraft.trim()) return;
@@ -52,13 +57,37 @@
         {/each}
       </div>
     </div>
-    <div class="h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label="Recorded focus relative to work budget" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.min(100, Math.round(100 * recordedMinutes / Math.max(1, controller.plannedMinutes)))}>
+    <div class="h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label="Recorded work relative to work budget" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.min(100, Math.round(100 * recordedMinutes / Math.max(1, controller.plannedMinutes)))}>
       <div class="h-full rounded-full bg-primary" style:width={Math.min(100, 100 * recordedMinutes / Math.max(1, controller.plannedMinutes)) + '%'}></div>
     </div>
     <div class="flex justify-between gap-2 text-meta text-muted-foreground">
-      <span><strong class="font-medium text-foreground">{controller.minutesLabel(recordedMinutes)}</strong> Pomodoro focus recorded</span>
+      <span><strong class="font-medium text-foreground">{controller.minutesLabel(recordedMinutes)}</strong> recorded ({controller.minutesLabel(controller.focusRecordedMs / 60_000)} focus + {controller.minutesLabel(controller.manualRecordedMs / 60_000)} manual)</span>
       <span>{controller.minutesLabel(remaining)} budget not recorded</span>
     </div>
+    <div class="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
+      <span class="text-meta text-muted-foreground">Remaining work can be reallocated without changing past activity.</span>
+      <Button size="sm" variant="outline" class="rounded-full" onclick={() => showReplan = !showReplan}>{showReplan ? 'Close replan' : 'Replan remaining time'}</Button>
+    </div>
+    {#if showReplan}
+      <div class="rounded-xl border border-border bg-muted/35 p-4">
+        <div class="text-meta font-semibold">SUGGESTED REMAINING ALLOCATION</div>
+        <p class="mt-2 text-meta text-muted-foreground">{controller.replanProposal.reason}</p>
+        <div class="mt-4 grid gap-3">
+          {#each workstreams as workstream}
+            <div>
+              <div class="mb-1 flex justify-between text-meta"><span>{WORKSTREAM_NAMES[workstream]}</span><span>{controller.minutesLabel(controller.replanProposal.allocations[workstream])}</span></div>
+              <div class="h-1.5 overflow-hidden rounded-full bg-muted"><div class="h-full rounded-full bg-primary" style:width={controller.replanProposal.remainingMinutes ? Math.min(100, 100 * controller.replanProposal.allocations[workstream] / controller.replanProposal.remainingMinutes) + '%' : '0%'}></div></div>
+            </div>
+          {/each}
+        </div>
+        <div class="mt-4 flex justify-end gap-2">
+          <Button variant="ghost" size="sm" class="rounded-full" onclick={() => showReplan = false}>Keep plan</Button>
+          <Button size="sm" class="rounded-full" onclick={() => { controller.acceptReplan(); showReplan = false; }}>Accept replan</Button>
+        </div>
+      </div>
+    {:else if controller.plan.revision}
+      <div class="text-meta text-muted-foreground">Accepted replan: {controller.plan.revision.reason}</div>
+    {/if}
     <button class="w-fit text-meta text-muted-foreground underline-offset-4 hover:underline" onclick={() => showAllocations = !showAllocations} aria-expanded={showAllocations}>Edit workstream allocations {showAllocations ? '−' : '+'}</button>
     {#if showAllocations}
       <div class="grid gap-3 border-t border-border pt-3 sm:grid-cols-2">
@@ -78,12 +107,27 @@
     <section class="mb-3 rounded-[20px] border border-[#DCE7FF] bg-[linear-gradient(125deg,#F5F8FF,#EAF1FF)] p-6">
       <div class="text-meta font-semibold text-secondary-foreground">NEXT VALUABLE ACTION</div>
       <h2 class="mt-4 text-title-lg font-semibold tracking-[-0.03em]">{suggested.title}</h2>
-      <p class="mt-2 text-ui text-[#596678]">{suggested.nextAction}</p>
+      <p class="mt-2 text-ui text-[#596678]">{suggested.checkpoint?.nextAction || suggested.nextAction}</p>
+      {#if suggested.checkpoint}
+        <div class="mt-4 grid gap-2 border-t border-[#DCE7FF] pt-4 text-meta">
+          <div><span class="font-medium text-secondary-foreground">Last completed:</span> {suggested.checkpoint.lastCompleted || 'Not set'}</div>
+          {#if suggested.checkpoint.blocker}<div><span class="font-medium text-secondary-foreground">Blocker:</span> {suggested.checkpoint.blocker}</div>{/if}
+          <div><span class="font-medium text-secondary-foreground">Resume:</span> {suggested.checkpoint.nextAction}</div>
+        </div>
+      {/if}
       <div class="mt-4 text-meta text-muted-foreground">{WORKSTREAM_NAMES[suggested.workstream]} · {suggested.impact} impact · {controller.minutesLabel(suggested.estimateMinutes)} estimated · {controller.minutesLabel(controller.focusMsForTask(suggested.id) / 60_000)} recorded</div>
       <div class="mt-5 flex flex-wrap items-center gap-2">
         <Button class="rounded-full" onclick={() => controller.openFocus(suggested)}><Play class="mr-1 size-4" /> Focus in Pomodoro</Button>
+        <Button variant="ghost" class="rounded-full text-muted-foreground" onclick={() => { editingCheckpointId = suggested.id; controller.checkpointPromptId = null; }}>Checkpoint</Button>
         <Button variant="ghost" class="rounded-full text-muted-foreground" onclick={() => { completingId = suggested.id; outcomeDraft = ''; evidenceDraft = ''; }}><Check class="mr-1 size-4" /> Mark done</Button>
       </div>
+      {#if checkpointTask && checkpointTask.id === suggested.id}
+        {#key checkpointTask.id}
+          <CheckpointEditor task={checkpointTask}
+            onSave={(last, blocker, next) => { controller.saveCheckpoint(checkpointTask.id, last, blocker, next); editingCheckpointId = null; }}
+            onCancel={() => { editingCheckpointId = null; controller.checkpointPromptId = null; }}/>
+        {/key}
+      {/if}
       {#if completingId === suggested.id}
         <form class="mt-5 grid gap-3 rounded-xl border border-border bg-card p-4" onsubmit={(e) => { e.preventDefault(); saveOutcome(); }}>
           <label class="text-meta font-medium" for="outcome">What did you accomplish?</label>
@@ -101,6 +145,13 @@
     </Card.Root>
   {/if}
 
+  {#if checkpointTask && checkpointTask.id !== suggested?.id}
+    <section class="mb-3 rounded-[20px] border border-border bg-card p-4">
+      <CheckpointEditor task={checkpointTask}
+        onSave={(last, blocker, next) => { controller.saveCheckpoint(checkpointTask.id, last, blocker, next); editingCheckpointId = null; }}
+        onCancel={() => { editingCheckpointId = null; controller.checkpointPromptId = null; }}/>
+    </section>
+  {/if}
   <section class="overflow-hidden rounded-[20px] border border-border bg-card">
     <div class="flex items-center justify-between p-4"><h3 class="text-title font-medium">Up next</h3><Button variant="ghost" size="sm" class="rounded-full text-meta text-muted-foreground" onclick={() => controller.view = 'priorities'}>Manage priorities <ArrowRight class="ml-1 size-3.5" /></Button></div>
     {#each controller.queue.filter((task) => task.id !== suggested?.id).slice(0, 3) as task}
@@ -113,5 +164,5 @@
       <p class="border-t border-border p-5 text-meta text-muted-foreground">No additional ready tasks.</p>
     {/each}
   </section>
-  <p class="mt-4 text-meta text-muted-foreground">Only completed Pomodoro focus sessions are recorded. The 6/8/12h budget is not an automatic work-time tracker.</p>
+  <p class="mt-4 text-meta text-muted-foreground">Work budget is tracked only where focus sessions or manual entries have been recorded; breaks are excluded.</p>
 {/if}
