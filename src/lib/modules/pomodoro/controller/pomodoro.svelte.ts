@@ -250,7 +250,7 @@ export function createPomodoroController() {
       sessionId: timer.status === 'idle' ? null :
         timer.mode === 'focus' && sessionStartedAt !== null ? currentFocusSessionId() :
         timer.mode + '-' + (timer.endsAt ?? timer.overtimeStartedAt ?? timer.durationMs),
-      task: title ? { id: linkedTask?.id ?? null, title, nextAction: linkedTask?.nextAction } : null,
+      task: floatingSettings.showTask && title ? { id: linkedTask?.id ?? null, title, nextAction: linkedTask?.nextAction } : null,
       timer: {
         mode: timer.mode,
         status: timer.status,
@@ -263,7 +263,7 @@ export function createPomodoroController() {
   }
 
   async function publishFloatingContext() {
-    if (!companionConnected) return;
+    if (!companionConnected || !floatingSettings.enabled) return;
     const payload = floatingSnapshotPayload();
     const serialized = JSON.stringify(payload);
     if (serialized === lastFloatingPayload) return;
@@ -278,7 +278,13 @@ export function createPomodoroController() {
     if (response.ok && response.data?.floating) {
       floatingSettings = response.data.floating;
       floatingError = '';
-      void publishFloatingContext();
+      // Disabled floating must not retain task details in extension storage.
+      lastFloatingPayload = '';
+      if (!floatingSettings.enabled) {
+        await clearFloatingFocusContext();
+      } else {
+        void publishFloatingContext();
+      }
     } else {
       floatingError = response.error || 'Unable to update floating widget.';
     }
@@ -786,6 +792,7 @@ export function createPomodoroController() {
         ringtone
       },
       notificationsEnabled,
+      floatingSettings,
       focusProtection: {
         enabled: focusProtectionEnabled,
         blockedDomains
@@ -815,11 +822,16 @@ export function createPomodoroController() {
         await stopFocusProtection();
         await setFocusProtectionEnabled(false);
         await syncFocusProtectionBlocklist([]);
-        await clearFloatingFocusContext();
-        await setFloatingFocusSettings({ enabled: false, excludedDomains: [], showTask: true });
       } catch {
         // Local deletion must still succeed if the optional extension is unavailable.
       }
+    }
+
+    // Floating preferences and mirrored task data have an independent privacy boundary.
+    if (companionConnected) {
+      try { await clearFloatingFocusContext(); } catch { /* Keep local deletion available. */ }
+      try { await setFloatingFocusSettings({ enabled: false, excludedDomains: [], showTask: true }); }
+      catch { /* Keep local deletion available. */ }
     }
 
     await releaseWakeLock();
