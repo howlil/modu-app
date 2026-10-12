@@ -145,6 +145,18 @@ export function createDailyExecutionController() {
     } catch { error = 'Unable to archive evidence.'; }
   }
 
+  async function restoreEvidence(id: string) {
+    const existing = evidenceRecords.find((record) => record.id === id && !!record.archivedAt);
+    if (!existing) return;
+    try {
+      const restored = { ...existing };
+      delete restored.archivedAt;
+      await saveEvidenceRecords([restored]);
+      await refreshEvidence();
+      intelligenceNotice = 'Evidence restored.';
+    } catch { error = 'Unable to restore evidence.'; }
+  }
+
   function updateHabitTarget(days: number) {
     if (!Number.isInteger(days) || days < 1 || days > 7) return;
     commit({...state,habit:{...state.habit,targetDaysPerWeek:days}});
@@ -377,7 +389,7 @@ export function createDailyExecutionController() {
     setGoal, setMode, setAllocation, addTask, updateTask, setTaskStatus, completeTask,
     openFocus, assignSession, saveReflection, refreshSessions, focusMsForTask, focusMsForWorkstream, workMsForWorkstream,
     saveCheckpoint, acceptReplan, logManualWork,
-    intelligenceSnapshot, refreshEvidence, addEvidence, archiveEvidence, importEvidence, updateHabitTarget, decideRecommendation,
+    intelligenceSnapshot, refreshEvidence, addEvidence, archiveEvidence, restoreEvidence, importEvidence, updateHabitTarget, decideRecommendation,
     minutesLabel
   };
 }
