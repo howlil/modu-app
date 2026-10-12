@@ -12,12 +12,13 @@ Optimize for time-to-result, correctness, privacy, low cognitive load, and low r
 
 ## 2. Current scope
 
-Only three validation modules exist right now:
+The current validation modules are:
 
 ```text
 Module
 ├── Merge PDF
 ├── Pomodoro
+├── Daily Execution
 └── Typing Practice
 ```
 
@@ -456,3 +457,8 @@ What current user-visible requirement needs this?
 ```
 
 If there is no concrete answer, do not add it yet.
+
+
+## Daily Execution × Pomodoro contract
+
+Daily Execution is the owner of goal, task, capacity budget (Low 6h, Medium 8h, High 12h), task evidence, and review. Pomodoro remains the exclusive focus timer, break controller, and focus-protection owner. Completed focus sessions are persisted once in the existing `module-pomodoro-activity` database by the shared session repository. A focus session may optionally refer to a task ID. A task does not become Done merely because a focus session completes. Daily Execution estimates/work budgets are not automatically actual hours worked: Review labels recorded Pomodoro focus time explicitly. Legacy unassigned sessions must remain valid. Focus time remains available in Pomodoro Activity; no duplicate activity heatmap or timer is allowed in Daily Execution.
