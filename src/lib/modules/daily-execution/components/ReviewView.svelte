@@ -16,6 +16,15 @@
     const date = new Date(session.endedAt);
     return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-') === controller.dayKey;
   }));
+  const thisWeek = $derived(controller.sessions.filter((session) => {
+    const start = new Date(controller.weekStart + 'T00:00:00');
+    const end = new Date(start);
+    end.setDate(start.getDate() + 7);
+    const key = localDayKey(session.endedAt);
+    return key >= controller.weekStart && key < localDayKey(end.getTime());
+  }));
+  const weeklyMinutes = $derived(thisWeek.reduce((total, session) => total + session.actualDurationMs, 0) / 60_000);
+  const weeklyActiveDays = $derived(new Set(thisWeek.map((session) => localDayKey(session.endedAt))).size);
   const todayDone = $derived(controller.state.tasks.filter((t) => t.status === 'done' && t.completedAt && localDayKey(t.completedAt) === controller.dayKey));
   const unassigned = $derived(controller.sessions.filter((s) => !s.taskId || !controller.state.tasks.some((t) => t.id === s.taskId)));
   $effect(() => {
@@ -76,7 +85,7 @@
 {/if}
 <Card.Root class="gap-3 rounded-[20px] p-5 shadow-none">
   <h3 class="text-title font-medium">Weekly reflection</h3>
-  <p class="text-meta text-muted-foreground">Week of {controller.weekStart}. One short feedback loop.</p>
+  <p class="text-meta text-muted-foreground">Week of {controller.weekStart} · {controller.minutesLabel(weeklyMinutes)} focused across {weeklyActiveDays} days. One short feedback loop.</p>
   <form class="grid gap-3" onsubmit={(e) => { e.preventDefault(); controller.saveReflection({ outcome, bottleneck, nextPriority }); saved = true; }}>
     <label class="grid gap-1 text-meta font-medium">Most valuable outcome<textarea class="min-h-16 rounded-lg border border-input p-3 text-ui font-normal" bind:value={outcome} placeholder="What moved the goal forward?"></textarea></label>
     <label class="grid gap-1 text-meta font-medium">Biggest bottleneck<textarea class="min-h-16 rounded-lg border border-input p-3 text-ui font-normal" bind:value={bottleneck} placeholder="What blocked progress?"></textarea></label>
