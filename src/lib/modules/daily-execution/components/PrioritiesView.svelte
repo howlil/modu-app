@@ -47,7 +47,7 @@
   {#each [...controller.queue, ...controller.state.tasks.filter((t) => t.status !== 'ready')] as task}
     <div class="border-b border-border p-4 last:border-b-0">
       <div class="flex flex-wrap items-start gap-3">
-        <span class:!hidden={task.status !== 'done'} class="mt-2 size-2 shrink-0 rounded-full border border-muted-foreground"></span>
+        <span class={task.status === 'done' ? 'mt-2 size-2 shrink-0 rounded-full bg-[#247A54]' : 'mt-2 size-2 shrink-0 rounded-full border border-muted-foreground'}></span>
         <div class="min-w-0 flex-1">
           <div class="text-ui font-medium" class:text-muted-foreground={task.status === 'done'}>{task.title}</div>
           <p class="mt-1 text-meta text-muted-foreground">{task.nextAction}</p>
