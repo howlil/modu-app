@@ -57,6 +57,17 @@ describe('Daily Execution ↔ Pomodoro session integration', () => {
     await expect(assignFocusSession('missing', 't')).rejects.toThrow();
   });
 
+  it('restores active focus accounting and legacy snapshots', () => {
+    const restored = normalizePomodoroSnapshot({
+      timer: { mode: 'focus', status: 'paused', durationMs: 1500000, remainingMs: 900000 },
+      focusAccounting: { accumulatedMs: 600000, runningSince: null }
+    }, 500000);
+    expect(restored.focusAccounting.accumulatedMs).toBe(600000);
+    expect(restored.focusAccounting.runningSince).toBeNull();
+    const legacy = normalizePomodoroSnapshot({ timer: { mode: 'focus', status: 'paused', durationMs: 1500000, remainingMs: 900000 } }, 500000);
+    expect(legacy.focusAccounting.accumulatedMs).toBe(600000);
+  });
+
   it('restores the linked task from the existing Pomodoro snapshot without breaking legacy snapshots', () => {
     const restored = normalizePomodoroSnapshot({
       linkedTask: { id: 'task-123', title: 'Verify duplicate callbacks' }
