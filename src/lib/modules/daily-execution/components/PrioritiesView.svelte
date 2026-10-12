@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Plus, Play } from 'lucide-svelte';
   import { Button } from '$lib/components/ui/button/index.js';
-  import { WORKSTREAM_NAMES, type Impact, type Workstream } from '../core/planning.ts';
+  import { WORKSTREAM_NAMES, type Impact, type Workstream, type ExecutionTask } from '../core/planning.ts';
   import type { DailyExecutionController } from '../controller/daily-execution.svelte.ts';
   let { controller }: { controller: DailyExecutionController } = $props();
   let showForm = $state(false);
@@ -14,11 +14,32 @@
   let outcomeFor = $state<string | null>(null);
   let outcome = $state('');
   let evidence = $state('');
+  let editId = $state<string | null>(null);
+  let editTitle = $state('');
+  let editAction = $state('');
+  let editStream = $state<Workstream>('build');
+  let editImpact = $state<Impact>('high');
+  let editEffort = $state(45);
+  let editDue = $state('');
   const workstreams = Object.keys(WORKSTREAM_NAMES) as Workstream[];
   function create() {
     if (!title.trim() || !nextAction.trim()) return;
     controller.addTask(title, nextAction, workstream, impact, effort, dueDate);
     title = ''; nextAction = ''; dueDate = ''; effort = 45; showForm = false;
+  }
+  function beginEdit(task: ExecutionTask) {
+    editId = task.id;
+    editTitle = task.title;
+    editAction = task.nextAction;
+    editStream = task.workstream;
+    editImpact = task.impact;
+    editEffort = task.estimateMinutes;
+    editDue = task.dueDate ?? '';
+  }
+  function saveEdit() {
+    if (!editId) return;
+    controller.updateTask(editId, editTitle, editAction, editStream, editImpact, editEffort, editDue);
+    editId = null;
   }
   function done() {
     if (outcomeFor && outcome.trim()) controller.completeTask(outcomeFor, outcome, evidence);
@@ -57,10 +78,12 @@
         <div class="flex flex-wrap items-center gap-1">
           {#if task.status === 'ready'}
             <Button variant="ghost" size="sm" class="rounded-full text-meta" onclick={() => controller.openFocus(task)}><Play class="mr-1 size-3.5" /> Focus</Button>
+            <Button variant="ghost" size="sm" class="rounded-full text-meta" onclick={() => beginEdit(task)}>Edit</Button>
             <Button variant="ghost" size="sm" class="rounded-full text-meta" onclick={() => { outcomeFor = task.id; outcome = ''; evidence = ''; }}>Done</Button>
             <Button variant="ghost" size="sm" class="rounded-full text-meta text-muted-foreground" onclick={() => controller.setTaskStatus(task.id, 'blocked')}>Block</Button>
           {:else if task.status === 'blocked'}
             <Button variant="ghost" size="sm" onclick={() => controller.setTaskStatus(task.id, 'ready')}>Unblock</Button>
+            <Button variant="ghost" size="sm" onclick={() => beginEdit(task)}>Edit</Button>
           {:else if task.status === 'done'}
             <span class="text-meta text-muted-foreground">Completed</span>
           {/if}
@@ -71,6 +94,19 @@
           {/if}
         </div>
       </div>
+      {#if editId === task.id}
+        <form class="mt-3 grid gap-3 border-t border-border pt-3" onsubmit={(e) => {e.preventDefault(); saveEdit();}}>
+          <label class="grid gap-1 text-meta font-medium">Title<input required maxlength="120" class="h-10 rounded-lg border border-input px-3 text-ui font-normal" bind:value={editTitle} /></label>
+          <label class="grid gap-1 text-meta font-medium">Next action<textarea required maxlength="240" class="min-h-16 rounded-lg border border-input p-3 text-ui font-normal" bind:value={editAction}></textarea></label>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="grid gap-1 text-meta">Workstream<select class="h-10 rounded-lg border border-input bg-card px-2" bind:value={editStream}>{#each workstreams as stream}<option value={stream}>{WORKSTREAM_NAMES[stream]}</option>{/each}</select></label>
+            <label class="grid gap-1 text-meta">Impact<select class="h-10 rounded-lg border border-input bg-card px-2" bind:value={editImpact}><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label>
+            <label class="grid gap-1 text-meta">Minutes<input type="number" min="1" max="720" required class="h-10 rounded-lg border border-input px-3" bind:value={editEffort} /></label>
+            <label class="grid gap-1 text-meta">Deadline<input type="date" class="h-10 rounded-lg border border-input px-3" bind:value={editDue} /></label>
+          </div>
+          <div class="flex justify-end gap-2"><Button type="button" variant="ghost" onclick={() => editId = null}>Cancel</Button><Button type="submit" disabled={!editTitle.trim() || !editAction.trim()}>Save changes</Button></div>
+        </form>
+      {/if}
       {#if outcomeFor === task.id}
         <form class="mt-3 grid gap-3 border-t border-border pt-3" onsubmit={(e) => {e.preventDefault(); done();}}>
           <label class="text-meta font-medium" for="task-outcome">What did you accomplish?</label>
