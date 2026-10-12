@@ -73,6 +73,15 @@ export function createDailyExecutionController() {
     commit({ ...state, tasks: [...state.tasks, task] });
   }
 
+  function updateTask(id: string, title: string, nextAction: string, workstream: Workstream, impact: Impact, estimateMinutes: number, dueDate = '') {
+    if (!title.trim() || !nextAction.trim() || !Number.isFinite(estimateMinutes) || estimateMinutes < 1 || estimateMinutes > 720) return;
+    if (!(workstream in CAPACITY_PRESETS.medium) || !['high', 'medium', 'low'].includes(impact)) return;
+    commit({ ...state, tasks: state.tasks.map((t) => t.id === id && t.status !== 'done' ? {
+      ...t, title: title.trim().slice(0, 120), nextAction: nextAction.trim().slice(0, 240),
+      workstream, impact, estimateMinutes: Math.round(estimateMinutes), dueDate: dueDate || undefined
+    } : t) });
+  }
+
   function setTaskStatus(id: string, status: TaskStatus) {
     if (status === 'done') return;
     commit({ ...state, tasks: state.tasks.map((t) => t.id === id ? { ...t, status } : t) });
@@ -148,7 +157,7 @@ export function createDailyExecutionController() {
     get recommendation() { return recommendation; },
     get loading() { return loading; },
     get error() { return error; },
-    setGoal, setMode, setAllocation, addTask, setTaskStatus, completeTask,
+    setGoal, setMode, setAllocation, addTask, updateTask, setTaskStatus, completeTask,
     openFocus, assignSession, saveReflection, refreshSessions, focusMsForTask, focusMsForWorkstream,
     minutesLabel
   };
