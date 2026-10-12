@@ -5,7 +5,29 @@ export type FocusProtectionConnection =
   | 'active'
   | 'error';
 
+export type FloatingFocusSettings = {
+  enabled: boolean;
+  showTask: boolean;
+  excludedDomains: string[];
+};
+
+export type FloatingFocusSnapshot = {
+  version: 1;
+  sessionId: string | null;
+  updatedAt: number;
+  task: { id: string | null; title: string; nextAction?: string } | null;
+  timer: {
+    mode: 'focus' | 'short' | 'long';
+    status: 'idle' | 'running' | 'paused' | 'complete' | 'overtime';
+    durationMs: number;
+    remainingMs: number;
+    endsAt: number | null;
+    overtimeStartedAt: number | null;
+  };
+};
+
 export type FocusProtectionExtensionStatus = {
+  floating?: FloatingFocusSettings;
   installed: boolean;
   enabled: boolean;
   active: boolean;
@@ -26,7 +48,10 @@ type BridgeRequest =
   | { type: 'SET_ENABLED'; enabled: boolean }
   | { type: 'SET_BLOCKLIST'; blockedDomains: string[] }
   | ({ type: 'START_FOCUS' } & FocusProtectionSession)
-  | { type: 'END_FOCUS'; sessionId?: string };
+  | { type: 'END_FOCUS'; sessionId?: string }
+  | { type: 'SET_FLOATING_SETTINGS'; settings: Partial<FloatingFocusSettings> }
+  | { type: 'SET_FLOATING_SNAPSHOT'; snapshot: FloatingFocusSnapshot }
+  | { type: 'CLEAR_FLOATING_CONTEXT' };
 
 type BridgeResponse<T = unknown> = {
   ok: boolean;
@@ -201,4 +226,19 @@ export async function stopFocusProtection(sessionId?: string) {
     type: 'END_FOCUS',
     sessionId
   });
+}
+
+
+export async function setFloatingFocusSettings(settings: Partial<FloatingFocusSettings>) {
+  return requestExtension<{ floating: FloatingFocusSettings }>({
+    type: 'SET_FLOATING_SETTINGS', settings
+  }, 3500);
+}
+
+export async function publishFloatingFocusSnapshot(snapshot: FloatingFocusSnapshot) {
+  return requestExtension<{ stored: boolean }>({ type: 'SET_FLOATING_SNAPSHOT', snapshot });
+}
+
+export async function clearFloatingFocusContext() {
+  return requestExtension<{ cleared: boolean }>({ type: 'CLEAR_FLOATING_CONTEXT' });
 }
