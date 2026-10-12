@@ -1,4 +1,5 @@
 <script lang="ts">
+  import * as Card from '$lib/components/ui/card/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
   import { Switch } from '$lib/components/ui/switch/index.js';
   import type { TypingPreferences } from '../core/trainer.ts';
@@ -15,7 +16,8 @@
   <h2 class="m-0 text-title font-semibold tracking-[-0.03em]">Settings</h2>
 </div>
 
-<div class="divide-y divide-border">
+<Card.Root class="mt-5 gap-0 rounded-[20px] py-1 shadow-none">
+  <Card.Content class="divide-y divide-border px-5">
   <div class="flex items-center justify-between gap-5 py-4">
     <div class="min-w-0">
       <strong class="block text-meta font-medium">Keyboard sound</strong>
@@ -75,5 +77,5 @@
     </div>
     <span class="shrink-0 text-meta tabular-nums">{preferences.masteryAccuracy}%</span>
   </div>
-</div>
-
+  </Card.Content>
+</Card.Root>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import * as Card from '$lib/components/ui/card/index.js';
   import {
     dueKeys,
     weakKeys,
@@ -35,7 +36,7 @@
   <p class="mt-1 text-meta text-muted-foreground">What changed, and what still needs work.</p>
 </div>
 
-<section class="mt-8 border-b border-border pb-6">
+<Card.Root class="mt-6 gap-0 rounded-[20px] py-5 shadow-none"><Card.Content class="px-5">
   <div class="flex items-end justify-between gap-4">
     <div>
       <span class="text-meta text-muted-foreground">Recent speed</span>
@@ -60,10 +61,10 @@
   {:else}
     <p class="mt-5 text-meta text-muted-foreground">Finish a training block to start the trend.</p>
   {/if}
-</section>
+</Card.Content></Card.Root>
 
-<div class="grid grid-cols-2 gap-8 py-6 max-[680px]:grid-cols-1 max-[680px]:gap-6">
-  <section class="min-w-0">
+<div class="mt-3 grid grid-cols-2 items-start gap-3 max-[680px]:grid-cols-1">
+  <Card.Root class="min-w-0 gap-0 rounded-[20px] py-5 shadow-none"><Card.Content class="px-5">
     <h3 class="m-0 text-meta font-medium">Needs work</h3>
     <div class="mt-3 divide-y divide-border">
       {#if weakKeyMetrics.length > 0}
@@ -100,9 +101,9 @@
         </div>
       {/each}
     </div>
-  </section>
+  </Card.Content></Card.Root>
 
-  <section>
+  <Card.Root class="gap-0 rounded-[20px] py-5 shadow-none"><Card.Content class="px-5">
     <h3 class="m-0 text-meta font-medium">Review today</h3>
     <div class="mt-3 flex flex-wrap gap-x-4 gap-y-2 font-mono text-meta">
       {#if dueReviewKeys.length > 0}
@@ -113,6 +114,6 @@
         <span class="font-sans text-meta text-muted-foreground">Nothing due.</span>
       {/if}
     </div>
-  </section>
+  </Card.Content></Card.Root>
 </div>
 
