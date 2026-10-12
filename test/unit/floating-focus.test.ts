@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import widgetStyles from '../../extension/floating/widget.css?raw';
+import appStyles from '../../src/app.css?raw';
 import { consumePendingFocusTask, writePendingFocusTask } from '../../src/lib/shared/focus-sessions/context.ts';
 import { normalizePomodoroSnapshot } from '../../src/lib/modules/pomodoro/adapters/persistence.ts';
 
@@ -9,8 +11,6 @@ const sources = import.meta.glob<string>(
 );
 const workerSource = sources['../../extension/service-worker.js'];
 const widgetSource = sources['../../extension/floating/widget.js'];
-const widgetStyles = sources['../../extension/floating/widget.css'];
-const appStyles = sources['../../src/app.css'];
 
 type ExtensionResponse = { ok: boolean; data?: Record<string, unknown>; error?: string };
 type MessageHandler = (message: Record<string, unknown>, sender: { url: string }, send: (value: ExtensionResponse) => void) => boolean;
