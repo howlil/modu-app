@@ -29,16 +29,8 @@
     {#if controller.intelligenceNotice}<p role="status" class="mt-3 text-meta text-muted-foreground">{controller.intelligenceNotice}</p>{/if}
   </section>
   <section class="rounded-[20px] border border-border bg-card p-5">
-    <h4 class="text-ui font-medium">Future read-only connections</h4>
-    <p class="mt-2 text-meta text-muted-foreground">No external account is connected by this feature. Secure authentication, permission scopes and disconnect controls must be validated before enabling sync.</p>
-    <div class="mt-3 divide-y divide-border">
-      {#each [{name:'GitHub',reason:'Pull requests and engineering deliverables'}, {name:'Airtable',reason:'Recruitment pipeline changes'}, {name:'CS-101',reason:'Evaluated learning outcomes'}] as source}
-        <div class="flex items-center justify-between gap-3 py-3">
-          <div><div class="text-ui font-medium">{source.name}</div><div class="text-meta text-muted-foreground">{source.reason}</div></div>
-          <span class="shrink-0 text-meta text-muted-foreground">Not connected</span>
-        </div>
-      {/each}
-    </div>
+    <h4 class="text-ui font-medium">External sources</h4>
+    <p class="mt-2 text-meta text-muted-foreground">No account is connected. Modu can be used independently; imported records are optional and remain marked as unverified until supported by a trusted source.</p>
   </section>
   <section class="rounded-xl bg-muted/50 p-4">
     <p class="text-meta text-muted-foreground">Expected JSON fields: <code>kind</code>, <code>title</code>, <code>observation</code>, <code>occurredAt</code> (Unix milliseconds). Optional: <code>source</code>, <code>externalId</code>, <code>taskId</code>, <code>topic</code> and <code>assessmentResult</code>.</p>
