@@ -33,13 +33,15 @@ export function createDailyExecutionController() {
   }));
   const recommendation = $derived(nextTask(state.tasks, dayKey));
 
-  function commit(value: ExecutionState) {
+  function commit(value: ExecutionState): boolean {
     try {
       saveExecutionState(value);
       state = value;
       error = '';
+      return true;
     } catch {
       error = 'Unable to save data in this browser. Changes were not applied.';
+      return false;
     }
   }
 
@@ -99,8 +101,7 @@ export function createDailyExecutionController() {
       manualError = 'Overlapping work interval. Existing time cannot be counted twice.'; return false;
     }
     const entry = { id: crypto.randomUUID(), taskId, startedAt, endedAt };
-    commit({ ...state, manualEntries: [...state.manualEntries, entry] });
-    return true;
+    return commit({ ...state, manualEntries: [...state.manualEntries, entry] });
   }
 
   function setGoal(goal: string, successCriteria: string) {
