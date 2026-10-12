@@ -41,12 +41,12 @@ describe('M3 recommendations',()=>{
       [{id:proposed!.id,status:'rejected',decidedAt:now()}])).toBeNull();
   });
   it('changes only remaining allocations, preserves their total and bounds transfer',()=>{
-    const base={build:210,interview:120,apply:60,english:60,review:30};
+    const base={build:210,interview:120,apply:60,english:60,review:30,general:0};
     const result=adjustRemainingAllocation(base,'interview',60);
     expect(result.interview).toBe(180);
     expect(Object.values(result).reduce((a,b)=>a+b,0)).toBe(480);
     expect(base.build).toBe(210);
-    expect(adjustRemainingAllocation({build:0,interview:0,apply:0,english:0,review:0},'interview',30).interview).toBe(0);
+    expect(adjustRemainingAllocation({build:0,interview:0,apply:0,english:0,review:0,general:0},'interview',30).interview).toBe(0);
   });
 });
 function now(){return Date.now();}
