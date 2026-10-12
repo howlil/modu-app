@@ -109,6 +109,7 @@
     </div>
   {/each}
 </Card.Root>
+{#if controller.state.plans[controller.dayKey]}
 <Card.Root class="mb-3 gap-4 rounded-[20px] p-5 shadow-none">
   <h3 class="text-title font-medium">Workstream allocation</h3>
   {#each workstreams as workstream}
@@ -121,6 +122,7 @@
   {/each}
   <p class="text-meta text-muted-foreground">Only recorded Pomodoro focus and manually logged work count. Unassigned activity is excluded from workstream totals.</p>
 </Card.Root>
+{/if}
 <Card.Root class="mb-3 gap-3 rounded-[20px] p-5 shadow-none">
   <h3 class="text-title font-medium">Outcomes</h3>
   {#each todayDone as task}
