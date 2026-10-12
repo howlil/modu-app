@@ -17,6 +17,19 @@ export const CAPACITY_PRESETS: Record<CapacityMode, Record<Workstream, number>> 
   high: { build: 360, interview: 180, apply: 90, english: 60, review: 30 }
 };
 
+export interface TaskCheckpoint {
+  lastCompleted: string;
+  blocker: string;
+  nextAction: string;
+  updatedAt: number;
+}
+export interface ManualWorkEntry {
+  id: string;
+  taskId: string | null;
+  startedAt: number;
+  endedAt: number;
+}
+
 export interface ExecutionTask {
   id: string;
   title: string;
@@ -29,13 +42,21 @@ export interface ExecutionTask {
   outcome?: string;
   evidenceUrl?: string;
   completedAt?: number;
+  checkpoint?: TaskCheckpoint;
   createdAt: number;
 }
 
+export interface PlanRevision {
+  reason: string;
+  remainingAllocations: Record<Workstream, number>;
+  recordedAtAcceptanceMs: number;
+  acceptedAt: number;
+}
 export interface DailyPlan {
   dateKey: string;
   mode: CapacityMode;
   allocations: Record<Workstream, number>;
+  revision?: PlanRevision;
 }
 
 export interface WeeklyReflection {
@@ -50,10 +71,11 @@ export interface ExecutionState {
   tasks: ExecutionTask[];
   plans: Record<string, DailyPlan>;
   reflections: Record<string, WeeklyReflection>;
+  manualEntries: ManualWorkEntry[];
 }
 
 export function emptyExecutionState(): ExecutionState {
-  return { goal: '', successCriteria: '', tasks: [], plans: {}, reflections: {} };
+  return { goal: '', successCriteria: '', tasks: [], plans: {}, reflections: {}, manualEntries: [] };
 }
 
 export function localDayKey(now: number): string {
