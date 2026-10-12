@@ -1,16 +1,7 @@
 export type GoalSchedule = 'weekdays' | 'every-day';
 
-export interface FocusActivitySession {
-  id: string;
-  startedAt: number;
-  endedAt: number;
-  plannedDurationMs: number;
-  actualDurationMs: number;
-  overtimeMs: number;
-  label: string;
-  goalMs: number;
-  status: 'completed';
-}
+import type { FocusActivitySession } from '#lib/shared/focus-sessions/types.ts';
+export type { FocusActivitySession } from '#lib/shared/focus-sessions/types.ts';
 
 export interface LegacyFocusSession {
   id: string;
