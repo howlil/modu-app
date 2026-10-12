@@ -89,7 +89,7 @@ describe('Module boundary rules', () => {
     expect(evidence).toContain('module-daily-execution-evidence');
     for (const file of sourceFiles('src/lib/modules/daily-execution')) {
       const source = read(file);
-      expect(source, file).not.toMatch(/\\b(createTimer|startTimer|pauseTimer|resetTimer)\\s*\\(/);
+      expect(source, file).not.toMatch(/\b(createTimer|startTimer|pauseTimer|resetTimer)\s*\(/);
       expect(source, file).not.toContain('module-pomodoro-activity');
     }
   });
