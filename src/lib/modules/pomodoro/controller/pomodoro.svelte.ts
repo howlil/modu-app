@@ -231,7 +231,6 @@ export function createPomodoroController() {
       soundEnabled,
       ringtone,
       notificationsEnabled,
-      floatingSettings,
       focusProtection: {
         enabled: focusProtectionEnabled,
         blockedDomains
