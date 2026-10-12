@@ -36,7 +36,7 @@ export function readExecutionState(): ExecutionState {
         typeof raw.habit.name === 'string' && Array.isArray(raw.habit.qualifyingWorkstreams) &&
         Number.isFinite(raw.habit.targetDaysPerWeek) && Number.isFinite(raw.habit.minimumSessionMinutes)
         ? {
-            id: 'technical-practice', name: raw.habit.name.slice(0, 80),
+            id: typeof raw.habit.id === 'string' ? raw.habit.id.slice(0,80) : 'optional-routine', name: raw.habit.name.slice(0, 80),
             qualifyingWorkstreams: raw.habit.qualifyingWorkstreams.filter((x): x is 'build' | 'interview' | 'apply' | 'english' | 'review' =>
               ['build','interview','apply','english','review'].includes(x)).slice(0,5),
             targetDaysPerWeek: Math.max(1,Math.min(7,Math.round(raw.habit.targetDaysPerWeek))),
