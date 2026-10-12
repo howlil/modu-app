@@ -437,13 +437,14 @@ function validateFloatingSnapshot(raw) {
     }
   };
 }
-async function syncFloatingScripts(enabled) {
+async function syncFloatingScripts(enabled, injectExisting = false) {
   const existing = await chrome.scripting.getRegisteredContentScripts({ ids: [FLOATING_SCRIPT_ID] });
   if (!enabled) {
     if (existing.length) await chrome.scripting.unregisterContentScripts({ ids: [FLOATING_SCRIPT_ID] });
     return;
   }
   if (!existing.length) {
+    injectExisting = true;
     await chrome.scripting.registerContentScripts([{
       id: FLOATING_SCRIPT_ID,
       matches: ['http://*/*', 'https://*/*'],
@@ -453,7 +454,8 @@ async function syncFloatingScripts(enabled) {
       persistAcrossSessions: true
     }]);
   }
-  // Registration affects new navigations; inject also into existing tabs.
+  // Only inject existing tabs after first registration or explicit enabling.
+  if (!injectExisting) return;
   const tabs = await chrome.tabs.query({});
   await Promise.allSettled(tabs.filter((tab) =>
     typeof tab.id === 'number' && /^https?:\/\//.test(tab.url || '') &&
@@ -466,7 +468,7 @@ async function updateFloatingSettings(input) {
   const previous = await readFloatingSettings();
   const next = floatingSettings({ ...previous, ...input });
   await chrome.storage.local.set({ [FLOATING_SETTINGS_KEY]: next });
-  await syncFloatingScripts(next.enabled);
+  await syncFloatingScripts(next.enabled, !previous.enabled && next.enabled);
   return next;
 }
 async function saveFloatingSnapshot(input) {
