@@ -49,39 +49,43 @@ export function subscribeEvidence(onChange: () => void): () => void {
   };
 }
 export async function loadEvidenceRecords(): Promise<EvidenceRecord[]> {
+  let db: IDBDatabase;
+  try { db = await openDatabase(); }
+  catch { return fallbackRead(); }
   try {
-    const db = await openDatabase();
-    try {
-      const records = await new Promise<EvidenceRecord[]>((resolve, reject) => {
-        const tx = db.transaction(STORE, 'readonly');
-        const request = tx.objectStore(STORE).getAll();
-        request.onsuccess = () => resolve(request.result as EvidenceRecord[]);
-        request.onerror = () => reject(request.error ?? new Error('Unable to load evidence'));
-      });
-      return records;
-    } finally { db.close(); }
-  } catch {
-    return fallbackRead();
-  }
+    const records = await new Promise<EvidenceRecord[]>((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readonly');
+      const request = tx.objectStore(STORE).getAll();
+      request.onsuccess = () => resolve(request.result as EvidenceRecord[]);
+      request.onerror = () => reject(request.error ?? new Error('Unable to load evidence'));
+    });
+    // A previous browser-storage fallback must remain readable if IndexedDB returns.
+    const combined = new Map(fallbackRead().map((record) => [record.id, record]));
+    for (const record of records) combined.set(record.id, record);
+    return [...combined.values()];
+  } finally { db.close(); }
 }
 export async function saveEvidenceRecords(records: EvidenceRecord[]): Promise<void> {
   if (records.length === 0) return;
-  try {
-    const db = await openDatabase();
-    try {
-      await new Promise<void>((resolve, reject) => {
-        const tx = db.transaction(STORE, 'readwrite');
-        const store = tx.objectStore(STORE);
-        for (const record of records) store.put(record);
-        tx.oncomplete = () => resolve();
-        tx.onabort = () => reject(tx.error ?? new Error('Evidence save aborted'));
-        tx.onerror = () => reject(tx.error ?? new Error('Unable to save evidence'));
-      });
-    } finally { db.close(); }
-  } catch {
+  let db: IDBDatabase;
+  try { db = await openDatabase(); }
+  catch {
     const existing = new Map(fallbackRead().map((record) => [record.id, record]));
     for (const record of records) existing.set(record.id, record);
     fallbackWrite([...existing.values()]);
+    broadcastChange();
+    return;
   }
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      const store = tx.objectStore(STORE);
+      for (const record of records) store.put(record);
+      tx.oncomplete = () => resolve();
+      tx.onabort = () => reject(tx.error ?? new Error('Evidence save aborted'));
+      tx.onerror = () => reject(tx.error ?? new Error('Unable to save evidence'));
+    });
+  } finally { db.close(); }
+  // Transaction errors must propagate: do not silently report a successful write.
   broadcastChange();
 }
