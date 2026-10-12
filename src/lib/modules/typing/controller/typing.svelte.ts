@@ -215,6 +215,20 @@ export function createTypingController() {
     trainingSurface?.focus();
   }
 
+  // Both the physical-keyboard listener and the mobile textarea use one input path.
+  function typeText(text: string) {
+    for (const character of text) {
+      if (runComplete) break;
+      handleCharacter(character);
+    }
+  }
+
+  function selectBlock(index: number) {
+    if (!Number.isInteger(index) || index < 0 || index >= TRAINING_BLOCKS.length) return;
+    blockIndex = index;
+    startAdaptiveBlock();
+  }
+
   function handleCharacter(typed: string) {
     const expected = currentCharacter;
     if (!expected) return;
@@ -386,6 +400,8 @@ export function createTypingController() {
     startTest,
     startLesson,
     nextBlock,
+    selectBlock,
+    typeText,
     setPrimaryTab,
     cycleGuide,
     previewKeyboardSound,
