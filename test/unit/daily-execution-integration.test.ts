@@ -76,6 +76,15 @@ describe('Daily Execution ↔ Pomodoro session integration', () => {
     expect(normalizePomodoroSnapshot({}, 100_000).linkedTask).toBeNull();
   });
 
+  it('treats an explicit start request as one-shot and keeps older handoffs compatible', () => {
+    vi.stubGlobal('sessionStorage', memoryStorage());
+    writePendingFocusTask({id:'task-9',title:'Personal errand',autoStart:true});
+    expect(consumePendingFocusTask('task-9')).toEqual({id:'task-9',title:'Personal errand',autoStart:true});
+    expect(consumePendingFocusTask('task-9')).toBeNull();
+    writePendingFocusTask({id:'task-10',title:'Read a book'});
+    expect(consumePendingFocusTask('task-10')).toEqual({id:'task-10',title:'Read a book'});
+  });
+
   it('uses a one-shot validated task handoff', () => {
     vi.stubGlobal('sessionStorage', memoryStorage());
     writePendingFocusTask({ id: 'task-5', title: 'Test callbacks' });
