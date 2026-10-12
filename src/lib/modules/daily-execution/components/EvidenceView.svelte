@@ -6,6 +6,7 @@
   let {controller}: {controller: DailyExecutionController} = $props();
   let kind = $state<EvidenceKind | 'all'>('all');
   let adding = $state(false);
+  let showArchived = $state(false);
   let title = $state('');
   let observation = $state('');
   let topic = $state('');
@@ -83,5 +84,23 @@
       No evidence recorded in this category. Existing task outcomes will appear here automatically after completion.
     </div>
   {/each}
+  {#if controller.evidenceRecords.some((record) => !!record.archivedAt)}
+    <div class="rounded-xl border border-border bg-card p-4">
+      <Button variant="ghost" size="sm" class="rounded-full text-meta" onclick={() => showArchived = !showArchived}>
+        {showArchived ? 'Hide archived evidence' : 'Show archived evidence'}
+      </Button>
+      {#if showArchived}
+        {#each controller.evidenceRecords.filter((record) => !!record.archivedAt) as archived}
+          <div class="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
+            <div class="min-w-0">
+              <div class="truncate text-ui font-medium">{archived.title}</div>
+              <div class="text-meta text-muted-foreground">{archived.kind} · {archived.source}</div>
+            </div>
+            <Button variant="outline" size="sm" class="rounded-full" onclick={() => controller.restoreEvidence(archived.id)}>Restore</Button>
+          </div>
+        {/each}
+      {/if}
+    </div>
+  {/if}
   <p class="text-meta text-muted-foreground">Evidence never adds focus duration or automatically completes tasks. User-reported records are not independently verified.</p>
 </div>
