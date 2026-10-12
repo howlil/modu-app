@@ -12,7 +12,20 @@ export function readExecutionState(): ExecutionState {
       typeof task.nextAction === 'string' && typeof task.workstream === 'string' &&
       ['ready', 'blocked', 'done', 'archived'].includes(task.status)
     ) : [];
+    const validIds = new Set(validTasks.map(task => task.id));
+    const days = Object.fromEntries(Object.entries(raw.days && typeof raw.days === 'object' ? raw.days : {})
+      .filter(([date]) => /^\d{4}-\d{2}-\d{2}$/.test(date))
+      .map(([date, value]) => {
+        const source = value && typeof value === 'object' ? value as {taskIds?:unknown;selectedTaskId?:unknown} : {};
+        const taskIds = [...new Set(Array.isArray(source.taskIds)
+          ? source.taskIds.filter((id): id is string => typeof id==='string' && validIds.has(id)) : [])];
+        return [date, {taskIds, selectedTaskId: typeof source.selectedTaskId==='string' && taskIds.includes(source.selectedTaskId) ? source.selectedTaskId : undefined}];
+      }));
+    const dayNotes = Object.fromEntries(Object.entries(raw.dayNotes && typeof raw.dayNotes === 'object' ? raw.dayNotes : {})
+      .filter(([date, value]) => /^\d{4}-\d{2}-\d{2}$/.test(date) && typeof value === 'string')
+      .map(([date, value]) => [date, String(value).slice(0,1000)]));
     return {
+      days, dayNotes,
       goal: typeof raw.goal === 'string' ? raw.goal : '',
       successCriteria: typeof raw.successCriteria === 'string' ? raw.successCriteria : '',
       tasks: validTasks,
