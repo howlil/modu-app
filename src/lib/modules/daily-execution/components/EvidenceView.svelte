@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button/index.js';
   import type { DailyExecutionController } from '../controller/daily-execution.svelte.ts';
-  import type { EvidenceKind, EvidenceRecord } from '../core/evidence.ts';
+  import type { EvidenceKind } from '../core/evidence.ts';
 
   let {controller}: {controller: DailyExecutionController} = $props();
   let kind = $state<EvidenceKind | 'all'>('all');
@@ -69,7 +69,7 @@
           {#if record.topic}<p class="mt-2 text-meta">Topic: {record.topic}{#if record.assessmentResult} · {record.assessmentResult.replace('-',' ')}{/if}</p>{/if}
           {#if record.url}<a class="mt-2 block break-all text-meta text-primary underline underline-offset-2" href={record.url} target="_blank" rel="noopener noreferrer">Open evidence ↗</a>{/if}
         </div>
-        {#if record.source === 'manual'}
+        {#if record.source !== 'task-outcome'}
           <Button size="sm" variant="ghost" class="shrink-0 rounded-full text-meta text-muted-foreground" onclick={()=>controller.archiveEvidence(record.id)}>Archive</Button>
         {/if}
       </div>
