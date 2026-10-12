@@ -1,4 +1,6 @@
 import { onMount, tick } from 'svelte';
+import { consumePendingFocusTask } from '#lib/shared/focus-sessions/context.ts';
+import type { FocusTaskContext } from '#lib/shared/focus-sessions/types.ts';
   import { createWakeLockController } from '#lib/modules/pomodoro/adapters/wake-lock.ts';
   import { clearFocusSessions, loadFocusSessions, saveFocusSession, saveFocusSessions } from '#lib/modules/pomodoro/adapters/activity-storage.ts';
   import {
@@ -98,6 +100,8 @@ export function createPomodoroController() {
   let timer = $state<TimerState>(createTimer('focus', DEFAULT_DURATIONS.focus * 60_000));
   let sessionStartedAt = $state<number | null>(null);
   let focusText = $state('');
+  let linkedTask = $state<FocusTaskContext | null>(null);
+  let contextNotice = $state('');
   let focusDraft = $state('');
   let focusEditing = $state(false);
   let focusInput = $state<HTMLInputElement | null>(null);
@@ -208,6 +212,7 @@ export function createPomodoroController() {
       durations,
       preferences,
       focusText,
+      linkedTask,
       soundEnabled,
       ringtone,
       notificationsEnabled,
@@ -234,6 +239,7 @@ export function createPomodoroController() {
       timer = restored.timer;
       sessionStartedAt = restored.sessionStartedAt;
       focusText = restored.focusText;
+      linkedTask = restored.linkedTask;
       focusDraft = restored.focusText;
       soundEnabled = restored.soundEnabled;
       ringtone = restored.ringtone;
@@ -460,13 +466,14 @@ export function createPomodoroController() {
   ) {
     const endedAt = Date.now();
     const session: FocusActivitySession = {
-      id: newSessionId(),
+      id: currentFocusSessionId(),
       startedAt: sessionStartedAt ?? endedAt - actualDurationMs,
       endedAt,
       plannedDurationMs,
       actualDurationMs: Math.max(plannedDurationMs, actualDurationMs),
       overtimeMs: Math.max(0, overtimeDurationMs),
       label: focusText.trim(),
+      taskId: linkedTask?.id ?? null,
       goalMs,
       status: 'completed'
     };
@@ -802,11 +809,31 @@ export function createPomodoroController() {
     persist();
   }
 
+  function unlinkTask() {
+    if (timer.status !== 'idle' || timer.mode !== 'focus') return;
+    linkedTask = null;
+    focusText = '';
+    focusDraft = '';
+    contextNotice = '';
+    persist();
+  }
+
   onMount(() => {
     notificationsSupported = typeof Notification !== 'undefined';
     wakeLockSupported = 'wakeLock' in navigator;
 
     restore();
+    const requestedTaskId = new URLSearchParams(window.location.search).get('taskId');
+    if (requestedTaskId) {
+      const pendingTask = consumePendingFocusTask(requestedTaskId);
+      if (pendingTask && timer.mode === 'focus' && timer.status === 'idle') {
+        linkedTask = pendingTask;
+        focusText = pendingTask.title;
+        focusDraft = pendingTask.title;
+      } else if (pendingTask) {
+        contextNotice = 'Finish or reset your current session before switching tasks.';
+      }
+    }
 
     if (!notificationsSupported) notificationsEnabled = false;
     if (!wakeLockSupported) preferences = { ...preferences, keepAwake: false };
@@ -904,6 +931,8 @@ export function createPomodoroController() {
     get durations() { return durations; },
     get preferences() { return preferences; },
     get focusText() { return focusText; },
+    get linkedTask() { return linkedTask; },
+    get contextNotice() { return contextNotice; },
     get focusDraft() { return focusDraft; },
     set focusDraft(value: string) { focusDraft = value; },
     get focusEditing() { return focusEditing; },
@@ -942,6 +971,7 @@ export function createPomodoroController() {
     beginFocusEdit,
     commitFocusEdit,
     cancelFocusEdit,
+    unlinkTask,
     handleReset,
     handlePrimary,
     handleSkip,
