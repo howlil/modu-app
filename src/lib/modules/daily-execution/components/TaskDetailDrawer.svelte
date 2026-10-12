@@ -8,12 +8,19 @@
    onSave: (fields: { title: string; context: string; nextAction: string; estimateMinutes: number; dueDate: string }) => boolean;
    onArchive: () => void;
  } = $props();
- let title = $state(task.title);
- let context = $state(task.context ?? (task.workstream === 'general' ? '' : task.workstream));
- let nextAction = $state(task.nextAction);
- let estimate = $state(task.estimateMinutes ? String(task.estimateMinutes) : '');
- let dueDate = $state(task.dueDate ?? '');
+ let title = $state('');
+ let context = $state('');
+ let nextAction = $state('');
+ let estimate = $state('');
+ let dueDate = $state('');
  let expanded = $state(false);
+ $effect(() => {
+   title = task.title;
+   context = task.context ?? (task.workstream === 'general' ? '' : task.workstream);
+   nextAction = task.nextAction;
+   estimate = task.estimateMinutes ? String(task.estimateMinutes) : '';
+   dueDate = task.dueDate ?? '';
+ });
  function submit(event: SubmitEvent) {
    event.preventDefault();
    if (onSave({ title, context, nextAction, estimateMinutes: estimate.trim() ? Number(estimate) : 0, dueDate })) onClose();
@@ -23,7 +30,7 @@
 <svelte:window onkeydown={keydown}/>
 <div class="fixed inset-0 z-50 flex justify-end bg-foreground/30">
  <button class="absolute inset-0 cursor-default" type="button" aria-label="Close activity details" onclick={onClose}></button>
- <aside role="dialog" aria-modal="true" aria-labelledby="daily-task-heading" class="relative z-10 flex h-full w-full max-w-[390px] flex-col overflow-y-auto border-l border-border bg-card shadow-xl">
+ <div role="dialog" aria-modal="true" aria-labelledby="daily-task-heading" class="relative z-10 flex h-full w-full max-w-[390px] flex-col overflow-y-auto border-l border-border bg-card shadow-xl">
    <header class="flex items-center justify-between border-b border-border px-5 py-4">
      <h2 id="daily-task-heading" class="text-title font-medium">Activity details</h2>
      <Button variant="ghost" size="icon" aria-label="Close" onclick={onClose}><X class="size-4"/></Button>
@@ -61,5 +68,5 @@
        <Button type="submit" class="rounded-lg" disabled={!title.trim()}>Save</Button>
      </div>
    </form>
- </aside>
+ </div>
 </div>
