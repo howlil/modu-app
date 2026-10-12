@@ -100,10 +100,13 @@ export function plannedMinutes(plan: DailyPlan): number {
 
 export function nextTask(tasks: ExecutionTask[], nowKey: string): ExecutionTask | null {
   const rank = { high: 0, medium: 1, low: 2 };
+  const nextDate = new Date(nowKey + 'T00:00:00');
+  nextDate.setDate(nextDate.getDate() + 1);
+  const upcoming = localDayKey(nextDate.getTime());
   return [...tasks].filter((t) => t.status === 'ready')
     .sort((a, b) => {
-      const urgentA = a.dueDate && a.dueDate <= nowKey ? -1 : 0;
-      const urgentB = b.dueDate && b.dueDate <= nowKey ? -1 : 0;
+      const urgentA = a.dueDate && a.dueDate <= upcoming ? -1 : 0;
+      const urgentB = b.dueDate && b.dueDate <= upcoming ? -1 : 0;
       return urgentA - urgentB || rank[a.impact] - rank[b.impact] ||
         (a.dueDate || '9999').localeCompare(b.dueDate || '9999') || a.createdAt - b.createdAt;
     })[0] ?? null;
