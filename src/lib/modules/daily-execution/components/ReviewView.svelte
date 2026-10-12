@@ -11,6 +11,10 @@
   let selectedTask = $state<Record<string, string>>({});
   let saved = $state(false);
   let lastLoadedWeek = $state('');
+  let manualOpen = $state(false);
+  let manualTaskId = $state('');
+  let manualStart = $state('13:15');
+  let manualDuration = $state(30);
   const workstreams = Object.keys(WORKSTREAM_NAMES) as Workstream[];
   const daily = $derived(controller.sessions.filter((session) => {
     const date = new Date(session.endedAt);
@@ -23,8 +27,16 @@
     const key = localDayKey(session.endedAt);
     return key >= controller.weekStart && key < localDayKey(end.getTime());
   }));
-  const weeklyMinutes = $derived(thisWeek.reduce((total, session) => total + session.actualDurationMs, 0) / 60_000);
-  const weeklyActiveDays = $derived(new Set(thisWeek.map((session) => localDayKey(session.endedAt))).size);
+  const thisWeekManual = $derived(controller.state.manualEntries.filter((entry) => {
+    const start = new Date(controller.weekStart + 'T00:00:00');
+    const end = new Date(start);
+    end.setDate(start.getDate() + 7);
+    const key = localDayKey(entry.endedAt);
+    return key >= controller.weekStart && key < localDayKey(end.getTime());
+  }));
+  const weeklyMinutes = $derived((thisWeek.reduce((total, session) => total + session.actualDurationMs, 0) +
+    thisWeekManual.reduce((total, entry) => total + entry.endedAt - entry.startedAt, 0)) / 60_000);
+  const weeklyActiveDays = $derived(new Set([...thisWeek.map((session) => localDayKey(session.endedAt)), ...thisWeekManual.map((entry) => localDayKey(entry.endedAt))]).size);
   const todayDone = $derived(controller.state.tasks.filter((t) => t.status === 'done' && t.completedAt && localDayKey(t.completedAt) === controller.dayKey));
   const unassigned = $derived(controller.sessions.filter((s) => !s.taskId || !controller.state.tasks.some((t) => t.id === s.taskId)));
   $effect(() => {
@@ -40,22 +52,61 @@
 
 <h2 class="text-title-lg font-semibold">Daily review</h2>
 <p class="mt-1 text-meta text-muted-foreground">Focus time and completed outcomes stay separate.</p>
-<div class="my-5 grid grid-cols-3 gap-2">
-  <Card.Root class="gap-1 rounded-xl p-4 shadow-none"><span class="text-meta text-muted-foreground">Focus recorded</span><strong class="text-title-lg font-medium tabular-nums">{controller.minutesLabel(controller.recordedMs / 60_000)}</strong></Card.Root>
+<div class="my-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+  <Card.Root class="gap-1 rounded-xl p-4 shadow-none"><span class="text-meta text-muted-foreground">Work recorded</span><strong class="text-title-lg font-medium tabular-nums">{controller.minutesLabel(controller.recordedMs / 60_000)}</strong></Card.Root>
+  <Card.Root class="gap-1 rounded-xl p-4 shadow-none"><span class="text-meta text-muted-foreground">Manual work</span><strong class="text-title-lg font-medium tabular-nums">{controller.minutesLabel(controller.manualRecordedMs / 60_000)}</strong></Card.Root>
   <Card.Root class="gap-1 rounded-xl p-4 shadow-none"><span class="text-meta text-muted-foreground">Sessions</span><strong class="text-title-lg font-medium tabular-nums">{daily.length}</strong></Card.Root>
   <Card.Root class="gap-1 rounded-xl p-4 shadow-none"><span class="text-meta text-muted-foreground">Tasks done</span><strong class="text-title-lg font-medium tabular-nums">{todayDone.length}</strong></Card.Root>
 </div>
+<Card.Root class="mb-3 gap-3 rounded-[20px] p-5 shadow-none">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div><h3 class="text-title font-medium">Work activity</h3><p class="text-meta text-muted-foreground">Pomodoro sessions and non-overlapping manual work.</p></div>
+    <Button variant="outline" size="sm" class="rounded-full" onclick={() => manualOpen = !manualOpen}>{manualOpen ? 'Close' : '+ Log untracked work'}</Button>
+  </div>
+  {#if manualOpen}
+    <form class="grid gap-3 rounded-xl border border-border bg-muted/40 p-4" onsubmit={(event) => {
+      event.preventDefault();
+      if (controller.logManualWork(manualTaskId || null, manualStart, manualDuration)) manualOpen = false;
+    }}>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <label class="grid gap-1 text-meta font-medium">Linked task (optional)
+          <select class="h-10 min-w-0 rounded-lg border border-input bg-card px-2 text-ui" bind:value={manualTaskId}>
+            <option value="">Unassigned work</option>
+            {#each controller.state.tasks as task}<option value={task.id}>{task.title}</option>{/each}
+          </select>
+        </label>
+        <label class="grid gap-1 text-meta font-medium">Start time
+          <input class="h-10 rounded-lg border border-input bg-card px-3 text-ui" type="time" required bind:value={manualStart}/>
+        </label>
+        <label class="grid gap-1 text-meta font-medium">Duration (minutes)
+          <input class="h-10 rounded-lg border border-input bg-card px-3 text-ui" type="number" min="1" max="720" required bind:value={manualDuration}/>
+        </label>
+      </div>
+      {#if controller.manualError}<p class="text-meta text-destructive" role="alert">{controller.manualError}</p>{/if}
+      <div class="flex justify-end"><Button type="submit" class="rounded-full">Save work</Button></div>
+    </form>
+  {/if}
+  {#each controller.state.manualEntries.filter((entry) => localDayKey(entry.endedAt) === controller.dayKey).sort((a, b) => a.startedAt - b.startedAt) as entry}
+    <div class="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
+      <div>
+        <div class="text-ui font-medium">{controller.state.tasks.find((task) => task.id === entry.taskId)?.title ?? 'Unassigned work'}</div>
+        <p class="text-meta text-muted-foreground">{new Date(entry.startedAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})} – {new Date(entry.endedAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</p>
+      </div>
+      <span class="text-meta text-muted-foreground">{controller.minutesLabel((entry.endedAt - entry.startedAt) / 60_000)} · Manual</span>
+    </div>
+  {/each}
+</Card.Root>
 <Card.Root class="mb-3 gap-4 rounded-[20px] p-5 shadow-none">
   <h3 class="text-title font-medium">Workstream allocation</h3>
   {#each workstreams as workstream}
-    {@const actual = controller.focusMsForWorkstream(workstream) / 60_000}
+    {@const actual = controller.workMsForWorkstream(workstream) / 60_000}
     {@const planned = controller.plan.allocations[workstream]}
     <div>
       <div class="mb-2 flex justify-between gap-2 text-meta"><span>{WORKSTREAM_NAMES[workstream]}</span><span class="tabular-nums text-muted-foreground">{controller.minutesLabel(actual)} / {controller.minutesLabel(planned)}</span></div>
       <div class="h-1.5 overflow-hidden rounded-full bg-muted"><div class="h-full rounded-full bg-primary" style:width={Math.min(100, 100 * actual / Math.max(1, planned)) + '%'}></div></div>
     </div>
   {/each}
-  <p class="text-meta text-muted-foreground">Only recorded Pomodoro sessions count. Other work hours are not inferred.</p>
+  <p class="text-meta text-muted-foreground">Only recorded Pomodoro focus and manually logged work count. Unassigned activity is excluded from workstream totals.</p>
 </Card.Root>
 <Card.Root class="mb-3 gap-3 rounded-[20px] p-5 shadow-none">
   <h3 class="text-title font-medium">Outcomes</h3>
@@ -85,7 +136,7 @@
 {/if}
 <Card.Root class="gap-3 rounded-[20px] p-5 shadow-none">
   <h3 class="text-title font-medium">Weekly reflection</h3>
-  <p class="text-meta text-muted-foreground">Week of {controller.weekStart} · {controller.minutesLabel(weeklyMinutes)} focused across {weeklyActiveDays} days. One short feedback loop.</p>
+  <p class="text-meta text-muted-foreground">Week of {controller.weekStart} · {controller.minutesLabel(weeklyMinutes)} recorded across {weeklyActiveDays} active days. One short feedback loop.</p>
   <form class="grid gap-3" onsubmit={(e) => { e.preventDefault(); controller.saveReflection({ outcome, bottleneck, nextPriority }); saved = true; }}>
     <label class="grid gap-1 text-meta font-medium">Most valuable outcome<textarea class="min-h-16 rounded-lg border border-input p-3 text-ui font-normal" bind:value={outcome} placeholder="What moved the goal forward?"></textarea></label>
     <label class="grid gap-1 text-meta font-medium">Biggest bottleneck<textarea class="min-h-16 rounded-lg border border-input p-3 text-ui font-normal" bind:value={bottleneck} placeholder="What blocked progress?"></textarea></label>
