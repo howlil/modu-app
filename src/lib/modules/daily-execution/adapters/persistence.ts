@@ -1,4 +1,4 @@
-import { emptyExecutionState, type ExecutionState, type ExecutionTask } from '../core/planning.ts';
+import { emptyExecutionState, type ExecutionState, type ExecutionTask, type ManualWorkEntry } from '../core/planning.ts';
 const KEY = 'modu-daily-execution-v1';
 
 export function readExecutionState(): ExecutionState {
@@ -17,7 +17,8 @@ export function readExecutionState(): ExecutionState {
       successCriteria: typeof raw.successCriteria === 'string' ? raw.successCriteria : '',
       tasks: validTasks,
       plans: raw.plans && typeof raw.plans === 'object' ? raw.plans : {},
-      reflections: raw.reflections && typeof raw.reflections === 'object' ? raw.reflections : {}
+      reflections: raw.reflections && typeof raw.reflections === 'object' ? raw.reflections : {},
+      manualEntries: Array.isArray(raw.manualEntries) ? raw.manualEntries.filter((entry): entry is ManualWorkEntry => !!entry && typeof entry.id === 'string' && (entry.taskId === null || typeof entry.taskId === 'string') && Number.isFinite(entry.startedAt) && Number.isFinite(entry.endedAt) && entry.endedAt > entry.startedAt) : []
     };
   } catch { return emptyExecutionState(); }
 }
