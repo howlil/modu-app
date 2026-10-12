@@ -110,6 +110,12 @@ describe('Modu Floating Focus', () => {
 
   it('keeps floating independent from blocker and rejects outdated snapshots', async () => {
     const extension = makeExtension();
+    const attemptedBeforeOptIn = await extension.send({
+      type: 'SET_FLOATING_SNAPSHOT', snapshot: snapshot(Date.now())
+    });
+    expect(attemptedBeforeOptIn.data?.stored).toBe(false);
+    expect(extension.data.has('module-floating-focus-v1')).toBe(false);
+
     const before = await extension.send({ type: 'PING' });
     expect(before.data?.active).toBe(false);
     expect((before.data?.floating as {enabled: boolean}).enabled).toBe(false);
@@ -127,6 +133,11 @@ describe('Modu Floating Focus', () => {
     await extension.send({type:'SET_FLOATING_SNAPSHOT', snapshot:stale});
     const latest = extension.data.get('module-floating-focus-v1') as ReturnType<typeof snapshot>;
     expect(latest.task.title).toBe('Verify duplicate payments');
+
+    await extension.send({ type: 'SET_FLOATING_SETTINGS', settings: { showTask: false } });
+    expect((extension.data.get('module-floating-focus-v1') as ReturnType<typeof snapshot>).task).toBeNull();
+    await extension.send({ type: 'SET_FLOATING_SNAPSHOT', snapshot: snapshot(now + 1) });
+    expect((extension.data.get('module-floating-focus-v1') as ReturnType<typeof snapshot>).task).toBeNull();
     expect((await extension.send({type:'SET_FLOATING_SNAPSHOT', snapshot:{...snapshot(now),timer:{mode:'invalid'}}})).ok).toBe(false);
 
     expect((await extension.send({type:'SET_FLOATING_SETTINGS', settings:{enabled:false}})).ok).toBe(true);
