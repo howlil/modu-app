@@ -76,6 +76,24 @@ describe('Module boundary rules', () => {
     }
   });
 
+  it('keeps M3 intelligence inside Daily Execution without a second timer or focus store', () => {
+    const review = read('src/lib/modules/daily-execution/components/ReviewView.svelte');
+    const controller = read('src/lib/modules/daily-execution/controller/daily-execution.svelte.ts');
+    const analytics = read('src/lib/modules/daily-execution/core/analytics.ts');
+    const evidence = read('src/lib/modules/daily-execution/adapters/evidence-storage.ts');
+    expect(review).toContain('IntelligenceView');
+    expect(review).toContain('EvidenceView');
+    expect(review).toContain('SourcesView');
+    expect(controller).toContain('loadFocusSessions');
+    expect(analytics).not.toMatch(/\\b(localStorage|indexedDB|window|document)\\b/);
+    expect(evidence).toContain('module-daily-execution-evidence');
+    for (const file of sourceFiles('src/lib/modules/daily-execution')) {
+      const source = read(file);
+      expect(source, file).not.toMatch(/\\b(createTimer|startTimer|pauseTimer|resetTimer)\\s*\\(/);
+      expect(source, file).not.toContain('module-pomodoro-activity');
+    }
+  });
+
   it('keeps Pomodoro route thin and feature-owned', () => {
     const route = read('src/routes/pomodoro/+page.svelte');
     expect(route).toContain('PomodoroWorkspace');
