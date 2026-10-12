@@ -1,4 +1,10 @@
 import { onMount } from 'svelte';
+import { buildIntelligenceSnapshot, localWindow, type MetricWindow } from '../core/analytics.ts';
+import { combineEvidence, evidenceIdentity, isEvidenceKind, type EvidenceKind, type EvidenceRecord } from '../core/evidence.ts';
+import { habitWeekSummary } from '../core/consistency.ts';
+import { adjustRemainingAllocation, weeklyRecommendation, type WeeklyRecommendation } from '../core/recommendations.ts';
+import { loadEvidenceRecords, saveEvidenceRecords, subscribeEvidence } from '../adapters/evidence-storage.ts';
+import { parseLocalEvidenceFile } from '../adapters/evidence-import.ts';
 import { assignFocusSession, loadFocusSessions, subscribeFocusSessions } from '#lib/shared/focus-sessions/repository.ts';
 import { writePendingFocusTask } from '#lib/shared/focus-sessions/context.ts';
 import type { FocusActivitySession } from '#lib/shared/focus-sessions/types.ts';
@@ -13,6 +19,10 @@ import {
 export function createDailyExecutionController() {
   let state = $state<ExecutionState>(emptyExecutionState());
   let sessions = $state<FocusActivitySession[]>([]);
+  let evidenceRecords = $state<EvidenceRecord[]>([]);
+  let reviewSubview = $state<'summary'|'intelligence'|'evidence'|'sources'>('summary');
+  let intelligenceNotice = $state('');
+  let evidenceRefreshVersion = 0;
   let view = $state<'today' | 'priorities' | 'review'>('today');
   let dayKey = $state(localDayKey(Date.now()));
   let weekStart = $state(weekKey(Date.now()));
@@ -32,6 +42,9 @@ export function createDailyExecutionController() {
     return first?.id === a.id ? -1 : 1;
   }));
   const recommendation = $derived(nextTask(state.tasks, dayKey));
+  const combinedEvidence = $derived(combineEvidence(evidenceRecords, state.tasks));
+  const habitProgress = $derived(habitWeekSummary(state.habit, sessions, state.tasks, weekStart));
+  const weeklyInsight = $derived(weeklyRecommendation(state.tasks, combinedEvidence, sessions, weekStart, Date.now(), state.recommendationDecisions));
 
   function commit(value: ExecutionState): boolean {
     try {
@@ -53,6 +66,120 @@ export function createDailyExecutionController() {
     } catch {
       error = 'Unable to load focus activity.';
     }
+  }
+
+  async function refreshEvidence() {
+    const version = ++evidenceRefreshVersion;
+    try {
+      const loaded = await loadEvidenceRecords();
+      if (version === evidenceRefreshVersion) evidenceRecords = loaded;
+    } catch {
+      error = 'Unable to read evidence records.';
+    }
+  }
+
+  function intelligenceSnapshot(window: MetricWindow) {
+    const {from,to} = localWindow(window, Date.now());
+    return buildIntelligenceSnapshot(sessions, state.manualEntries, state.tasks, combinedEvidence, from, to);
+  }
+
+  async function addEvidence(input: {
+    title: string; observation: string; kind: EvidenceKind; taskId?: string;
+    topic?: string; assessmentResult?: EvidenceRecord['assessmentResult']; url?: string;
+  }): Promise<boolean> {
+    if (!input.title.trim() || !input.observation.trim() || !isEvidenceKind(input.kind)) return false;
+    if (input.taskId && !state.tasks.some((task) => task.id === input.taskId)) return false;
+    const record: EvidenceRecord = {
+      id: crypto.randomUUID(), title: input.title.trim().slice(0,160),
+      observation: input.observation.trim().slice(0,800), kind: input.kind,
+      source: 'manual', occurredAt: Date.now(), verification: 'user-reported',
+      taskId: input.taskId || undefined,
+      topic: input.topic?.trim().slice(0,80) || undefined,
+      assessmentResult: input.kind === 'assessment' ? input.assessmentResult : undefined,
+      url: input.url?.trim().startsWith('https://') ? input.url.trim().slice(0,500) : undefined
+    };
+    try {
+      await saveEvidenceRecords([record]);
+      await refreshEvidence();
+      intelligenceNotice = 'Evidence saved locally.';
+      return true;
+    } catch {
+      error = 'Unable to save evidence.';
+      return false;
+    }
+  }
+
+  async function importEvidence(file: File): Promise<number> {
+    try {
+      const imported = await parseLocalEvidenceFile(file, Date.now());
+      const existing = await loadEvidenceRecords();
+      const identities = new Set([...existing, ...projectExistingOutcomes()].map((record) => evidenceIdentity(record)));
+      const unique = imported.filter((record) => {
+        const key = evidenceIdentity(record);
+        if (identities.has(key)) return false;
+        identities.add(key);
+        return true;
+      });
+      await saveEvidenceRecords(unique);
+      await refreshEvidence();
+      intelligenceNotice = unique.length + ' new evidence records imported. ' +
+        (imported.length - unique.length) + ' duplicates skipped. Imported claims remain unverified.';
+      return unique.length;
+    } catch (cause) {
+      error = cause instanceof Error ? cause.message : 'Evidence import failed.';
+      return -1;
+    }
+  }
+
+  function projectExistingOutcomes() {
+    return combinedEvidence.filter((record) => record.source === 'task-outcome');
+  }
+
+  async function archiveEvidence(id: string) {
+    const existing = evidenceRecords.find((record) => record.id === id && record.source !== 'task-outcome');
+    if (!existing) return;
+    try {
+      await saveEvidenceRecords([{...existing,archivedAt:Date.now()}]);
+      await refreshEvidence();
+      intelligenceNotice = 'Evidence archived.';
+    } catch { error = 'Unable to archive evidence.'; }
+  }
+
+  function updateHabitTarget(days: number) {
+    if (!Number.isInteger(days) || days < 1 || days > 7) return;
+    commit({...state,habit:{...state.habit,targetDaysPerWeek:days}});
+  }
+
+  function decideRecommendation(recommendation: WeeklyRecommendation, decision: 'accepted'|'rejected', additionalMinutes = 0) {
+    if (weeklyInsight?.id !== recommendation.id) return false;
+    const nextState: ExecutionState = {
+      ...state,
+      recommendationDecisions: [
+        ...state.recommendationDecisions.filter((entry) => entry.id !== recommendation.id),
+        {id:recommendation.id,status:decision,decidedAt:Date.now()}
+      ].slice(-200)
+    };
+    if (decision === 'accepted' && recommendation.workstream && additionalMinutes > 0) {
+      nextState.plans = {
+        ...state.plans,
+        [dayKey]: {
+          ...plan,
+          revision: {
+            reason: recommendation.reason,
+            remainingAllocations: adjustRemainingAllocation(
+              replanProposal.allocations, recommendation.workstream, additionalMinutes
+            ),
+            recordedAtAcceptanceMs: recordedMs,
+            acceptedAt: Date.now()
+          }
+        }
+      };
+    }
+    if (!commit(nextState)) return false;
+    intelligenceNotice = decision === 'accepted'
+      ? 'Recommendation accepted. Remaining plan updated if an allocation change was proposed.'
+      : 'Recommendation rejected. Current plan preserved.';
+    return true;
   }
 
   function saveCheckpoint(taskId: string, lastCompleted: string, blocker: string, nextAction: string) {
@@ -204,6 +331,8 @@ export function createDailyExecutionController() {
     weekStart = weekKey(Date.now());
     loading = false;
     void refreshSessions();
+    void refreshEvidence();
+    const unsubscribeEvidence = subscribeEvidence(() => void refreshEvidence());
     const unsubscribe = subscribeFocusSessions(() => void refreshSessions());
     const syncPlans = (event: StorageEvent) => {
       if (event.key === 'modu-daily-execution-v1') state = readExecutionState();
@@ -215,12 +344,19 @@ export function createDailyExecutionController() {
       const next = localDayKey(Date.now());
       if (next !== dayKey) { dayKey = next; weekStart = weekKey(Date.now()); void refreshSessions(); }
     }, 60_000);
-    return () => { unsubscribe(); window.removeEventListener('storage', syncPlans); document.removeEventListener('visibilitychange', onVisible); window.clearInterval(interval); };
+    return () => { unsubscribeEvidence(); unsubscribe(); window.removeEventListener('storage', syncPlans); document.removeEventListener('visibilitychange', onVisible); window.clearInterval(interval); };
   });
 
   return {
     get state() { return state; },
     get sessions() { return sessions; },
+    get evidenceRecords() { return evidenceRecords; },
+    get combinedEvidence() { return combinedEvidence; },
+    get weeklyInsight() { return weeklyInsight; },
+    get habitProgress() { return habitProgress; },
+    get intelligenceNotice() { return intelligenceNotice; },
+    get reviewSubview() { return reviewSubview; },
+    set reviewSubview(value: 'summary'|'intelligence'|'evidence'|'sources') { reviewSubview = value; },
     get view() { return view; },
     set view(value: 'today' | 'priorities' | 'review') { view = value; },
     get dayKey() { return dayKey; },
@@ -241,6 +377,7 @@ export function createDailyExecutionController() {
     setGoal, setMode, setAllocation, addTask, updateTask, setTaskStatus, completeTask,
     openFocus, assignSession, saveReflection, refreshSessions, focusMsForTask, focusMsForWorkstream, workMsForWorkstream,
     saveCheckpoint, acceptReplan, logManualWork,
+    intelligenceSnapshot, refreshEvidence, addEvidence, archiveEvidence, importEvidence, updateHabitTarget, decideRecommendation,
     minutesLabel
   };
 }
