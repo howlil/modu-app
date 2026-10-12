@@ -12,4 +12,4 @@ export interface FocusActivitySession {
   completionKind?: 'full' | 'partial';
 }
 
-export type FocusTaskContext = { id: string; title: string; nextAction?: string };
+export type FocusTaskContext = { id: string; title: string; nextAction?: string; autoStart?: boolean };
