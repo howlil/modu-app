@@ -43,6 +43,10 @@
          <Button variant="ghost" size="sm" class="h-8 rounded-lg px-2 text-meta" onclick={() => todayIds.has(task.id) ? controller.removeFromToday(task.id) : controller.addToToday(task.id)}>
            {todayIds.has(task.id) ? 'Remove' : '+ Today'}
          </Button>
+       {:else if task.status === 'blocked' || task.status === 'archived'}
+         <Button variant="ghost" size="sm" class="h-8 rounded-lg px-2 text-meta" onclick={() => controller.setTaskStatus(task.id, 'ready')}>
+           {task.status === 'blocked' ? 'Unblock' : 'Restore'}
+         </Button>
        {/if}
      </div>
    {:else}
@@ -54,6 +58,6 @@
  {#key editing.id}
    <TaskDetailDrawer task={editing} onClose={() => editing = null}
      onSave={fields => controller.editSimple(editing?.id ?? '', fields)}
-     onArchive={() => { controller.archiveSimple(editing?.id ?? ''); editing = null; }}/>
+     onArchive={() => { if (editing?.status === 'archived' || editing?.status === 'blocked') controller.setTaskStatus(editing.id, 'ready'); else controller.archiveSimple(editing?.id ?? ''); editing = null; }}/>
  {/key}
 {/if}
