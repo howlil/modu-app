@@ -152,7 +152,20 @@
         onCancel={() => { editingCheckpointId = null; controller.checkpointPromptId = null; }}/>
     </section>
   {/if}
-  <section class="overflow-hidden rounded-[20px] border border-border bg-card">
+  {#if controller.weeklyInsight}
+    <section class="mb-3 flex items-start gap-3 rounded-[20px] border border-border bg-card p-5">
+      <div class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-secondary text-secondary-foreground">
+        <ArrowRight class="size-4" strokeWidth={1.8} />
+      </div>
+      <div class="min-w-0 flex-1">
+        <div class="text-meta font-medium text-muted-foreground">WEEKLY INSIGHT</div>
+        <div class="mt-1 text-ui font-medium">{controller.weeklyInsight.title}</div>
+        <p class="mt-2 text-meta text-muted-foreground">{controller.weeklyInsight.reason}</p>
+        <Button variant="ghost" size="sm" class="mt-2 h-8 rounded-full px-2 text-meta text-primary" onclick={() => { controller.reviewSubview = 'intelligence'; controller.view = 'review'; }}>View recommendation <ArrowRight class="ml-1 size-3.5" /></Button>
+      </div>
+    </section>
+  {/if}
+    <section class="overflow-hidden rounded-[20px] border border-border bg-card">
     <div class="flex items-center justify-between p-4"><h3 class="text-title font-medium">Up next</h3><Button variant="ghost" size="sm" class="rounded-full text-meta text-muted-foreground" onclick={() => controller.view = 'priorities'}>Manage priorities <ArrowRight class="ml-1 size-3.5" /></Button></div>
     {#each controller.queue.filter((task) => task.id !== suggested?.id).slice(0, 3) as task}
       <div class="flex items-center gap-3 border-t border-border px-4 py-3">
