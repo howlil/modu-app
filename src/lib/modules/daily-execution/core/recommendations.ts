@@ -48,14 +48,21 @@ export function weeklyRecommendation(
       priority: 100
     });
   }
+  const assessmentWindowStart = now - 28 * 24 * 3_600_000;
   const gaps = new Map<string, EvidenceRecord[]>();
-  for (const record of evidence) {
-    if (record.kind !== 'assessment' || record.assessmentResult !== 'needs-practice' || !record.topic?.trim()) continue;
-    const topic = record.topic.trim().toLowerCase();
+  const assessments = evidence.filter((record) => record.kind === 'assessment' &&
+    record.verification !== 'unverified' && !!record.topic?.trim() &&
+    record.occurredAt >= assessmentWindowStart && record.occurredAt <= now);
+  for (const record of assessments) {
+    const topic = record.topic!.trim().toLowerCase();
     gaps.set(topic, [...(gaps.get(topic) ?? []), record]);
   }
   for (const [topic, records] of gaps) {
-    const distinct = [...new Map(records.map((record) => [record.id, record])).values()];
+    const sorted = [...new Map(records.map((record) => [record.id, record])).values()]
+      .sort((a,b)=>b.occurredAt-a.occurredAt);
+    // A recent successful result supersedes older weaknesses.
+    if (sorted[0]?.assessmentResult === 'passed') continue;
+    const distinct = sorted.filter((record)=>record.assessmentResult==='needs-practice').slice(0,3);
     if (distinct.length < 2) continue;
     const ids = distinct.map((record) => record.id).sort();
     candidates.push({
