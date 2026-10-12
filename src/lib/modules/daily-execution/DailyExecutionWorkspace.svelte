@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { Settings2 } from 'lucide-svelte';
   import ToolHeader from '#lib/components/ToolHeader.svelte';
   import { createDailyExecutionController } from './controller/daily-execution.svelte.ts';
   import TodayView from './components/TodayView.svelte';
