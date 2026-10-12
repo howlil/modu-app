@@ -19,7 +19,11 @@ import type { FocusTaskContext } from '#lib/shared/focus-sessions/types.ts';
     stopFocusProtection,
     syncFocusProtectionBlocklist,
     type FocusProtectionConnection,
-    type FocusProtectionExtensionStatus
+    type FocusProtectionExtensionStatus,
+    type FloatingFocusSettings,
+    publishFloatingFocusSnapshot,
+    setFloatingFocusSettings,
+    clearFloatingFocusContext
   } from '#lib/modules/pomodoro/adapters/focus-protection.ts';
   import {
     DEFAULT_RINGTONE,
@@ -120,6 +124,11 @@ export function createPomodoroController() {
   let blockedDomains = $state<string[]>([]);
   let focusProtectionConnection = $state<FocusProtectionConnection>('checking');
   let focusProtectionError = $state('');
+  let floatingSettings = $state<FloatingFocusSettings>({ enabled: false, showTask: true, excludedDomains: [] });
+  let floatingError = $state('');
+  let companionConnected = false;
+  let lastFloatingPayload = '';
+  let floatingRevision = Date.now();
   let dailyGoalHours = $state(8);
   let goalSchedule = $state<GoalSchedule>('weekdays');
   let activitySessions = $state<FocusActivitySession[]>([]);
@@ -222,6 +231,7 @@ export function createPomodoroController() {
       soundEnabled,
       ringtone,
       notificationsEnabled,
+      floatingSettings,
       focusProtection: {
         enabled: focusProtectionEnabled,
         blockedDomains
@@ -231,6 +241,48 @@ export function createPomodoroController() {
       dailyGoalHours,
       goalSchedule
     });
+    void publishFloatingContext();
+  }
+
+  function floatingSnapshotPayload() {
+    const title = linkedTask?.title || focusText.trim();
+    return {
+      version: 1 as const,
+      sessionId: timer.status === 'idle' ? null :
+        timer.mode === 'focus' && sessionStartedAt !== null ? currentFocusSessionId() :
+        timer.mode + '-' + (timer.endsAt ?? timer.overtimeStartedAt ?? timer.durationMs),
+      task: title ? { id: linkedTask?.id ?? null, title, nextAction: linkedTask?.nextAction } : null,
+      timer: {
+        mode: timer.mode,
+        status: timer.status,
+        durationMs: timer.durationMs,
+        remainingMs: timer.remainingMs,
+        endsAt: timer.endsAt,
+        overtimeStartedAt: timer.overtimeStartedAt
+      }
+    };
+  }
+
+  async function publishFloatingContext() {
+    if (!companionConnected) return;
+    const payload = floatingSnapshotPayload();
+    const serialized = JSON.stringify(payload);
+    if (serialized === lastFloatingPayload) return;
+    const snapshot = { ...payload, updatedAt: ++floatingRevision };
+    const response = await publishFloatingFocusSnapshot(snapshot);
+    if (response.ok) lastFloatingPayload = serialized;
+  }
+
+  async function updateFloatingFocus(settings: Partial<FloatingFocusSettings>) {
+    if (!companionConnected) return;
+    const response = await setFloatingFocusSettings(settings);
+    if (response.ok && response.data?.floating) {
+      floatingSettings = response.data.floating;
+      floatingError = '';
+      void publishFloatingContext();
+    } else {
+      floatingError = response.error || 'Unable to update floating widget.';
+    }
   }
 
   function restore() {
@@ -336,8 +388,12 @@ export function createPomodoroController() {
 
     if (!detected) {
       focusProtectionConnection = 'missing';
+      companionConnected = false;
       return;
     }
+    companionConnected = true;
+    if (detected.floating) floatingSettings = detected.floating;
+    void publishFloatingContext();
 
     try {
       const blocklistResponse = await syncFocusProtectionBlocklist(blockedDomains);
@@ -760,6 +816,8 @@ export function createPomodoroController() {
         await stopFocusProtection();
         await setFocusProtectionEnabled(false);
         await syncFocusProtectionBlocklist([]);
+        await clearFloatingFocusContext();
+        await setFloatingFocusSettings({ enabled: false, excludedDomains: [], showTask: true });
       } catch {
         // Local deletion must still succeed if the optional extension is unavailable.
       }
@@ -784,6 +842,8 @@ export function createPomodoroController() {
     focusProtectionEnabled = false;
     blockedDomains = [];
     focusProtectionError = '';
+    floatingSettings = { enabled: false, showTask: true, excludedDomains: [] };
+    lastFloatingPayload = '';
     dailyGoalHours = 8;
     goalSchedule = 'weekdays';
     activitySessions = [];
@@ -1009,6 +1069,9 @@ export function createPomodoroController() {
     get blockedDomains() { return blockedDomains; },
     get focusProtectionConnection() { return focusProtectionConnection; },
     get focusProtectionError() { return focusProtectionError; },
+    get floatingSettings() { return floatingSettings; },
+    get floatingError() { return floatingError; },
+    get companionConnected() { return companionConnected; },
     get dailyGoalHours() { return dailyGoalHours; },
     get goalSchedule() { return goalSchedule; },
     get activitySessions() { return activitySessions; },
@@ -1043,6 +1106,7 @@ export function createPomodoroController() {
     updateDuration,
     toggleFocusProtection,
     updateBlockedDomains,
+    updateFloatingFocus,
     toggleSound,
     toggleNotifications,
     selectRingtone,
