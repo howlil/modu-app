@@ -64,9 +64,9 @@
     <Button variant="outline" size="sm" class="rounded-full" onclick={() => manualOpen = !manualOpen}>{manualOpen ? 'Close' : '+ Log untracked work'}</Button>
   </div>
   {#if manualOpen}
-    <form class="grid gap-3 rounded-xl border border-border bg-muted/40 p-4" onsubmit={(event) => {
+    <form class="grid gap-3 rounded-xl border border-border bg-muted/40 p-4" onsubmit={async (event) => {
       event.preventDefault();
-      if (controller.logManualWork(manualTaskId || null, manualStart, manualDuration)) manualOpen = false;
+      if (await controller.logManualWork(manualTaskId || null, manualStart, manualDuration)) manualOpen = false;
     }}>
       <div class="grid gap-3 sm:grid-cols-2">
         <label class="grid gap-1 text-meta font-medium">Linked task (optional)
