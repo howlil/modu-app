@@ -104,6 +104,7 @@ export function createPomodoroController() {
   let partialDialogOpen = $state(false);
   let partialIntent = $state<'reset' | 'switch' | 'skip'>('reset');
   let partialTargetMode = $state<PomodoroMode>('focus');
+  let expiredFocusEndAt: number | null = null;
   let focusText = $state('');
   let linkedTask = $state<FocusTaskContext | null>(null);
   let contextNotice = $state('');
@@ -238,6 +239,9 @@ export function createPomodoroController() {
       if (!saved) return;
 
       const restored = normalizePomodoroSnapshot(saved, clockNow);
+      expiredFocusEndAt = saved.timer?.mode === 'focus' && saved.timer?.status === 'running' &&
+        typeof saved.timer.endsAt === 'number' && saved.timer.endsAt <= clockNow
+        ? saved.timer.endsAt : null;
       durations = restored.durations;
       preferences = restored.preferences;
       dailyGoalHours = restored.dailyGoalHours;
@@ -266,7 +270,9 @@ export function createPomodoroController() {
       persist();
     }
 
-    activitySessions = await loadFocusSessions();
+    const restored = await loadFocusSessions();
+    activitySessions = [...new Map([...activitySessions, ...restored].map((session) => [session.id, session])).values()]
+      .sort((a, b) => b.endedAt - a.endedAt);
   }
 
   function applyProtectionStatus(status: FocusProtectionExtensionStatus | null) {
@@ -881,6 +887,15 @@ export function createPomodoroController() {
     if (!wakeLockSupported) preferences = { ...preferences, keepAwake: false };
 
     hydrated = true;
+    if (expiredFocusEndAt !== null && sessionStartedAt !== null) {
+      focusAccounting = pauseFocus(focusAccounting, clockNow, expiredFocusEndAt);
+      if (timer.status === 'complete') {
+        recordFocusSession(timer.durationMs, focusAccounting.accumulatedMs, 0);
+      } else {
+        persist();
+      }
+      expiredFocusEndAt = null;
+    }
     void loadActivity().then(() => persist());
     void connectFocusProtection();
     updateDocumentTitle();
