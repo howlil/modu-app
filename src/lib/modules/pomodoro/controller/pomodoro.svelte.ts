@@ -944,6 +944,7 @@ export function createPomodoroController() {
     wakeLockSupported = 'wakeLock' in navigator;
 
     restore();
+    let startFromDaily = false;
     const requestedTaskId = new URLSearchParams(window.location.search).get('taskId');
     if (requestedTaskId) {
       const pendingTask = consumePendingFocusTask(requestedTaskId);
@@ -951,6 +952,7 @@ export function createPomodoroController() {
         linkedTask = pendingTask;
         focusText = pendingTask.title;
         focusDraft = pendingTask.title;
+        startFromDaily = pendingTask.autoStart === true;
       } else if (pendingTask) {
         contextNotice = 'Finish or reset your current session before switching tasks.';
       }
@@ -960,6 +962,7 @@ export function createPomodoroController() {
     if (!wakeLockSupported) preferences = { ...preferences, keepAwake: false };
 
     hydrated = true;
+    if (startFromDaily && timer.mode === 'focus' && timer.status === 'idle') start();
     if (expiredFocusEndAt !== null && sessionStartedAt !== null) {
       focusAccounting = pauseFocus(focusAccounting, clockNow, expiredFocusEndAt);
       if (timer.status === 'complete') {
