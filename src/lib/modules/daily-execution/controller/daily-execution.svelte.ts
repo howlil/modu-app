@@ -57,7 +57,7 @@ export function createDailyExecutionController() {
 
   function saveCheckpoint(taskId: string, lastCompleted: string, blocker: string, nextAction: string) {
     if (!nextAction.trim() || !state.tasks.some((task) => task.id === taskId)) return;
-    commit({ ...state, tasks: state.tasks.map((task) => task.id === taskId ? {
+    const saved = commit({ ...state, tasks: state.tasks.map((task) => task.id === taskId ? {
       ...task, checkpoint: {
         lastCompleted: lastCompleted.trim().slice(0, 350),
         blocker: blocker.trim().slice(0, 350),
@@ -65,7 +65,7 @@ export function createDailyExecutionController() {
         updatedAt: Date.now()
       }
     } : task) });
-    checkpointPromptId = null;
+    if (saved) checkpointPromptId = null;
   }
 
   function acceptReplan() {
@@ -80,7 +80,7 @@ export function createDailyExecutionController() {
     } } });
   }
 
-  function logManualWork(taskId: string | null, time: string, durationMinutes: number): boolean {
+  async function logManualWork(taskId: string | null, time: string, durationMinutes: number): Promise<boolean> {
     manualError = '';
     if (taskId !== null && !state.tasks.some((task) => task.id === taskId)) {
       manualError = 'Select a valid task.'; return false;
@@ -93,15 +93,19 @@ export function createDailyExecutionController() {
     if (!Number.isFinite(startedAt) || localDayKey(startedAt) !== dayKey || localDayKey(endedAt) !== dayKey) {
       manualError = 'Manual entries must fit within the selected day.'; return false;
     }
+    // Refresh persisted work immediately before overlap validation. A separate Pomodoro tab
+    // may have completed a session since this view last rendered.
+    const latestSessions = await loadFocusSessions();
+    const latestState = readExecutionState();
     const existing = [
-      ...sessions.map((session) => ({ startedAt: session.startedAt, endedAt: session.endedAt })),
-      ...state.manualEntries
+      ...latestSessions.map((session) => ({ startedAt: session.startedAt, endedAt: session.endedAt })),
+      ...latestState.manualEntries
     ];
     if (overlapsExistingWork(startedAt, endedAt, existing)) {
       manualError = 'Overlapping work interval. Existing time cannot be counted twice.'; return false;
     }
     const entry = { id: crypto.randomUUID(), taskId, startedAt, endedAt };
-    return commit({ ...state, manualEntries: [...state.manualEntries, entry] });
+    return commit({ ...latestState, manualEntries: [...latestState.manualEntries, entry] });
   }
 
   function setGoal(goal: string, successCriteria: string) {
@@ -201,13 +205,17 @@ export function createDailyExecutionController() {
     loading = false;
     void refreshSessions();
     const unsubscribe = subscribeFocusSessions(() => void refreshSessions());
+    const syncPlans = (event: StorageEvent) => {
+      if (event.key === 'modu-daily-execution-v1') state = readExecutionState();
+    };
+    window.addEventListener('storage', syncPlans);
     const onVisible = () => { if (document.visibilityState === 'visible') void refreshSessions(); };
     document.addEventListener('visibilitychange', onVisible);
     const interval = window.setInterval(() => {
       const next = localDayKey(Date.now());
       if (next !== dayKey) { dayKey = next; weekStart = weekKey(Date.now()); void refreshSessions(); }
     }, 60_000);
-    return () => { unsubscribe(); document.removeEventListener('visibilitychange', onVisible); window.clearInterval(interval); };
+    return () => { unsubscribe(); window.removeEventListener('storage', syncPlans); document.removeEventListener('visibilitychange', onVisible); window.clearInterval(interval); };
   });
 
   return {
