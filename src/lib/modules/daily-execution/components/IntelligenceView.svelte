@@ -61,7 +61,7 @@
           <div class="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1">
             <span class="text-meta text-muted-foreground tabular-nums">{fmt(bucket.total)}</span>
             <div class="w-full max-w-14 rounded-t-md bg-primary/65" style:height={Math.max(bucket.total > 0 ? 4 : 0, Math.round(bucket.total / chartMax * 90)) + 'px'}></div>
-            <span class="w-full truncate text-center text-[10px] text-muted-foreground">{bucket.label}</span>
+            <span class="w-full truncate text-center text-meta text-muted-foreground">{bucket.label}</span>
           </div>
         {/each}
       </div>
