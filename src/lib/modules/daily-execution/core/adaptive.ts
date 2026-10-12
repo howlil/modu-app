@@ -1,4 +1,4 @@
-import { WORKSTREAM_NAMES, type DailyPlan, type ExecutionTask, type Workstream, type ManualWorkEntry, plannedMinutes } from './planning.ts';
+import { WORKSTREAM_NAMES, type DailyPlan, type ExecutionTask, type Workstream, plannedMinutes } from './planning.ts';
 
 export type WorkAllocation = Record<Workstream, number>;
 export interface ReplanProposal {
@@ -46,7 +46,3 @@ export function overlapsExistingWork(start: number, end: number, records: { star
   return records.some((r) => Number.isFinite(r.startedAt) && Number.isFinite(r.endedAt) && start < r.endedAt && end > r.startedAt);
 }
 
-export function minutesFromManual(entries: ManualWorkEntry[], dateKey: string, localDay: (timestamp: number) => string): number {
-  return entries.filter((entry) => localDay(entry.endedAt) === dateKey)
-    .reduce((sum, entry) => sum + Math.max(0, entry.endedAt - entry.startedAt), 0) / 60_000;
-}
