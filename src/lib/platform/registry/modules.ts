@@ -32,9 +32,9 @@ export const modules: ModuleDefinition[] = [
   {
     id: 'image-compress',
     name: 'Image Compress',
-    route: '#',
+    route: '/image/compress',
     layout: 'file-transform',
-    status: 'coming-soon'
+    status: 'available'
   }
 ];
 
