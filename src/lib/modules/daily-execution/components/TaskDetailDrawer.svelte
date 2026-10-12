@@ -63,7 +63,11 @@
        </div>
      {/if}
      <div class="mt-2 flex flex-wrap justify-end gap-2">
-       <Button type="button" variant="ghost" class="rounded-lg text-muted-foreground" onclick={onArchive}>Archive</Button>
+       {#if task.status !== 'done'}
+         <Button type="button" variant="ghost" class="rounded-lg text-muted-foreground" onclick={onArchive}>
+           {task.status === 'blocked' ? 'Unblock' : task.status === 'archived' ? 'Restore' : 'Archive'}
+         </Button>
+       {/if}
        <Button type="button" variant="outline" class="rounded-lg" onclick={onClose}>Cancel</Button>
        <Button type="submit" class="rounded-lg" disabled={!title.trim()}>Save</Button>
      </div>
