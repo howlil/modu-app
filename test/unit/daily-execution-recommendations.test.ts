@@ -6,7 +6,7 @@ import type { EvidenceRecord } from '../../src/lib/modules/daily-execution/core/
 const baseTask: ExecutionTask = {id:'t1',title:'Java mock',nextAction:'Practice',workstream:'interview',impact:'high',estimateMinutes:60,status:'ready',createdAt:1};
 const assessment = (id:string): EvidenceRecord => ({
   id,kind:'assessment',source:'manual',title:'Java mock',observation:'Needs practice',
-  occurredAt:Date.now(),topic:'Java concurrency',assessmentResult:'needs-practice',verification:'user-reported'
+  occurredAt:new Date(2026,9,12,12).getTime(),topic:'Java concurrency',assessmentResult:'needs-practice',verification:'user-reported'
 });
 const today = new Date(2026,9,13,12).getTime();
 describe('M3 recommendations',()=>{
@@ -15,6 +15,17 @@ describe('M3 recommendations',()=>{
     const found = weeklyRecommendation([baseTask],[assessment('e1'),assessment('e2')],[],'2026-10-12',today,[]);
     expect(found?.ruleId).toBe('repeated-assessment-gap');
     expect(found?.evidenceIds).toEqual(['e1','e2']);
+  });
+  it('does not infer skill gaps from unverified imports or stale assessments',()=>{
+    const old={...assessment('old'),occurredAt:today-40*24*3_600_000};
+    const other=assessment('new');
+    expect(weeklyRecommendation([baseTask],[old,other],[],'2026-10-12',today,[])).toBeNull();
+    expect(weeklyRecommendation([baseTask],[{...assessment('u1'),verification:'unverified'},{...assessment('u2'),verification:'unverified'}],[],'2026-10-12',today,[])).toBeNull();
+  });
+  it('a newer passed assessment suppresses an older weakness',()=>{
+    const weak=[{...assessment('w1'),occurredAt:today-2*24*3_600_000},{...assessment('w2'),occurredAt:today-24*3_600_000}];
+    const passed={...assessment('ok'),assessmentResult:'passed' as const,occurredAt:today-60_000};
+    expect(weeklyRecommendation([baseTask],[...weak,passed],[],'2026-10-12',today,[])).toBeNull();
   });
   it('uses entered deadlines and never fabricates external verification',()=>{
     const found = weeklyRecommendation([{...baseTask,dueDate:'2026-10-14'}],[],[],'2026-10-12',today,[]);
