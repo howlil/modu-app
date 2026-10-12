@@ -8,6 +8,7 @@ export type TypingPreferences = {
   automaticGuideFading: boolean;
   oppositeHandShift: boolean;
   keyboardSound: boolean;
+  fingerShadow: boolean;
 };
 
 export type KeyStat = {
@@ -75,7 +76,8 @@ export const DEFAULT_TYPING_PREFERENCES: TypingPreferences = {
   strictCorrection: true,
   automaticGuideFading: true,
   oppositeHandShift: true,
-  keyboardSound: true
+  keyboardSound: true,
+  fingerShadow: true
 };
 
 export const KEY_ROWS = [
