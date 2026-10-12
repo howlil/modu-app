@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CAPACITY_PRESETS, localDayKey, makePlan, minutesLabel, nextTask, plannedMinutes, type ExecutionTask } from '../../src/lib/modules/daily-execution/core/planning.ts';
+import { CAPACITY_PRESETS, makePlan, minutesLabel, nextTask, plannedMinutes, type ExecutionTask } from '../../src/lib/modules/daily-execution/core/planning.ts';
 
 const t = (id: string, impact: 'low' | 'medium' | 'high', status: 'ready' | 'blocked' | 'done' = 'ready', dueDate?: string): ExecutionTask => ({
   id, title: id, nextAction: id + ' next', workstream: 'build', impact, status,
