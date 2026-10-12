@@ -451,14 +451,6 @@ export function createPomodoroController() {
         : 'Pomodoro — Module';
   }
 
-  function newSessionId() {
-    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-      return crypto.randomUUID();
-    }
-
-    return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  }
-
   function recordFocusSession(
     plannedDurationMs: number,
     actualDurationMs: number,
