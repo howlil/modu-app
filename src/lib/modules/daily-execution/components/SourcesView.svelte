@@ -5,11 +5,12 @@
   let {controller}: {controller: DailyExecutionController} = $props();
   let selected: File | null = $state(null);
   let importing = $state(false);
+  let fileInput: HTMLInputElement | undefined = $state(undefined);
   async function importSelected() {
     if (!selected) return;
     importing = true;
     try { await controller.importEvidence(selected); }
-    finally { importing = false; selected = null; }
+    finally { importing = false; selected = null; if (fileInput) fileInput.value = ''; }
   }
 </script>
 
@@ -19,7 +20,7 @@
     <h4 class="text-ui font-medium">Local JSON import</h4>
     <p class="mt-2 text-meta text-muted-foreground">Import up to 100 evidence entries from a JSON array (max 512 KB). Provider claims in a file remain unverified. Repeated records with the same source and external ID are skipped.</p>
     <label class="mt-4 grid gap-2 text-meta font-medium">Choose a JSON file
-      <input type="file" accept=".json,application/json" class="w-full min-w-0 rounded-lg border border-input p-2 text-meta" onchange={(event)=> selected = event.currentTarget.files?.[0] ?? null}/>
+      <input bind:this={fileInput} type="file" accept=".json,application/json" class="w-full min-w-0 rounded-lg border border-input p-2 text-meta" onchange={(event)=> selected = event.currentTarget.files?.[0] ?? null}/>
     </label>
     <div class="mt-4 flex flex-wrap items-center justify-between gap-2">
       <span class="text-meta text-muted-foreground">{selected ? selected.name : 'No file selected'}</span>
