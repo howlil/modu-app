@@ -34,10 +34,10 @@ describe('M2 execution state compatibility', () => {
     const state = emptyExecutionState();
     state.plans['2026-10-12'] = {
       dateKey: '2026-10-12', mode: 'medium',
-      allocations: { build: 210, interview: 120, apply: 60, english: 60, review: 30 },
+      allocations: { build: 210, interview: 120, apply: 60, english: 60, review: 30, general: 0 },
       revision: {
         reason: 'Interview tomorrow',
-        remainingAllocations: { build: 90, interview: 180, apply: 40, english: 10, review: 0 },
+        remainingAllocations: { build: 90, interview: 180, apply: 40, english: 10, review: 0, general: 0 },
         recordedAtAcceptanceMs: 9_600_000,
         acceptedAt: 12345
       }
