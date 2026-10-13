@@ -118,6 +118,40 @@ try {
   await activePage.getByRole('button', { name: 'Reopen File imported activity' }).click();
   record('DLY-M3-02 JSON import to source picker to Today, local completion and undo');
 
+  await activePage.getByRole('navigation', { name: 'Daily views' }).getByRole('button', { name: 'All' }).click();
+  let remoteTitle='Sample public issue';
+  let remoteState='open';
+  await activePage.route('https://api.github.com/repos/demo/sample/issues?**', async route => {
+    await route.fulfill({status:200,contentType:'application/json',
+      headers:{'access-control-allow-origin':'*'},
+      body:JSON.stringify([{number:7,title:remoteTitle,state:remoteState,
+        html_url:'https://github.com/demo/sample/issues/7'}])});
+  });
+  await activePage.getByRole('button', { name: /Activity sources/ }).click();
+  await activePage.getByRole('textbox', { name: 'Repository', exact: true }).fill('demo/sample');
+  await activePage.getByRole('button', { name: 'Add repository' }).click();
+  const remotePick=activePage.getByRole('button', { name: 'Add linked Sample public issue to Today' });
+  await remotePick.waitFor({ timeout: 10000 });
+  await remotePick.click();
+  remoteTitle='Sample public issue updated';
+  remoteState='closed';
+  await activePage.getByRole('button', { name: 'Refresh demo/sample' }).click();
+  await activePage.getByText('public issues updated', {exact:false}).waitFor({ timeout: 10000 });
+  const linkedSnapshot=await activePage.evaluate(() => {
+    const snapshot=JSON.parse(localStorage.getItem('modu-daily-execution-v1') ?? '{}');
+    return snapshot.tasks.filter(task=>task.source?.connectionId==='github:demo/sample');
+  });
+  assert.equal(linkedSnapshot.length,1,'Refresh must not create duplicate tasks');
+  assert.equal(linkedSnapshot[0].source.remoteStatus,'completed');
+  assert.equal(linkedSnapshot[0].status,'ready','Remote completion must not complete local task');
+  await activePage.getByRole('button', { name: 'Disconnect demo/sample' }).click();
+  const remaining=await activePage.evaluate(() => {
+    const snapshot=JSON.parse(localStorage.getItem('modu-daily-execution-v1') ?? '{}');
+    return snapshot.tasks.filter(task=>task.source?.connectionId==='github:demo/sample');
+  });
+  assert.equal(remaining.length,1,'Disconnect must preserve linked local history');
+  record('DLY-M3-03 public GitHub connect, incremental refresh, no write-back and disconnect');
+
   await activePage.screenshot({ path: output + '/desktop.png', fullPage: true });
   await activePage.getByRole('button', { name: 'Start focus' }).click();
   await activePage.waitForURL(/\/pomodoro\?taskId=/);
