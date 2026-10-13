@@ -58,14 +58,14 @@ async function download(buttonName){
   return readFile(await d.path());
 }
 async function normalizedPNG(bytes,width,height){
-  return page.evaluate(async(bytes)=>{
+  return page.evaluate(async({bytes,width,height})=>{
     const b=await createImageBitmap(new Blob([new Uint8Array(bytes)]));
     const c=document.createElement('canvas');c.width=width;c.height=height;
     const x=c.getContext('2d');x.fillStyle='white';x.fillRect(0,0,width,height);
     x.drawImage(b,0,0,width,height);b.close();
     const png=await new Promise(resolve=>c.toBlob(resolve,'image/png'));
     return [...new Uint8Array(await png.arrayBuffer())];
-  },[...bytes],width,height);
+  },{bytes:[...bytes],width,height});
 }
 let sample=0;
 async function runCase(kind,original,format,targetKB,resize){
