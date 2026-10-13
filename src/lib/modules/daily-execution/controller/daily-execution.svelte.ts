@@ -13,7 +13,7 @@ import { DAILY_STORAGE_KEY, DailyStorageConflictError, readExecutionSnapshot, sa
 import {
   CAPACITY_PRESETS, emptyExecutionState, localDayKey, makePlan, minutesLabel, nextTask, plannedMinutes, weekKey,
   tasksForDay, currentForDay, selectForDay, removeFromDay, setNextForDay, completeSimply, reopenSimply,
-  sameEditableTask,
+  sameEditableTask, moveForDay, unfinishedFromYesterday, bringForwardFromYesterday,
   type CapacityMode, type DailyPlan, type ExecutionState, type ExecutionTask, type Impact, type TaskStatus, type Workstream,
   type WeeklyReflection
 } from '../core/planning.ts';
@@ -41,6 +41,7 @@ export function createDailyExecutionController() {
   const todayTasks = $derived(tasksForDay(state,dayKey));
   const availableTasks = $derived(state.tasks.filter(t=>t.status==='ready'&&!todayTasks.some(x=>x.id===t.id)));
   const selectedTodayTask = $derived(currentForDay(state,dayKey));
+  const yesterdayTasks = $derived(unfinishedFromYesterday(state,dayKey));
   const focusRecordedMs = $derived(sessions.filter((s) => localDayKey(s.endedAt) === dayKey).reduce((sum, s) => sum + s.actualDurationMs, 0));
   const manualRecordedMs = $derived(state.manualEntries.filter((entry) => localDayKey(entry.endedAt) === dayKey).reduce((sum, entry) => sum + entry.endedAt - entry.startedAt, 0));
   const recordedMs = $derived(focusRecordedMs + manualRecordedMs);
@@ -306,6 +307,8 @@ export function createDailyExecutionController() {
   function addToToday(id:string){syncDay();return commit(selectForDay(state,id,dayKey));}
   function removeFromToday(id:string){syncDay();return commit(removeFromDay(state,id,dayKey));}
   function chooseNext(id:string){syncDay();return commit(setNextForDay(state,id,dayKey));}
+  function moveToday(id:string,direction:-1|1){syncDay();const changed=moveForDay(state,id,dayKey,direction);return changed!==state&&commit(changed);}
+  function carryYesterday(){syncDay();const changed=bringForwardFromYesterday(state,dayKey);return changed!==state&&commit(changed);}
   function completeQuick(id:string){return commit(completeSimply(state,id,Date.now()));}
   function reopenQuick(id:string){return commit(reopenSimply(state,id));}
   function editSimple(id:string,fields:{title:string;context?:string;nextAction?:string;estimateMinutes?:number;dueDate?:string}, expected?: ExecutionTask):boolean{
@@ -453,6 +456,7 @@ export function createDailyExecutionController() {
     get todayTasks(){return todayTasks;},
     get availableTasks(){return availableTasks;},
     get selectedTodayTask(){return selectedTodayTask;},
+    get yesterdayTasks(){return yesterdayTasks;},
     get dayNote(){return state.dayNotes[dayKey]??'';},
     get sessions() { return sessions; },
     get evidenceRecords() { return evidenceRecords; },
@@ -482,7 +486,7 @@ export function createDailyExecutionController() {
     get storageReady() { return storageReady; },
     get syncNotice() { return syncNotice; },
     reloadFromStorage,
-    quickAdd,addToToday,removeFromToday,chooseNext,completeQuick,reopenQuick,editSimple,archiveSimple,saveDayNote,
+    quickAdd,addToToday,removeFromToday,chooseNext,moveToday,carryYesterday,completeQuick,reopenQuick,editSimple,archiveSimple,saveDayNote,
     setGoal, setMode, setAllocation, addTask, updateTask, setTaskStatus, completeTask,
     openFocus, assignSession, saveReflection, refreshSessions, focusMsForTask, focusMsForWorkstream, workMsForWorkstream,
     saveCheckpoint, acceptReplan, logManualWork,
