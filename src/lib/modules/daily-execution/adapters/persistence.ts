@@ -1,4 +1,5 @@
 import { emptyExecutionState, type ExecutionState, type ExecutionTask, type ManualWorkEntry } from '../core/planning.ts';
+import { isSourceReference, isSourceCandidate, isSourceConnection, sourceIdentity } from '../core/connected-activities.ts';
 const KEY = 'modu-daily-execution-v1';
 export const DAILY_STORAGE_KEY = KEY;
 
@@ -23,6 +24,17 @@ export function readExecutionSnapshot(): { state: ExecutionState; raw: string | 
         !['ready', 'blocked', 'done', 'archived'].includes(task.status)
       )
     )) throw new Error('Invalid Daily tasks. Original data has been preserved.');
+    if (candidate.tasks?.some(task => task.source !== undefined && !isSourceReference(task.source))) {
+      throw new Error('Invalid linked activity. Original data has been preserved.');
+    }
+    if (candidate.sourceConnections !== undefined &&
+      (!Array.isArray(candidate.sourceConnections) || candidate.sourceConnections.some(v=>!isSourceConnection(v)))) {
+      throw new Error('Invalid source connection. Original data has been preserved.');
+    }
+    if (candidate.sourceItems !== undefined &&
+      (!Array.isArray(candidate.sourceItems) || candidate.sourceItems.some(v=>!isSourceCandidate(v)))) {
+      throw new Error('Invalid source candidates. Original data has been preserved.');
+    }
     if (candidate.days !== undefined && (
       !candidate.days || typeof candidate.days !== 'object' || Array.isArray(candidate.days)
     )) throw new Error('Invalid dated selections.');
@@ -49,6 +61,13 @@ function parseExecutionState(rawSnapshot: string | null): ExecutionState {
       typeof task.nextAction === 'string' && typeof task.workstream === 'string' &&
       ['ready', 'blocked', 'done', 'archived'].includes(task.status)
     ) : [];
+    const seenRefs=new Set<string>();
+    for(const task of validTasks){
+      if(!task.source)continue;
+      const key=sourceIdentity(task.source);
+      if(seenRefs.has(key))throw new Error('Duplicate source identity.');
+      seenRefs.add(key);
+    }
     const validIds = new Set(validTasks.map(task => task.id));
     const days = Object.fromEntries(Object.entries(raw.days && typeof raw.days === 'object' ? raw.days : {})
       .filter(([date]) => /^\d{4}-\d{2}-\d{2}$/.test(date))
@@ -61,8 +80,16 @@ function parseExecutionState(rawSnapshot: string | null): ExecutionState {
     const dayNotes = Object.fromEntries(Object.entries(raw.dayNotes && typeof raw.dayNotes === 'object' ? raw.dayNotes : {})
       .filter(([date, value]) => /^\d{4}-\d{2}-\d{2}$/.test(date) && typeof value === 'string')
       .map(([date, value]) => [date, String(value).slice(0,1000)]));
+    const sourceConnections = Array.isArray(raw.sourceConnections)
+      ? raw.sourceConnections.filter(isSourceConnection).slice(0,30) : [];
+    const knownConnections = new Set(sourceConnections.map(c=>c.id));
+    const sourceItems = Array.isArray(raw.sourceItems)
+      ? [...new Map(raw.sourceItems.filter(isSourceCandidate)
+        .filter(item=>knownConnections.has(item.source.connectionId))
+        .slice(0,1500).map(item=>[sourceIdentity(item.source),item])).values()]
+      : [];
     return {
-      days, dayNotes,
+      days, dayNotes, sourceConnections, sourceItems,
       goal: typeof raw.goal === 'string' ? raw.goal : '',
       successCriteria: typeof raw.successCriteria === 'string' ? raw.successCriteria : '',
       tasks: validTasks,
