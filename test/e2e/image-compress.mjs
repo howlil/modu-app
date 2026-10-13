@@ -63,6 +63,14 @@ try {
 
   const cta = page.getByRole('button', { name: 'Smart resize & retry 20 KB' });
   await cta.waitFor();
+  // M1.7: recovery action must remain reachable on a 360px mobile viewport.
+  await page.setViewportSize({ width: 360, height: 800 });
+  const horizontalOverflow = await page.evaluate(() =>
+    document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  assert.ok(horizontalOverflow <= 2, 'Unexpected mobile horizontal overflow: '+horizontalOverflow);
+  await cta.focus();
+  assert.equal(await cta.evaluate(el => document.activeElement === el), true);
+  await page.setViewportSize({ width: 1280, height: 800 });
   const previousLabel = await page.locator('figcaption').last().innerText();
   assert.match(previousLabel, /Output/);
   const [previousDownload] = await Promise.all([
