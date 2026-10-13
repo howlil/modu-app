@@ -18,6 +18,11 @@ async function ready(page) {
   await page.getByRole('heading', { name: 'Today', exact: true }).waitFor();
   await page.getByRole('textbox', { name: 'New activity' }).waitFor();
 }
+async function openSources(page) {
+  const panel=page.getByRole('region', { name: 'Connected activity sources' });
+  if (!(await panel.isVisible())) await page.getByRole('button', { name: /Activity sources/ }).click();
+  await panel.waitFor();
+}
 async function noOverflow(page, label) {
   const { width, scrollWidth } = await page.evaluate(() => ({
     width: document.documentElement.clientWidth,
@@ -87,7 +92,7 @@ try {
   // M3: sources are opt-in, linked identity survives reload, detach preserves local task.
   const nav = activePage.getByRole('navigation', { name: 'Daily views' });
   await nav.getByRole('button', { name: 'All' }).click();
-  await activePage.getByRole('button', { name: /Activity sources/ }).click();
+  await openSources(activePage);
   const sources=activePage.getByRole('region', { name: 'Connected activity sources' });
   await sources.getByRole('textbox', { name: 'Title', exact: true }).fill('Read reference document');
   await sources.getByRole('textbox', { name: 'Original HTTPS URL' }).fill('https://example.com/reference');
@@ -103,7 +108,7 @@ try {
   record('DLY-M3-01 manual HTTPS link, local Today task and detach preserving ID');
 
   await activePage.getByRole('navigation', { name: 'Daily views' }).getByRole('button', { name: 'All' }).click();
-  await activePage.getByRole('button', { name: /Activity sources/ }).click();
+  await openSources(activePage);
   await activePage.locator('#daily-activities-file').setInputFiles({
     name: 'personal-tasks.json', mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify([{ id:'one',title:'File imported activity',status:'open' }]))
@@ -127,7 +132,7 @@ try {
       body:JSON.stringify([{number:7,title:remoteTitle,state:remoteState,
         html_url:'https://github.com/demo/sample/issues/7'}])});
   });
-  await activePage.getByRole('button', { name: /Activity sources/ }).click();
+  await openSources(activePage);
   await activePage.getByRole('textbox', { name: 'Repository', exact: true }).fill('demo/sample');
   await activePage.getByRole('button', { name: 'Add repository' }).click();
   const remotePick=activePage.getByRole('button', { name: 'Add linked Sample public issue to Today' });
