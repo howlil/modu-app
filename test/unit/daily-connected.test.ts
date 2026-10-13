@@ -67,6 +67,25 @@ describe('M3 connected activities',()=>{
   expect(refreshed.sourceItems.map(x=>x.source.externalId)).toEqual(['43']);
   expect(sourceCandidates(refreshed).map(x=>x.source.externalId)).toEqual(['43']);
  });
+ it('incremental reconciliation retains unchanged candidates and updates changed remote status',()=>{
+  const state={...emptyExecutionState(),sourceConnections:[{...connection,lastSyncedAt:1000}],
+    sourceItems:[item('1','Original'),item('2','Other')]};
+  const updated=reconcileSource(state,state.sourceConnections[0],[{
+    ...item('1','Changed'),source:{...item('1').source,remoteStatus:'completed'}
+  }],2000,true);
+  expect(updated.sourceItems.map(x=>x.source.externalId)).toEqual(['2','1']);
+  expect(updated.sourceItems.find(x=>x.source.externalId==='1')?.source.remoteStatus).toBe('completed');
+  expect(updated.sourceItems.find(x=>x.source.externalId==='2')?.title).toBe('Other');
+  expect(updated.sourceConnections[0].lastSyncedAt).toBe(2000);
+  expect(state.sourceItems[0].title).toBe('Original');
+ });
+ it('rejects over-limit snapshots without partial local mutation',()=>{
+  const state={...emptyExecutionState(),sourceConnections:[connection]};
+  const items=Array.from({length:1501},(_,i)=>item(String(i)));
+  expect(()=>reconcileSource(state,connection,items,100)).toThrow('Too many cached');
+  expect(state.sourceItems).toHaveLength(0);
+ });
+
  it('roundtrips linked records in legacy localStorage without overwriting legacy fields',()=>{
   const entries=storage();
   const initial={...emptyExecutionState(),goal:'unchanged',sourceConnections:[connection],sourceItems:[item()]};
@@ -106,6 +125,18 @@ describe('M3 import and public adapter',()=>{
   expect(result).toHaveLength(100);
   expect(result.find(x=>x.source.externalId==='101')?.source.remoteStatus).toBe('completed');
  });
+ it('adds since parameter only to subsequent complete refreshes',async()=>{
+  const requested:string[]=[];
+  const fetcher=vi.fn(async (url:string)=>{
+    requested.push(url);
+    return {ok:true,json:async()=>[]} as Response;
+  });
+  await loadPublicGithubIssues(connection,undefined,fetcher as typeof fetch);
+  await loadPublicGithubIssues({...connection,lastSyncedAt:600_000},undefined,fetcher as typeof fetch);
+  expect(new URL(requested[0]).searchParams.has('since')).toBe(false);
+  expect(new URL(requested[1]).searchParams.get('since')).toBe(new Date(480_000).toISOString());
+ });
+
  it('leaves an old source snapshot intact on partial fetch failure',async()=>{
   const fetcher=vi.fn(async()=>({ok:false,status:429} as Response));
   await expect(loadPublicGithubIssues(connection,undefined,fetcher as typeof fetch))
