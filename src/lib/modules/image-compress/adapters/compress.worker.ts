@@ -70,7 +70,9 @@ scope.onmessage = async (event: MessageEvent<Request>) => {
         }
       } else {
         // Flatten alpha against white: transparent PNGs must not become black.
-        const rgba = new Uint8ClampedArray(pixels.data);
+        // The worker handles one output format per request. Flatten in-place
+        // rather than copying a second 14MP RGBA buffer (~56MB).
+        const rgba = pixels.data;
         for (let i = 0; i < rgba.length; i += 4) {
           const a = rgba[i + 3] / 255;
           if (a !== 1) {
