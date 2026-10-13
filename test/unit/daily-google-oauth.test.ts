@@ -56,7 +56,8 @@ describe('Google Tasks OAuth security contract',()=>{
    expect(encrypted).not.toContain('refresh-token-example');
    expect(await decryptSecret(encrypted,oauth,'owner-a')).toBe('refresh-token-example');
    await expect(decryptSecret(encrypted,oauth,'owner-b')).rejects.toThrow();
-   const changed=encrypted.slice(0,-1)+(encrypted.endsWith('A')?'B':'A');
+   // Flip an authenticated IV byte, not an unused trailing base64 padding bit.
+   const changed=(encrypted[0]==='A'?'B':'A')+encrypted.slice(1);
    await expect(decryptSecret(changed,oauth,'owner-a')).rejects.toThrow();
  });
  it('sets HttpOnly Lax cookie scoped to Google auth endpoints',()=>{
