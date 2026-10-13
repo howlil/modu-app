@@ -42,22 +42,6 @@
         "limit": 20,
         "period": 60
       }
-    },
-    {
-      "name": "DAILY_GOOGLE_AUTH_LIMITER",
-      "namespace_id": "20261013",
-      "simple": {
-        "limit": 5,
-        "period": 60
-      }
-    },
-    {
-      "name": "DAILY_GOOGLE_TASKS_LIMITER",
-      "namespace_id": "20261014",
-      "simple": {
-        "limit": 12,
-        "period": 60
-      }
     }
   ]
 }
