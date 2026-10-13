@@ -1,6 +1,7 @@
 <script lang="ts">
  import { Button } from '#lib/components/ui/button/index.js';
- import { Search } from 'lucide-svelte';
+ import { Search, Link2 } from 'lucide-svelte';
+ import ConnectedSources from './ConnectedSources.svelte';
  import QuickCapture from './QuickCapture.svelte';
  import TaskDetailDrawer from './TaskDetailDrawer.svelte';
  import type { ExecutionTask } from '../core/planning.ts';
@@ -10,6 +11,7 @@
  let filter = $state<'all' | 'today' | 'available' | 'done'>('all');
  let editing = $state<ExecutionTask | null>(null);
  let query = $state('');
+ let showSources = $state(false);
  let visibleLimit = $state(20);
  function changeFilter(value: typeof filter) { filter = value; visibleLimit = 20; }
  function searchChanged() { visibleLimit = 20; }
@@ -32,6 +34,14 @@
 </header>
 <section class="rounded-[20px] border border-border bg-card p-4 sm:p-5">
  <QuickCapture onAdd={title => controller.quickAdd(title,'all')}/>
+ <div class="mt-3 flex justify-end">
+   <Button size="sm" variant="ghost" class="min-h-10 rounded-lg text-meta text-muted-foreground"
+     aria-expanded={showSources} onclick={() => showSources=!showSources}>
+     <Link2 class="mr-1 size-4"/> {showSources?'Hide sources':'Activity sources'}
+     {#if controller.state.sourceConnections.length}({controller.state.sourceConnections.length}){/if}
+   </Button>
+ </div>
+ {#if showSources}<ConnectedSources {controller}/>{/if}
  <div class="mb-4 mt-5 flex flex-wrap gap-2">
    {#each [['all','All'],['today','Today'],['available','Not planned'],['done','Completed']] as entry}
      {@const key = entry[0] as typeof filter}
@@ -54,7 +64,7 @@
        </button>
        <button type="button" class="min-w-0 flex-1 py-1 text-left" onclick={() => editing = task}>
          <span class="block truncate text-ui font-medium" class:line-through={task.status === 'done'}>{task.title}</span>
-         <span class="text-meta text-muted-foreground">{task.context ?? (task.workstream !== 'general' ? task.workstream : 'No context')}{task.status === 'blocked' ? ' · Blocked' : ''}{task.status === 'archived' ? ' · Archived' : ''}</span>
+         <span class="text-meta text-muted-foreground">{task.source ? task.source.providerId+' · Linked'+(controller.state.sourceConnections.some(c=>c.id===task.source?.connectionId)?'':' · Disconnected') : (task.context ?? (task.workstream !== 'general' ? task.workstream : 'No context'))}{task.status === 'blocked' ? ' · Blocked' : ''}{task.status === 'archived' ? ' · Archived' : ''}</span>
        </button>
        {#if task.status === 'ready'}
          <Button variant="ghost" size="sm" class="h-8 rounded-lg px-2 text-meta" onclick={() => todayIds.has(task.id) ? controller.removeFromToday(task.id) : controller.addToToday(task.id)}>
