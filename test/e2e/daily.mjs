@@ -142,7 +142,7 @@ try {
   await perf.reload();
   await perf.getByRole('navigation', { name: 'Daily views' }).getByRole('button', { name: 'All' }).click();
   await perf.getByRole('textbox', { name: 'Search all activities' }).fill('Stress activity 0999');
-  await perf.getByRole('button', { name: 'Stress activity 0999' }).waitFor();
+  await perf.getByText('Stress activity 0999', { exact: true }).waitFor({ timeout: 8000 });
   assert.ok(Date.now() - started < 20000, '1,000-activity smoke took too long');
   record('DLY-11 large-list filtering (1000 activities) within 20s CI smoke budget');
   await perfContext.close();
