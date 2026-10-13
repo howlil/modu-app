@@ -172,7 +172,12 @@ export async function encodeImageToTarget(
     if (signal?.aborted) { cancel(); return; }
     try {
       worker.postMessage({ file, format, targetBytes, allowResize, mode,
-      manualRegion:mode==='content-aware'?manualRegion:undefined,
+      manualRegion:mode==='content-aware' && manualRegion ? {
+        id: manualRegion.id, kind: manualRegion.kind, source: manualRegion.source,
+        confidence: manualRegion.confidence,
+        bounds: {x:manualRegion.bounds.x,y:manualRegion.bounds.y,
+          width:manualRegion.bounds.width,height:manualRegion.bounds.height}
+      } : undefined,
       previousOutput: mode !== 'standard' && previousOutput ? {
         blob: previousOutput.blob, width: previousOutput.width, height: previousOutput.height,
         quality: previousOutput.quality, resized: previousOutput.resized
