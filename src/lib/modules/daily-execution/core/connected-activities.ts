@@ -124,7 +124,11 @@ export function reconcileSource(
     if(!t.source || t.source.connectionId!==connection.id)return t;
     const fresh=byKey.get(sourceIdentity(t.source));
     if(!fresh)return t;
-    return {...t,source:{...fresh.source,lastSyncedAt:now,remoteTitle:fresh.title}};
+    // Update provider-owned title only while Modu's title still matches the previous provider snapshot.
+    // A user-edited title is an implicit local override and must survive future refreshes.
+    const original=(t.source.remoteTitle??t.title).slice(0,120);
+    return {...t,...(t.title===original?{title:fresh.title.slice(0,120)}:{}),
+      source:{...fresh.source,lastSyncedAt:now,remoteTitle:fresh.title.slice(0,160)}};
   });
   const synced:SourceConnection={...connection,status:'up-to-date',error:undefined,lastSyncedAt:now};
   return {...state,tasks,sourceConnections:[
