@@ -13,12 +13,13 @@ interface Request {
 const scope = self as DedicatedWorkerGlobalScope;
 scope.onmessage = async (event: MessageEvent<Request>) => {
   let bitmap: ImageBitmap | undefined;
+  let originalCanvas: OffscreenCanvas | undefined;
   try {
     const { file, format, targetBytes, allowResize } = event.data;
     bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
     const source = { width: bitmap.width, height: bitmap.height };
     const resizer = createPica({ features: ['js', 'wasm'], concurrency: 1 });
-    const originalCanvas = new OffscreenCanvas(source.width, source.height);
+    originalCanvas = new OffscreenCanvas(source.width, source.height);
     const originalContext = originalCanvas.getContext('2d', { willReadFrequently: true });
     if (!originalContext) throw new Error('Canvas initialization failed.');
     originalContext.drawImage(bitmap, 0, 0);
@@ -120,8 +121,6 @@ scope.onmessage = async (event: MessageEvent<Request>) => {
         engine: usedBrowserFallback ? 'browser-fallback' : 'wasm'
       }
     });
-    originalCanvas.width = 0;
-    originalCanvas.height = 0;
   } catch (error) {
     scope.postMessage({
       type: 'error',
@@ -129,5 +128,9 @@ scope.onmessage = async (event: MessageEvent<Request>) => {
     });
   } finally {
     bitmap?.close();
+    if (originalCanvas) {
+      originalCanvas.width = 0;
+      originalCanvas.height = 0;
+    }
   }
 };
