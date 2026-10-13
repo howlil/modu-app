@@ -13,6 +13,7 @@ import { DAILY_STORAGE_KEY, DailyStorageConflictError, readExecutionSnapshot, sa
 import {
   CAPACITY_PRESETS, emptyExecutionState, localDayKey, makePlan, minutesLabel, nextTask, plannedMinutes, weekKey,
   tasksForDay, currentForDay, selectForDay, removeFromDay, setNextForDay, completeSimply, reopenSimply,
+  sameEditableTask,
   type CapacityMode, type DailyPlan, type ExecutionState, type ExecutionTask, type Impact, type TaskStatus, type Workstream,
   type WeeklyReflection
 } from '../core/planning.ts';
@@ -307,8 +308,13 @@ export function createDailyExecutionController() {
   function chooseNext(id:string){syncDay();return commit(setNextForDay(state,id,dayKey));}
   function completeQuick(id:string){return commit(completeSimply(state,id,Date.now()));}
   function reopenQuick(id:string){return commit(reopenSimply(state,id));}
-  function editSimple(id:string,fields:{title:string;context?:string;nextAction?:string;estimateMinutes?:number;dueDate?:string}):boolean{
-    if(!fields.title.trim()||!state.tasks.some(t=>t.id===id))return false;
+  function editSimple(id:string,fields:{title:string;context?:string;nextAction?:string;estimateMinutes?:number;dueDate?:string}, expected?: ExecutionTask):boolean{
+    const current = state.tasks.find(t=>t.id===id);
+    if(!fields.title.trim()||!current)return false;
+    if(expected && !sameEditableTask(current,expected)){
+      error = 'This activity changed in another tab. Close the details and reopen them before saving.';
+      return false;
+    }
     const minutes=fields.estimateMinutes??0;
     if(!Number.isFinite(minutes)||minutes<0||minutes>720)return false;
     return commit({...state,tasks:state.tasks.map(t=>t.id===id?{...t,title:fields.title.trim().slice(0,120),context:fields.context?.trim().slice(0,60)||undefined,nextAction:fields.nextAction?.trim().slice(0,240)??t.nextAction,estimateMinutes:Math.round(minutes),dueDate:fields.dueDate||undefined}:t)});
