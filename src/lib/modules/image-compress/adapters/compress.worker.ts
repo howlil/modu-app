@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 import createPica from 'pica';
 import { optimizeAdaptive, type Dimensions } from '../core/adaptive.ts';
+import { planPerceptualCandidates, isBetterPerceptualCandidate } from '../core/perceptual.ts';
 import type { ImageOutputFormat } from '../core/target-size.ts';
 
 interface Request {
@@ -8,6 +9,7 @@ interface Request {
   format: ImageOutputFormat;
   targetBytes: number;
   allowResize: boolean;
+  mode?: 'standard' | 'perceptual';
 }
 
 const scope = self as DedicatedWorkerGlobalScope;
@@ -15,7 +17,7 @@ scope.onmessage = async (event: MessageEvent<Request>) => {
   let bitmap: ImageBitmap | undefined;
   let originalCanvas: OffscreenCanvas | undefined;
   try {
-    const { file, format, targetBytes, allowResize } = event.data;
+    const { file, format, targetBytes, allowResize, mode = 'standard' } = event.data;
     bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
     const source = { width: bitmap.width, height: bitmap.height };
     const resizer = createPica({ features: ['js', 'wasm'], concurrency: 1 });
@@ -68,6 +70,10 @@ scope.onmessage = async (event: MessageEvent<Request>) => {
           if (fallback.type !== format) throw new Error('WebP encoding is unsupported.');
           bytes = await fallback.arrayBuffer();
         }
+      } else if (format === 'image/avif') {
+        const { encodeAvif } = await import('./avif-encoder.ts');
+        const encoded = await encodeAvif(pixels, quality);
+        bytes = await encoded.arrayBuffer();
       } else {
         // Flatten alpha against white: transparent PNGs must not become black.
         // The worker handles one output format per request. Flatten in-place
@@ -103,23 +109,62 @@ scope.onmessage = async (event: MessageEvent<Request>) => {
       return new Blob([bytes as BlobPart], { type: format });
     };
 
+    const started = Date.now();
     const result = await optimizeAdaptive(source, encode, {
       targetBytes,
       allowResize,
       minimumShortSide: 640,
+      minimumQuality: format === 'image/avif' ? 0.5 : 0.7,
+      maximumQuality: format === 'image/avif' ? 0.85 : 1,
       onAttempt: (count) => scope.postMessage({ type: 'progress', attempts: count })
     });
+
+    let best = result;
+    let evidence: { metric: 'milo'; rawError: number; improved: boolean; scoredCandidates: number; comparisonLongSide: number } | undefined;
+    if (mode === 'perceptual' && result.status === 'within-target') {
+      const { scorePerceptualMilo } = await import('./perceptual-scorer.ts');
+      // A scorer failure is surfaced, never fabricated as a score.
+      let error = await scorePerceptualMilo(sourceCanvas, result.blob);
+      const plan = planPerceptualCandidates({
+        source, baseline: result,
+        allowResize, minShortSide: 640,
+        maxCandidates: format === 'image/avif' ? 3 : 4
+      });
+      let scoredCandidates = 1;
+      let improvements = 0;
+      for (const candidate of plan) {
+        // Soft budget limits additional encoding/scoring work. Worker can still
+        // be terminated immediately on user cancellation.
+        if (Date.now() - started > 35_000) break;
+        const blob = await encode(candidate, candidate.quality);
+        scope.postMessage({ type: 'progress', attempts: result.attempts + scoredCandidates });
+        if (blob.size === 0 || blob.size > targetBytes) continue;
+        const rawError = await scorePerceptualMilo(sourceCanvas, blob);
+        scoredCandidates++;
+        if (isBetterPerceptualCandidate(
+          { ...candidate, blob, error: rawError },
+          { width: best.width, height: best.height, quality: best.quality, blob: best.blob, error },
+          targetBytes
+        )) {
+          error = rawError;
+          best = { ...result, ...candidate, blob, resized: candidate.width !== source.width || candidate.height !== source.height };
+          improvements++;
+        }
+      }
+      evidence = { metric: 'milo', rawError: error, improved: improvements > 0, scoredCandidates, comparisonLongSide: 256 };
+    }
 
     scope.postMessage({
       type: 'result',
       result: {
-        blob: result.blob,
-        quality: result.quality,
-        attempts: result.attempts,
-        status: result.status,
-        resized: result.resized,
-        width: result.width,
-        height: result.height,
+        blob: best.blob,
+        quality: best.quality,
+        attempts: result.attempts + (evidence?.scoredCandidates ?? 0),
+        status: best.status,
+        resized: best.resized,
+        width: best.width,
+        height: best.height,
+        qualityEvidence: evidence,
         format,
         engine: usedBrowserFallback ? 'browser-fallback' : 'wasm'
       }
