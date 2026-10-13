@@ -158,6 +158,13 @@ export function reopenSimply(state:ExecutionState,id:string):ExecutionState{
     return {...rest,status:'ready' as const};
   })};
 }
+/** Detect edits to the same activity while its detail panel is open. */
+export function sameEditableTask(a: ExecutionTask, b: ExecutionTask): boolean {
+  return a.id === b.id && a.title === b.title && a.nextAction === b.nextAction &&
+    a.context === b.context && a.estimateMinutes === b.estimateMinutes &&
+    a.dueDate === b.dueDate && a.status === b.status;
+}
+
 export function minutesLabel(value: number): string {
   const total = Math.max(0, Math.round(value));
   return total < 60 ? total + 'm' : Math.floor(total / 60) + 'h' + (total % 60 ? ' ' + total % 60 + 'm' : '');
