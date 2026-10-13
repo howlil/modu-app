@@ -1,6 +1,5 @@
 import type { HabitDefinition } from './consistency.ts';
 import type { RecommendationDecision } from './recommendations.ts';
-import type { SourceReference, SourceConnection, SourceCandidate } from './connected-activities.ts';
 
 export type CapacityMode = 'low' | 'medium' | 'high';
 export type Workstream = 'build' | 'interview' | 'apply' | 'english' | 'review' | 'general';
@@ -50,7 +49,7 @@ export interface ExecutionTask {
   checkpoint?: TaskCheckpoint;
   createdAt: number;
   context?: string;
-  source?: SourceReference;
+  referenceUrl?: string;
 }
 
 export interface PlanRevision {
@@ -74,8 +73,6 @@ export interface WeeklyReflection {
 
 export interface DaySelection {taskIds: string[]; selectedTaskId?: string}
 export interface ExecutionState {
-  sourceConnections: SourceConnection[];
-  sourceItems: SourceCandidate[];
   days: Record<string,DaySelection>;
   dayNotes: Record<string,string>;
   goal: string;
@@ -89,7 +86,7 @@ export interface ExecutionState {
 }
 
 export function emptyExecutionState(): ExecutionState {
-  return { goal: '', successCriteria: '', tasks: [], sourceConnections: [], sourceItems: [], days: {}, dayNotes: {}, plans: {}, reflections: {}, manualEntries: [], habit: { id: 'optional-routine', name: 'Optional routine', qualifyingWorkstreams: [], targetDaysPerWeek: 3, minimumSessionMinutes: 15 }, recommendationDecisions: [] };
+  return { goal: '', successCriteria: '', tasks: [], days: {}, dayNotes: {}, plans: {}, reflections: {}, manualEntries: [], habit: { id: 'optional-routine', name: 'Optional routine', qualifyingWorkstreams: [], targetDaysPerWeek: 3, minimumSessionMinutes: 15 }, recommendationDecisions: [] };
 }
 
 export function localDayKey(now: number): string {
