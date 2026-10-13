@@ -1,6 +1,6 @@
 // @ts-nocheck — executed by the separate Playwright job; not part of the Svelte application typecheck.
 import { chromium, firefox, webkit } from 'playwright';
-import { stat } from 'node:fs/promises';
+import { stat, readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 
 const host = process.env.MODU_E2E_URL || 'http://127.0.0.1:8787/image/compress';
@@ -91,6 +91,55 @@ try {
   assert.ok(finalBytes <= 20_000, 'Recovered file must satisfy strict 20,000-byte budget');
   assert.equal(await cta.count(), 0, 'Retry CTA should not repeat after success');
   assert.ok((await page.locator('body').innerText()).includes('WASM encoder'));
+  // M1.7: preview mode and zoom controls preserve a real decoded result.
+  await page.getByRole('button', { name: 'Result', exact: true }).click();
+  assert.equal(await page.getByAltText('Compressed preview').count(), 1);
+  assert.equal(await page.getByAltText('Original preview').count(), 0);
+  await page.getByRole('button', { name: '100%', exact: true }).click();
+  assert.equal(await page.getByRole('button', { name: '100%', exact: true }).getAttribute('aria-pressed'), 'true');
+  await page.getByRole('button', { name: 'Compare', exact: true }).click();
+  await page.getByRole('button', { name: 'Fit', exact: true }).click();
+
+  // M1.5: alpha is flattened against white when a transparent PNG is saved as JPEG.
+  const alpha = await page.evaluate(async () => {
+    const c=document.createElement('canvas'); c.width=96; c.height=96;
+    const ctx=c.getContext('2d'); ctx.clearRect(0,0,96,96);
+    ctx.fillStyle='red';ctx.fillRect(24,24,48,48);
+    const blob=await new Promise(resolve=>c.toBlob(resolve,'image/png'));
+    return [...new Uint8Array(await blob.arrayBuffer())];
+  });
+  await page.locator('#modu-image-input').setInputFiles({
+    name:'alpha-test.png',mimeType:'image/png',buffer:Buffer.from(alpha)
+  });
+  await page.getByText('alpha-test.png').waitFor();
+  await page.getByRole('button', { name: 'JPEG', exact: true }).click();
+  await page.locator('#modu-target-kb').fill('100');
+  await page.getByRole('button', { name: 'Compress image', exact: true }).click();
+  await page.getByText('Target reached').waitFor({ timeout:120000 });
+  const [jpeg] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('button',{name:'Download image'}).click()
+  ]);
+  const jpgBytes=await readFile(await jpeg.path());
+  const corner=await page.evaluate(async arr=>{
+    const b=new Blob([new Uint8Array(arr)],{type:'image/jpeg'});
+    const image=await createImageBitmap(b);
+    const c=document.createElement('canvas');
+    c.width=96;c.height=96;
+    const ctx=c.getContext('2d');ctx.drawImage(image,0,0);
+    const rgba=Array.from(ctx.getImageData(0,0,1,1).data);
+    image.close();return rgba;
+  },[...jpgBytes]);
+  assert.ok(corner[0]>245&&corner[1]>245&&corner[2]>245,
+    'Transparent PNG must have white JPEG background; got '+JSON.stringify(corner));
+
+  // M1.5: a forged MIME cannot bypass input inspection.
+  await page.locator('#modu-image-input').setInputFiles({
+    name:'fake.png',mimeType:'image/png',buffer:Buffer.from('not a png')
+  });
+  await page.getByText('The file content does not match its image format.').waitFor();
+  console.log('M1 fidelity and invalid-input E2E passed:',{corner});
+
   assert.deepEqual(browserErrors, []);
   console.log('Image recovery E2E passed:', {
     previousBytes,
