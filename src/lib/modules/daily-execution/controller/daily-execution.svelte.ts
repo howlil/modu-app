@@ -9,7 +9,7 @@ import { assignFocusSession, loadFocusSessions, subscribeFocusSessions } from '#
 import { writePendingFocusTask } from '#lib/shared/focus-sessions/context.ts';
 import type { FocusActivitySession } from '#lib/shared/focus-sessions/types.ts';
 import { proposeReplan, overlapsExistingWork } from '../core/adaptive.ts';
-import { readExecutionState, saveExecutionState } from '../adapters/persistence.ts';
+import { DAILY_STORAGE_KEY, DailyStorageConflictError, readExecutionSnapshot, saveExecutionStateIfCurrent } from '../adapters/persistence.ts';
 import {
   CAPACITY_PRESETS, emptyExecutionState, localDayKey, makePlan, minutesLabel, nextTask, plannedMinutes, weekKey,
   tasksForDay, currentForDay, selectForDay, removeFromDay, setNextForDay, completeSimply, reopenSimply,
@@ -31,6 +31,9 @@ export function createDailyExecutionController() {
   let manualError = $state('');
   let checkpointPromptId = $state<string | null>(null);
   let loading = $state(true);
+  let storageReady = $state(false);
+  let syncNotice = $state('');
+  let observedRaw: string | null = null;
   let refreshVersion = 0;
 
   const plan = $derived(state.plans[dayKey] ?? makePlan(dayKey, 'medium'));
@@ -50,14 +53,53 @@ export function createDailyExecutionController() {
   const habitProgress = $derived(habitWeekSummary(state.habit, sessions, state.tasks, weekStart));
   const weeklyInsight = $derived(weeklyRecommendation(state.tasks, combinedEvidence, sessions, weekStart, Date.now(), state.recommendationDecisions));
 
-  function commit(value: ExecutionState): boolean {
+  function reloadFromStorage(notify = false): boolean {
     try {
-      saveExecutionState(value);
-      state = value;
+      const snapshot = readExecutionSnapshot();
+      const changed = observedRaw !== snapshot.raw;
+      state = snapshot.state;
+      observedRaw = snapshot.raw;
+      storageReady = true;
       error = '';
+      if (notify && changed) syncNotice = 'Daily changed in another tab. Latest activities loaded.';
       return true;
     } catch {
-      error = 'Unable to save data in this browser. Changes were not applied.';
+      storageReady = false;
+      error = 'Unable to safely read your local Daily data. No data has been overwritten.';
+      return false;
+    }
+  }
+
+  function syncDay(now = Date.now()): void {
+    const next = localDayKey(now);
+    if (next !== dayKey) {
+      dayKey = next;
+      weekStart = weekKey(now);
+      syncNotice = 'A new day has started. Choose what matters today.';
+      void refreshSessions();
+    }
+  }
+
+  function commit(value: ExecutionState): boolean {
+    if (!storageReady) {
+      error = 'Daily storage is unavailable. Changes were not applied.';
+      return false;
+    }
+    try {
+      const raw = saveExecutionStateIfCurrent(value, observedRaw);
+      observedRaw = raw;
+      state = value;
+      error = '';
+      syncNotice = '';
+      return true;
+    } catch (cause) {
+      if (cause instanceof DailyStorageConflictError) {
+        if (reloadFromStorage()) {
+          error = 'Daily changed in another tab. Latest activities loaded; review and retry your action.';
+        }
+      } else {
+        error = 'Unable to save data in this browser. Changes were not applied.';
+      }
       return false;
     }
   }
@@ -239,7 +281,7 @@ export function createDailyExecutionController() {
     // Refresh persisted work immediately before overlap validation. A separate Pomodoro tab
     // may have completed a session since this view last rendered.
     const latestSessions = await loadFocusSessions();
-    const latestState = readExecutionState();
+    const latestState = state;
     const existing = [
       ...latestSessions.map((session) => ({ startedAt: session.startedAt, endedAt: session.endedAt })),
       ...latestState.manualEntries
@@ -253,15 +295,16 @@ export function createDailyExecutionController() {
 
 
   function quickAdd(title:string,placement:'today'|'all'):boolean{
+    syncDay();
     const clean=title.trim().slice(0,120);
     if(!clean)return false;
     const task:ExecutionTask={id:crypto.randomUUID(),title:clean,nextAction:'',workstream:'general',impact:'medium',estimateMinutes:0,status:'ready',createdAt:Date.now()};
     const next={...state,tasks:[...state.tasks,task]};
     return commit(placement==='today'?selectForDay(next,task.id,dayKey):next);
   }
-  function addToToday(id:string){return commit(selectForDay(state,id,dayKey));}
-  function removeFromToday(id:string){return commit(removeFromDay(state,id,dayKey));}
-  function chooseNext(id:string){return commit(setNextForDay(state,id,dayKey));}
+  function addToToday(id:string){syncDay();return commit(selectForDay(state,id,dayKey));}
+  function removeFromToday(id:string){syncDay();return commit(removeFromDay(state,id,dayKey));}
+  function chooseNext(id:string){syncDay();return commit(setNextForDay(state,id,dayKey));}
   function completeQuick(id:string){return commit(completeSimply(state,id,Date.now()));}
   function reopenQuick(id:string){return commit(reopenSimply(state,id));}
   function editSimple(id:string,fields:{title:string;context?:string;nextAction?:string;estimateMinutes?:number;dueDate?:string}):boolean{
@@ -275,7 +318,7 @@ export function createDailyExecutionController() {
     // Preserve historical day membership; the view filters archived tasks.
     return commit({...state,tasks:state.tasks.map(t=>t.id===id?{...t,status:'archived' as const}:t)});
   }
-  function saveDayNote(note:string){return commit({...state,dayNotes:{...state.dayNotes,[dayKey]:note.slice(0,1000)}});}
+  function saveDayNote(note:string){syncDay();return commit({...state,dayNotes:{...state.dayNotes,[dayKey]:note.slice(0,1000)}});}
   function setGoal(goal: string, successCriteria: string) {
     if (!goal.trim()) return;
     commit({ ...state, goal: goal.trim().slice(0, 120), successCriteria: successCriteria.trim().slice(0, 240) });
@@ -365,7 +408,7 @@ export function createDailyExecutionController() {
   }
 
   onMount(() => {
-    state = readExecutionState();
+    reloadFromStorage();
     const requested = new URLSearchParams(window.location.search).get('checkpointTaskId');
     if (requested && state.tasks.some((task) => task.id === requested)) checkpointPromptId = requested;
     dayKey = localDayKey(Date.now());
@@ -376,16 +419,27 @@ export function createDailyExecutionController() {
     const unsubscribeEvidence = subscribeEvidence(() => void refreshEvidence());
     const unsubscribe = subscribeFocusSessions(() => void refreshSessions());
     const syncPlans = (event: StorageEvent) => {
-      if (event.key === 'modu-daily-execution-v1') state = readExecutionState();
+      if (event.key === DAILY_STORAGE_KEY || event.key === null) reloadFromStorage(true);
     };
     window.addEventListener('storage', syncPlans);
-    const onVisible = () => { if (document.visibilityState === 'visible') void refreshSessions(); };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        syncDay();
+        reloadFromStorage(true);
+        void refreshSessions();
+      }
+    };
     document.addEventListener('visibilitychange', onVisible);
-    const interval = window.setInterval(() => {
-      const next = localDayKey(Date.now());
-      if (next !== dayKey) { dayKey = next; weekStart = weekKey(Date.now()); void refreshSessions(); }
-    }, 60_000);
-    return () => { unsubscribeEvidence(); unsubscribe(); window.removeEventListener('storage', syncPlans); document.removeEventListener('visibilitychange', onVisible); window.clearInterval(interval); };
+    window.addEventListener('focus', onVisible);
+    const interval = window.setInterval(() => syncDay(), 60_000);
+    return () => {
+      unsubscribeEvidence();
+      unsubscribe();
+      window.removeEventListener('storage', syncPlans);
+      window.removeEventListener('focus', onVisible);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.clearInterval(interval);
+    };
   });
 
   return {
@@ -419,6 +473,9 @@ export function createDailyExecutionController() {
     get recommendation() { return recommendation; },
     get loading() { return loading; },
     get error() { return error; },
+    get storageReady() { return storageReady; },
+    get syncNotice() { return syncNotice; },
+    reloadFromStorage,
     quickAdd,addToToday,removeFromToday,chooseNext,completeQuick,reopenQuick,editSimple,archiveSimple,saveDayNote,
     setGoal, setMode, setAllocation, addTask, updateTask, setTaskStatus, completeTask,
     openFocus, assignSession, saveReflection, refreshSessions, focusMsForTask, focusMsForWorkstream, workMsForWorkstream,
