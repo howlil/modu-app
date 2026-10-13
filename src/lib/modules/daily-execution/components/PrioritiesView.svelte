@@ -92,6 +92,7 @@
  {#key editing.id}
    <TaskDetailDrawer task={editing} onClose={() => editing = null}
      onSave={fields => controller.editSimple(editing?.id ?? '', fields, editing ?? undefined)}
+     onDetach={() => { if (controller.detachLinked(editing?.id ?? '')) editing = null; }}
      onArchive={() => { if (editing?.status === 'archived' || editing?.status === 'blocked') controller.setTaskStatus(editing.id, 'ready'); else controller.archiveSimple(editing?.id ?? ''); editing = null; }}/>
  {/key}
 {/if}
