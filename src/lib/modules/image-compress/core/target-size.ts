@@ -1,4 +1,4 @@
-export type ImageOutputFormat = 'image/jpeg' | 'image/webp';
+export type ImageOutputFormat = 'image/jpeg' | 'image/webp' | 'image/avif';
 
 // A conservative encoder-parameter guardrail; NOT a validated visual quality metric.
 // Never use quality=0 as an automatic fallback for an impossible byte budget.
@@ -39,7 +39,8 @@ export async function findTargetSize(
   encode: (quality: number) => Promise<Blob>,
   targetBytes: number,
   onAttempt?: (attempts: number) => void,
-  minimumQuality = MIN_ENCODER_QUALITY
+  minimumQuality = MIN_ENCODER_QUALITY,
+  maximumQuality = 1
 ): Promise<TargetSizeResult> {
   if (!Number.isSafeInteger(targetBytes) || targetBytes <= 0) {
     throw new Error('Invalid target size.');
@@ -49,6 +50,7 @@ export async function findTargetSize(
     throw new Error('Invalid minimum encoder quality.');
   }
 
+  if (!Number.isFinite(maximumQuality) || maximumQuality > 1 || maximumQuality <= minimumQuality) throw new Error('Invalid maximum quality.');
   let attempts = 0;
   async function measure(quality: number): Promise<EncodingCandidate> {
     const blob = await encode(quality);
@@ -58,7 +60,7 @@ export async function findTargetSize(
     return { blob, quality };
   }
 
-  const highest = await measure(1);
+  const highest = await measure(maximumQuality);
   if (highest.blob.size <= targetBytes) {
     return { ...highest, attempts, status: 'within-target' };
   }
@@ -71,7 +73,7 @@ export async function findTargetSize(
   // Encoder bindings quantize quality to integer values; search that domain
   // so we do not encode the same rounded setting repeatedly.
   let low = Math.ceil(minimumQuality * 100);
-  let high = 100;
+  let high = Math.round(maximumQuality * 100);
   let bestLevel = low;
   while (high - low > 1) {
     const mid = Math.floor((low + high) / 2);
@@ -83,7 +85,7 @@ export async function findTargetSize(
   }
   // Verify the adjacent upper neighborhood. Actual byte sizes need not be
   // strictly monotonic across adjacent quality levels.
-  for (let q = bestLevel + 1; q <= Math.min(100, bestLevel + 2); q++) {
+  for (let q = bestLevel + 1; q <= Math.min(Math.round(maximumQuality * 100), bestLevel + 2); q++) {
     const candidate = await measure(q / 100);
     if (candidate.blob.size <= targetBytes) {
       best = candidate;

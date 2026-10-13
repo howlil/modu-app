@@ -9,6 +9,8 @@ export interface AdaptiveOptions {
   targetBytes: number;
   allowResize: boolean;
   minimumShortSide?: number;
+  minimumQuality?: number;
+  maximumQuality?: number;
   onAttempt?: (count: number) => void;
 }
 
@@ -33,7 +35,7 @@ export async function optimizeAdaptive(
 
   const run = (dimensions: Dimensions) => findTargetSize(
     (quality) => measure(dimensions, quality),
-    options.targetBytes, undefined, MIN_ENCODER_QUALITY
+    options.targetBytes, undefined, options.minimumQuality ?? MIN_ENCODER_QUALITY, options.maximumQuality ?? 1
   );
 
   const original = await run(source);
@@ -55,10 +57,10 @@ export async function optimizeAdaptive(
   });
 
   const smallest = dimensionsAt(minScale);
-  const minBlob = await measure(smallest, MIN_ENCODER_QUALITY);
+  const minBlob = await measure(smallest, options.minimumQuality ?? MIN_ENCODER_QUALITY);
   if (minBlob.size > options.targetBytes) {
     return {
-      blob: minBlob, quality: MIN_ENCODER_QUALITY,
+      blob: minBlob, quality: options.minimumQuality ?? MIN_ENCODER_QUALITY,
       status: 'quality-limited', attempts,
       ...smallest, resized: true
     };
@@ -71,7 +73,7 @@ export async function optimizeAdaptive(
   for (let pass = 0; pass < 6 && high - low > 0.002; pass++) {
     const mid = (low + high) / 2;
     const dimensions = dimensionsAt(mid);
-    const blob = await measure(dimensions, MIN_ENCODER_QUALITY);
+    const blob = await measure(dimensions, options.minimumQuality ?? MIN_ENCODER_QUALITY);
     if (blob.size <= options.targetBytes) {
       low = mid;
       feasibleDimensions = dimensions;
