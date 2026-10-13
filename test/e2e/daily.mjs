@@ -84,6 +84,40 @@ try {
   await second.close();
   record('DLY-07 cross-tab storage synchronization');
 
+  // M3: sources are opt-in, linked identity survives reload, detach preserves local task.
+  const nav = activePage.getByRole('navigation', { name: 'Daily views' });
+  await nav.getByRole('button', { name: 'All' }).click();
+  await activePage.getByRole('button', { name: /Activity sources/ }).click();
+  const sources=activePage.getByRole('region', { name: 'Connected activity sources' });
+  await sources.getByRole('textbox', { name: 'Title', exact: true }).fill('Read reference document');
+  await sources.getByRole('textbox', { name: 'Original HTTPS URL' }).fill('https://example.com/reference');
+  await sources.getByRole('button', { name: 'Add to Today' }).click();
+  await nav.getByRole('button', { name: 'Today' }).click();
+  await activePage.getByRole('button', { name: 'Read reference document', exact: true }).click();
+  const linkedDetails=activePage.getByRole('dialog', { name: 'Activity details' });
+  await linkedDetails.getByRole('link', { name: 'Open original' }).waitFor();
+  await linkedDetails.getByRole('button', { name: 'Detach source' }).click();
+  await linkedDetails.waitFor({ state: 'hidden' });
+  await activePage.reload();
+  await activePage.getByRole('button', { name: 'Read reference document', exact: true }).waitFor();
+  record('DLY-M3-01 manual HTTPS link, local Today task and detach preserving ID');
+
+  await activePage.getByRole('navigation', { name: 'Daily views' }).getByRole('button', { name: 'All' }).click();
+  await activePage.getByRole('button', { name: /Activity sources/ }).click();
+  await activePage.locator('#daily-activities-file').setInputFiles({
+    name: 'personal-tasks.json', mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify([{ id:'one',title:'File imported activity',status:'open' }]))
+  });
+  const pick=activePage.getByRole('button', { name: 'Add linked File imported activity to Today' });
+  await pick.waitFor();
+  await pick.click();
+  await activePage.getByRole('navigation', { name: 'Daily views' }).getByRole('button', { name: 'Today' }).click();
+  await activePage.getByRole('button', { name: 'File imported activity', exact: true }).waitFor();
+  await activePage.getByRole('button', { name: 'Complete File imported activity' }).click();
+  await activePage.getByRole('button', { name: 'Completed (1)' }).click();
+  await activePage.getByRole('button', { name: 'Reopen File imported activity' }).click();
+  record('DLY-M3-02 JSON import to source picker to Today, local completion and undo');
+
   await activePage.screenshot({ path: output + '/desktop.png', fullPage: true });
   await activePage.getByRole('button', { name: 'Start focus' }).click();
   await activePage.waitForURL(/\/pomodoro\?taskId=/);
