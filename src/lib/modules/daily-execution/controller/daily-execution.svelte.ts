@@ -58,7 +58,7 @@ export function createDailyExecutionController() {
     try {
       const snapshot = readExecutionSnapshot();
       const changed = observedRaw !== snapshot.raw;
-      state = snapshot.state;
+      if (changed || !storageReady) state = snapshot.state;
       observedRaw = snapshot.raw;
       storageReady = true;
       error = '';
