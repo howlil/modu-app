@@ -112,14 +112,17 @@ async function runCase(kind,original,format,targetKB,resize){
   if(row.improved && output.length===baselineBytes.length && Buffer.compare(output,baselineBytes)===0) {
     throw new Error('M2 falsely reported improvement without changing output');
   }
-  const m=text.match(/Raw error\\s+([0-9.]+)\\s+vs baseline\\s+([0-9.]+)/);
+  const m=text.match(/Raw error\s+([0-9.]+)\s+vs baseline\s+([0-9.]+)/);
   row.miloRawError=m?Number(m[1]):null;
   row.miloBaselineRawError=m?Number(m[2]):null;
   if(row.improved && (!m || row.miloRawError > row.miloBaselineRawError + 0.00001)) {
-    throw new Error('False perceptual improvement: result worse than previous download');
+    throw new Error(!m ? 'MILO UI score was not parseable: '+text.slice(-500) :
+      'Perceptual error became worse: '+row.miloRawError+' vs '+row.miloBaselineRawError);
   }
   report.results.push(row);
-  if(row.improved&&sample<24){
+  // Keep a balanced, bounded set of independent reference comparisons,
+  // including unchanged outputs. Do not select only claimed improvements.
+  if([200,500].includes(targetKB) && resize && sample<12){
     const id=String(sample++).padStart(2,'0');
     const sourceSize=await page.getByAltText('Original preview').evaluate(img=>({
       width:img.naturalWidth,height:img.naturalHeight

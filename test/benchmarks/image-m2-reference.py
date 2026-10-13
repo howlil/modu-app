@@ -32,6 +32,9 @@ def run(root: Path) -> dict:
               "samples": [], "summary": {}}
     for folder in sorted(root.glob("image-m2-*")):
         evidence = folder / "reference"
+        manifest_path = folder / "results.json"
+        test_rows = json.loads(manifest_path.read_text())["results"] if manifest_path.exists() else []
+        by_id = {x["referenceId"]: x for x in test_rows if "referenceId" in x}
         for original in sorted(evidence.glob("*-original.png")):
             stem = original.name.removesuffix("-original.png")
             baseline = evidence / f"{stem}-baseline.png"
@@ -42,15 +45,20 @@ def run(root: Path) -> dict:
             improved_score = score(original, improved)
             report["samples"].append({
                 "fixture": folder.name, "sample": stem,
+                "case": {k: by_id[stem].get(k) for k in
+                         ["kind","format","targetKB","resize","improved","baselineBytes","optimizedBytes",
+                          "miloRawError","miloBaselineRawError"]} if stem in by_id else {},
                 "baselineScore": baseline_score, "optimizedScore": improved_score,
                 "delta": round(improved_score - baseline_score, 4),
             })
     samples = report["samples"]
     if not samples:
-        raise RuntimeError("No perceptual improvement evidence was produced.")
+        raise RuntimeError("No reference evidence was produced; check benchmark fixture selection.")
     deltas = [s["delta"] for s in samples]
     report["summary"] = {
         "sampleCount": len(samples),
+        "claimedImprovements": sum(1 for x in samples if x["case"].get("improved")),
+        "claimedImprovementsReferenceRegressed": sum(1 for x in samples if x["case"].get("improved") and x["delta"] < -0.5),
         "meanDelta": round(sum(deltas) / len(deltas), 4),
         "referenceImproved": sum(1 for x in deltas if x > 0),
         "referenceRegressed": sum(1 for x in deltas if x < 0),
