@@ -7,6 +7,35 @@ import {
 
 const INPUT_FORMATS = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
+/** Validate magic bytes and reject animation before opening a decoder.
+ * MIME type alone is user-controlled. Bounded read prevents large allocations.
+ */
+export async function validateImageSignature(file: File): Promise<void> {
+  const bytes = new Uint8Array(await file.slice(0, Math.min(file.size, 262_144)).arrayBuffer());
+  const jpeg = bytes.length >= 3 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
+  const png = bytes.length >= 8 && [137,80,78,71,13,10,26,10].every((v,i) => bytes[i] === v);
+  const fourcc = (offset: number) => String.fromCharCode(...bytes.slice(offset, offset + 4));
+  const webp = bytes.length >= 16 && fourcc(0) === 'RIFF' && fourcc(8) === 'WEBP';
+  if (!((file.type === 'image/jpeg' && jpeg) ||
+        (file.type === 'image/png' && png) ||
+        (file.type === 'image/webp' && webp))) {
+    throw new Error('The file content does not match its image format.');
+  }
+  if (png) {
+    for (let offset = 8; offset + 12 <= bytes.length;) {
+      const length = ((bytes[offset] * 0x1000000) + (bytes[offset+1] << 16) +
+        (bytes[offset+2] << 8) + bytes[offset+3]) >>> 0;
+      const name = fourcc(offset + 4);
+      if (name === 'acTL') throw new Error('Animated PNG is not supported. Choose a still image.');
+      if (name === 'IDAT' || name === 'IEND' || length > bytes.length - offset - 12) break;
+      offset += length + 12;
+    }
+  }
+  if (webp && fourcc(12) === 'VP8X' && bytes.length >= 21 && (bytes[20] & 0x02)) {
+    throw new Error('Animated WebP is not supported. Choose a still image.');
+  }
+}
+
 export interface ImageInfo { width: number; height: number }
 export interface EncodedImage extends TargetSizeResult, ImageInfo {
   format: ImageOutputFormat;
@@ -27,7 +56,8 @@ function checkDimensions(width: number, height: number): void {
 
 export async function inspectImage(file: File): Promise<ImageInfo> {
   validateFile(file);
-  const bitmap = await createImageBitmap(file);
+  await validateImageSignature(file);
+  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
   try {
     checkDimensions(bitmap.width, bitmap.height);
     return { width: bitmap.width, height: bitmap.height };
@@ -45,6 +75,8 @@ export async function encodeImageToTarget(
   allowResize = false
 ): Promise<EncodedImage> {
   validateFile(file);
+  if (signal?.aborted) throw new DOMException('Compression canceled.', 'AbortError');
+  await validateImageSignature(file);
   if (signal?.aborted) throw new DOMException('Compression canceled.', 'AbortError');
 
   // An exact-format original below budget is always preferable to re-encoding.
@@ -72,6 +104,11 @@ export async function encodeImageToTarget(
       finish();
       reject(new DOMException('Compression canceled.', 'AbortError'));
     }
+    worker.onmessageerror = () => {
+      if (settled) return;
+      finish();
+      reject(new Error('Unable to receive the result from the image worker.'));
+    };
     worker.onerror = () => {
       if (settled) return;
       finish();
