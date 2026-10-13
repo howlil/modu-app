@@ -44,6 +44,14 @@ try {
   capture(activePage);
   activePage.setDefaultTimeout(10000);
   await ready(activePage);
+  const googleResponse=await activePage.request.get(new URL('/api/daily/google/status',url).toString());
+  assert.equal(googleResponse.status(),200);
+  const googleStatus=await googleResponse.json();
+  assert.equal(typeof googleStatus.available,'boolean');
+  assert.equal(typeof googleStatus.connected,'boolean');
+  assert.equal(googleStatus.connected,false,'Fresh browser must not inherit an OAuth connection');
+  assert.equal(JSON.stringify(googleStatus).includes('refresh_token'),false,'Never return OAuth secrets to a browser');
+  record('DLY-OAUTH-01 fail-closed Google Tasks status and no provider credential leakage');
   await activePage.locator('body').click({ position: { x: 5, y: 5 } });
   await activePage.keyboard.press('/');
   assert.equal(await activePage.getByRole('textbox', { name: 'New activity' }).evaluate(el => document.activeElement === el), true);
