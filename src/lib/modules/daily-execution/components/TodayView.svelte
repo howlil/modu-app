@@ -210,6 +210,7 @@
  {#key editing.id}
    <TaskDetailDrawer task={editing} onClose={() => editing = null}
      onSave={fields => controller.editSimple(editing?.id ?? '', fields, editing ?? undefined)}
+     onDetach={() => { if (controller.detachLinked(editing?.id ?? '')) editing = null; }}
      onRemoveFromToday={() => { if (controller.removeFromToday(editing?.id ?? '')) editing = null; }}
      onArchive={() => { if (controller.archiveSimple(editing?.id ?? '')) editing = null; }}/>
  {/key}
