@@ -107,7 +107,7 @@ export function detachActivity(state:ExecutionState, id:string):ExecutionState {
 /** Atomic full-snapshot reconciliation; a missing GitHub issue is not a deletion assertion. */
 export function reconcileSource(
   state:ExecutionState, connection:SourceConnection,
-  remoteItems:SourceCandidate[], now:number
+  remoteItems:SourceCandidate[], now:number, incremental=false
 ):ExecutionState {
   const unique=new Map<string,SourceCandidate>();
   for(const item of remoteItems) {
@@ -117,6 +117,9 @@ export function reconcileSource(
   }
   const byKey=new Map(unique);
   const other=state.sourceItems.filter(item=>item.source.connectionId!==connection.id);
+  const kept=incremental?state.sourceItems.filter(item=>item.source.connectionId===connection.id &&
+    !byKey.has(sourceIdentity(item.source))):[];
+  if(other.length+kept.length+unique.size>1500)throw new Error('Too many cached activities (limit 1500).');
   const tasks=state.tasks.map(t=>{
     if(!t.source || t.source.connectionId!==connection.id)return t;
     const fresh=byKey.get(sourceIdentity(t.source));
@@ -126,7 +129,7 @@ export function reconcileSource(
   const synced:SourceConnection={...connection,status:'up-to-date',error:undefined,lastSyncedAt:now};
   return {...state,tasks,sourceConnections:[
     ...state.sourceConnections.filter(c=>c.id!==connection.id),synced
-  ],sourceItems:[...other,...[...byKey.values()].map(item=>({
+  ],sourceItems:[...other,...kept,...[...byKey.values()].map(item=>({
     ...item,source:{...item.source,lastSyncedAt:now}
   }))]};
 }
