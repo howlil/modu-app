@@ -1,0 +1,46 @@
+name: Image Compressor Browser E2E
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'src/lib/modules/image-compress/**'
+      - 'test/e2e/image-compress.mjs'
+      - '.github/workflows/image-compress-e2e.yml'
+      - 'package.json'
+      - 'bun.lock'
+      - 'vite.config.ts'
+      - 'wrangler.jsonc'
+  workflow_dispatch:
+
+jobs:
+  image-compressor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.2.15'
+      - name: Install app dependencies
+        run: bun install --frozen-lockfile
+      - name: Install temporary browser test dependency
+        run: |
+          bun add -d playwright
+          bunx playwright install --with-deps chromium
+      - name: Build Cloudflare production bundle
+        run: bun run build
+      - name: Start production-like Cloudflare Worker
+        run: |
+          bunx wrangler dev --port 8787 > /tmp/modu-image-e2e-wrangler.log 2>&1 &
+          for i in $(seq 1 50); do
+            if curl --fail --silent http://127.0.0.1:8787/image/compress > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/modu-image-e2e-wrangler.log
+          exit 1
+      - name: Verify one-click recovery
+        run: node test/e2e/image-compress.mjs
+      - name: Wrangler logs on failure
+        if: failure()
+        run: tail -100 /tmp/modu-image-e2e-wrangler.log || true
