@@ -53,6 +53,8 @@ jobs:
             await page.locator('#modu-image-input').setInputFiles({
               name: 'synthetic-photo.png', mimeType: 'image/png', buffer: Buffer.from(pixels)
             });
+            await page.getByText('synthetic-photo.png').waitFor({ timeout: 15000 });
+            console.log('Input inspected:', (await page.locator('body').innerText()).slice(0,700));
             await page.getByLabel('Allow smart resize').click();
             await page.locator('#modu-target-kb').fill('50');
             await page.getByRole('button',{name:/Compress image/}).click();
