@@ -18,11 +18,6 @@ async function ready(page) {
   await page.getByRole('heading', { name: 'Today', exact: true }).waitFor();
   await page.getByRole('textbox', { name: 'New activity' }).waitFor();
 }
-async function openSources(page) {
-  const panel=page.getByRole('region', { name: 'Connected activity sources' });
-  if (!(await panel.isVisible())) await page.getByRole('button', { name: /Activity sources/ }).click();
-  await panel.waitFor();
-}
 async function noOverflow(page, label) {
   const { width, scrollWidth } = await page.evaluate(() => ({
     width: document.documentElement.clientWidth,
@@ -44,14 +39,6 @@ try {
   capture(activePage);
   activePage.setDefaultTimeout(10000);
   await ready(activePage);
-  const googleResponse=await activePage.request.get(new URL('/api/daily/google/status',url).toString());
-  assert.equal(googleResponse.status(),200);
-  const googleStatus=await googleResponse.json();
-  assert.equal(typeof googleStatus.available,'boolean');
-  assert.equal(typeof googleStatus.connected,'boolean');
-  assert.equal(googleStatus.connected,false,'Fresh browser must not inherit an OAuth connection');
-  assert.equal(JSON.stringify(googleStatus).includes('refresh_token'),false,'Never return OAuth secrets to a browser');
-  record('DLY-OAUTH-01 fail-closed Google Tasks status and no provider credential leakage');
   await activePage.locator('body').click({ position: { x: 5, y: 5 } });
   await activePage.keyboard.press('/');
   assert.equal(await activePage.getByRole('textbox', { name: 'New activity' }).evaluate(el => document.activeElement === el), true);
@@ -97,78 +84,43 @@ try {
   await second.close();
   record('DLY-07 cross-tab storage synchronization');
 
-  // M3: sources are opt-in, linked identity survives reload, detach preserves local task.
-  const nav = activePage.getByRole('navigation', { name: 'Daily views' });
-  await nav.getByRole('button', { name: 'All' }).click();
-  await openSources(activePage);
-  const sources=activePage.getByRole('region', { name: 'Connected activity sources' });
-  await sources.getByRole('textbox', { name: 'Title', exact: true }).fill('Read reference document');
-  await sources.getByRole('textbox', { name: 'Original HTTPS URL' }).fill('https://example.com/reference');
-  await sources.getByRole('button', { name: 'Add to Today' }).click();
-  await nav.getByRole('button', { name: 'Today' }).click();
-  await activePage.getByRole('button', { name: /^Read reference document/ }).click();
-  const linkedDetails=activePage.getByRole('dialog', { name: 'Activity details' });
-  await linkedDetails.getByRole('link', { name: 'Open original' }).waitFor();
-  await linkedDetails.getByRole('button', { name: 'Detach source' }).click();
-  await linkedDetails.waitFor({ state: 'hidden' });
+  // M3 rollback: old linked tasks must become usable plain local tasks
+  // without rewriting storage until a user actually saves an edit.
+  await activePage.evaluate(() => {
+    const key='modu-daily-execution-v1';
+    const snapshot=JSON.parse(localStorage.getItem(key) ?? '{}');
+    snapshot.sourceConnections=[{id:'github:demo/repo',providerId:'github',status:'up-to-date',label:'demo/repo'}];
+    snapshot.sourceItems=[{title:'Not selected',source:{
+      providerId:'github',connectionId:'github:demo/repo',externalId:'123',remoteStatus:'open'
+    }}];
+    snapshot.tasks.push({
+      id:'legacy-linked-task',title:'Legacy linked task',nextAction:'',workstream:'general',
+      impact:'medium',estimateMinutes:0,status:'ready',createdAt:Date.now(),
+      source:{providerId:'github',connectionId:'github:demo/repo',externalId:'42',
+        remoteStatus:'open',url:'https://github.com/demo/repo/issues/42'}
+    });
+    localStorage.setItem(key,JSON.stringify(snapshot));
+  });
   await activePage.reload();
-  await activePage.getByRole('button', { name: /^Read reference document/ }).waitFor();
-  record('DLY-M3-01 manual HTTPS link, local Today task and detach preserving ID');
-
+  const beforeMigration=await activePage.evaluate(() =>
+    JSON.parse(localStorage.getItem('modu-daily-execution-v1') ?? '{}')
+  );
+  assert.equal(beforeMigration.tasks.find(t=>t.id==='legacy-linked-task').source.externalId,'42');
   await activePage.getByRole('navigation', { name: 'Daily views' }).getByRole('button', { name: 'All' }).click();
-  await openSources(activePage);
-  await activePage.locator('#daily-activities-file').setInputFiles({
-    name: 'personal-tasks.json', mimeType: 'application/json',
-    buffer: Buffer.from(JSON.stringify([{ id:'one',title:'File imported activity',status:'open' }]))
-  });
-  const pick=activePage.getByRole('button', { name: 'Add linked File imported activity to Today' });
-  await pick.waitFor();
-  await pick.click();
+  await activePage.getByRole('button', { name: 'Legacy linked task', exact: true }).click();
+  const legacyDetails=activePage.getByRole('dialog', { name: 'Activity details' });
+  await legacyDetails.getByRole('link', { name: 'Open reference' }).waitFor();
+  await legacyDetails.getByRole('button', { name: 'Save' }).click();
+  const afterMigration=await activePage.evaluate(() =>
+    JSON.parse(localStorage.getItem('modu-daily-execution-v1') ?? '{}')
+  );
+  assert.equal(afterMigration.tasks.find(t=>t.id==='legacy-linked-task').referenceUrl,
+    'https://github.com/demo/repo/issues/42');
+  assert.equal(afterMigration.tasks.find(t=>t.id==='legacy-linked-task').source,undefined);
+  assert.equal(afterMigration.sourceConnections,undefined);
+  assert.equal(afterMigration.sourceItems,undefined);
   await activePage.getByRole('navigation', { name: 'Daily views' }).getByRole('button', { name: 'Today' }).click();
-  await activePage.getByRole('button', { name: /^File imported activity/ }).waitFor();
-  await activePage.getByRole('button', { name: 'Complete File imported activity' }).click();
-  await activePage.getByRole('button', { name: 'Completed (1)' }).click();
-  await activePage.getByRole('button', { name: 'Reopen File imported activity' }).click();
-  record('DLY-M3-02 JSON import to source picker to Today, local completion and undo');
-
-  await activePage.getByRole('navigation', { name: 'Daily views' }).getByRole('button', { name: 'All' }).click();
-  let remoteTitle='Sample public issue';
-  let remoteState='open';
-  await activePage.route('https://api.github.com/repos/demo/sample/issues?**', async route => {
-    await route.fulfill({status:200,contentType:'application/json',
-      headers:{'access-control-allow-origin':'*'},
-      body:JSON.stringify([{number:7,title:remoteTitle,state:remoteState,
-        html_url:'https://github.com/demo/sample/issues/7'}])});
-  });
-  await openSources(activePage);
-  await activePage.getByRole('textbox', { name: 'Repository', exact: true }).fill('demo/sample');
-  await activePage.getByRole('button', { name: 'Add repository' }).click();
-  const remotePick=activePage.getByRole('button', { name: 'Add linked Sample public issue to Today' });
-  await remotePick.waitFor({ timeout: 10000 });
-  await remotePick.click();
-  remoteTitle='Sample public issue updated';
-  remoteState='closed';
-  await activePage.getByRole('button', { name: 'Refresh demo/sample' }).click();
-  await activePage.getByText('public issues updated', {exact:false}).waitFor({ timeout: 10000 });
-  const linkedSnapshot=await activePage.evaluate(() => {
-    const snapshot=JSON.parse(localStorage.getItem('modu-daily-execution-v1') ?? '{}');
-    return snapshot.tasks.filter(task=>task.source?.connectionId==='github:demo/sample');
-  });
-  assert.equal(linkedSnapshot.length,1,'Refresh must not create duplicate tasks');
-  assert.equal(linkedSnapshot[0].source.remoteStatus,'completed');
-  assert.equal(linkedSnapshot[0].status,'ready','Remote completion must not complete local task');
-  await activePage.getByRole('button', { name: 'Disconnect demo/sample' }).click();
-  const remaining=await activePage.evaluate(() => {
-    const snapshot=JSON.parse(localStorage.getItem('modu-daily-execution-v1') ?? '{}');
-    return snapshot.tasks.filter(task=>task.source?.connectionId==='github:demo/sample');
-  });
-  assert.equal(remaining.length,1,'Disconnect must preserve linked local history');
-  record('DLY-M3-03 public GitHub connect, incremental refresh, no write-back and disconnect');
-  await activePage.getByRole('navigation', { name: 'Daily views' }).getByRole('button', { name: 'Today' }).click();
-  await activePage.getByRole('button', { name: 'Manage', exact: true }).click();
-  await activePage.getByRole('heading', { name: 'Activity sources' }).waitFor();
-  await activePage.getByRole('navigation', { name: 'Daily views' }).getByRole('button', { name: 'Today' }).click();
-  record('DLY-M3-04 direct source management navigation from Today');
+  record('DLY-LEGACY-01 migrated linked task retains ID and HTTPS reference without provider state');
 
   await activePage.screenshot({ path: output + '/desktop.png', fullPage: true });
   await activePage.getByRole('button', { name: 'Start focus' }).click();
