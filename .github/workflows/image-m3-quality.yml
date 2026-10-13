@@ -7,6 +7,8 @@ on:
       - '.github/workflows/image-m3-quality.yml'
       - 'test/benchmarks/image-compress-m3.mjs'
       - 'test/benchmarks/image-m3-reference.py'
+      - 'src/lib/modules/image-compress/adapters/face-detector.ts'
+      - 'static/models/image-compress/**'
   schedule:
     - cron: '47 4 * * 0'
 concurrency:
@@ -37,7 +39,7 @@ jobs:
           if [ "${{ matrix.kind }}" = "portrait" ]; then
             curl --fail --location --retry 3 --max-time 100 \
               --user-agent 'ModuImageBench/3.0 (Open-source QA)' \
-              'https://commons.wikimedia.org/wiki/Special:Redirect/file/Portrait_of_woman.jpg?width=1280' \
+              'https://commons.wikimedia.org/wiki/Special:Redirect/file/Grace_Hopper.jpg' \
               -o test/fixtures/image-compress/portrait.jpg
           else
             curl --fail --location --retry 3 --max-time 100 \

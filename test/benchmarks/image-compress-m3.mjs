@@ -94,6 +94,7 @@ async function attempt(original,format,targetKB,resize){
   await page.getByText(/Important details checked:/).waitFor({timeout:180000});
   const body=await page.locator('body').innerText();
   row.faces=Number(body.match(/Important details checked:\s*(\d+) face/)?.[1]||0);
+  if(kind==='portrait' && row.faces===0)throw new Error('Face ROI is missing from the portrait benchmark');
   row.improved=body.includes('A better matching result was found.');
   row.m3Ms=Math.round(performance.now()-startM3);
   const last=await download('Download image');
