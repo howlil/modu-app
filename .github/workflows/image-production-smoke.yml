@@ -1,0 +1,39 @@
+name: Image Compressor Production Smoke
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/image-production-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  public-site:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.2.15'
+      - name: Install existing dependencies
+        run: bun install --frozen-lockfile
+      - name: Install Chromium browser harness
+        run: |
+          bun add -d playwright
+          bunx playwright install --with-deps chromium
+      - name: Verify deployed production user journey
+        env:
+          MODU_E2E_URL: https://modu.howlil.site/image/compress
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            echo "Production browser verification attempt $attempt"
+            if curl --fail --location --silent --show-error --max-time 20 "$MODU_E2E_URL" >/dev/null &&
+               node test/e2e/image-compress.mjs; then
+              echo "Production image-compressor flow verified."
+              exit 0
+            fi
+            sleep 90
+          done
+          echo "Production smoke did not complete; check Cloudflare Workers Builds deployment status."
+          exit 1
