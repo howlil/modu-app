@@ -120,11 +120,12 @@ scope.onmessage = async (event: MessageEvent<Request>) => {
     });
 
     let best = result;
-    let evidence: { metric: 'milo'; rawError: number; improved: boolean; scoredCandidates: number; comparisonLongSide: number } | undefined;
+    let evidence: { metric: 'milo'; rawError: number; baselineRawError: number; improved: boolean; scoredCandidates: number; comparisonLongSide: number } | undefined;
     if (mode === 'perceptual' && result.status === 'within-target') {
       const { scorePerceptualMilo } = await import('./perceptual-scorer.ts');
       // A scorer failure is surfaced, never fabricated as a score.
-      let error = await scorePerceptualMilo(sourceCanvas, result.blob);
+      const baselineError = await scorePerceptualMilo(sourceCanvas, result.blob);
+      let error = baselineError;
       const plan = planPerceptualCandidates({
         source, baseline: result,
         allowResize, minShortSide: 640,
@@ -151,7 +152,7 @@ scope.onmessage = async (event: MessageEvent<Request>) => {
           improvements++;
         }
       }
-      evidence = { metric: 'milo', rawError: error, improved: improvements > 0, scoredCandidates, comparisonLongSide: 256 };
+      evidence = { metric: 'milo', rawError: error, baselineRawError: baselineError, improved: improvements > 0, scoredCandidates, comparisonLongSide: 256 };
     }
 
     scope.postMessage({

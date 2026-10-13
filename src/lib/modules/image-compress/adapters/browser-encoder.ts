@@ -41,7 +41,7 @@ export interface EncodedImage extends TargetSizeResult, ImageInfo {
   format: ImageOutputFormat;
   resized: boolean;
   engine: 'wasm' | 'browser-fallback' | 'original';
-  qualityEvidence?: { metric: 'milo'; rawError: number; improved: boolean; scoredCandidates: number; comparisonLongSide: number };
+  qualityEvidence?: { metric: 'milo'; rawError: number; baselineRawError?: number; improved: boolean; scoredCandidates: number; comparisonLongSide: number };
 }
 
 function validateFile(file: File): void {
