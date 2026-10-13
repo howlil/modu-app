@@ -1,5 +1,6 @@
 <script lang="ts">
  import { X } from 'lucide-svelte';
+ import { onMount } from 'svelte';
  import { Button } from '#lib/components/ui/button/index.js';
  import type { ExecutionTask } from '../core/planning.ts';
  let { task, onClose, onSave, onArchive }: {
@@ -14,6 +15,12 @@
  let estimate = $state('');
  let dueDate = $state('');
  let expanded = $state(false);
+ let dialog: HTMLDivElement;
+ onMount(() => {
+   const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+   dialog?.querySelector<HTMLInputElement>('input')?.focus();
+   return () => { if (previous?.isConnected) previous.focus(); };
+ });
  $effect(() => {
    title = task.title;
    context = task.context ?? (task.workstream === 'general' ? '' : task.workstream);
@@ -25,12 +32,31 @@
    event.preventDefault();
    if (onSave({ title, context, nextAction, estimateMinutes: estimate.trim() ? Number(estimate) : 0, dueDate })) onClose();
  }
- function keydown(event: KeyboardEvent) { if (event.key === 'Escape') onClose(); }
+ function keydown(event: KeyboardEvent) {
+   if (event.key === 'Escape') {
+     event.preventDefault();
+     onClose();
+     return;
+   }
+   if (event.key !== 'Tab' || !dialog) return;
+   const focusable = [...dialog.querySelectorAll<HTMLElement>(
+     'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+   )].filter(node => node.getClientRects().length > 0);
+   if (!focusable.length) { event.preventDefault(); dialog.focus(); return; }
+   const first = focusable[0];
+   const last = focusable[focusable.length - 1];
+   if (!dialog.contains(document.activeElement) ||
+     (event.shiftKey && document.activeElement === first) ||
+     (!event.shiftKey && document.activeElement === last)) {
+     event.preventDefault();
+     (event.shiftKey ? last : first).focus();
+   }
+ }
 </script>
 <svelte:window onkeydown={keydown}/>
 <div class="fixed inset-0 z-50 flex justify-end bg-foreground/30">
  <button class="absolute inset-0 cursor-default" type="button" aria-label="Close activity details" onclick={onClose}></button>
- <div role="dialog" aria-modal="true" aria-labelledby="daily-task-heading" class="relative z-10 flex h-full w-full max-w-[390px] flex-col overflow-y-auto border-l border-border bg-card shadow-xl">
+ <div bind:this={dialog} role="dialog" aria-modal="true" aria-labelledby="daily-task-heading" tabindex="-1" class="relative z-10 flex h-full w-full max-w-[390px] flex-col overflow-y-auto border-l border-border bg-card shadow-xl">
    <header class="flex items-center justify-between border-b border-border px-5 py-4">
      <h2 id="daily-task-heading" class="text-title font-medium">Activity details</h2>
      <Button variant="ghost" size="icon" aria-label="Close" onclick={onClose}><X class="size-4"/></Button>
