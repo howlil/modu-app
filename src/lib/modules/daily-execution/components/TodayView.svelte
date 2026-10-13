@@ -139,7 +139,7 @@
          <div class="mt-4 border-b border-border pb-3">
            <div class="flex items-center justify-between gap-2">
              <h3 class="text-meta font-medium">From connected sources</h3>
-             <Button variant="ghost" size="sm" class="min-h-10 rounded-lg px-2 text-meta" onclick={() => controller.view='priorities'}>Manage</Button>
+             <Button variant="ghost" size="sm" class="min-h-10 rounded-lg px-2 text-meta" onclick={() => controller.openSourcePanel()}>Manage</Button>
            </div>
            {#each controller.availableSources.slice(0,3) as item (item.source.providerId+item.source.connectionId+item.source.externalId)}
              <div class="flex min-h-11 items-center gap-2">
