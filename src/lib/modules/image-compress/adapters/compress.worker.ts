@@ -2,6 +2,8 @@
 import createPica from 'pica';
 import { optimizeAdaptive, type Dimensions } from '../core/adaptive.ts';
 import { planPerceptualCandidates, isBetterPerceptualCandidate } from '../core/perceptual.ts';
+import {selectRegions,type ImportantRegion} from '../core/content-regions.ts';
+import {assessContentCandidate} from '../core/region-policy.ts';
 import type { ImageOutputFormat } from '../core/target-size.ts';
 
 interface Request {
@@ -9,7 +11,8 @@ interface Request {
   format: ImageOutputFormat;
   targetBytes: number;
   allowResize: boolean;
-  mode?: 'standard' | 'perceptual';
+  mode?: 'standard' | 'perceptual' | 'content-aware';
+  manualRegion?: ImportantRegion;
   previousOutput?: { blob: Blob; width: number; height: number; quality: number; resized: boolean };
 }
 
@@ -18,7 +21,7 @@ scope.onmessage = async (event: MessageEvent<Request>) => {
   let bitmap: ImageBitmap | undefined;
   let originalCanvas: OffscreenCanvas | undefined;
   try {
-    const { file, format, targetBytes, allowResize, mode = 'standard', previousOutput } = event.data;
+    const { file, format, targetBytes, allowResize, mode = 'standard', previousOutput, manualRegion } = event.data;
     bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
     const source = { width: bitmap.width, height: bitmap.height };
     const resizer = createPica({ features: ['js', 'wasm'], concurrency: 1 });
@@ -111,7 +114,11 @@ scope.onmessage = async (event: MessageEvent<Request>) => {
     };
 
     const started = Date.now();
-    const result = await optimizeAdaptive(source, encode, {
+    // Content-aware optimization uses the exact verified current output as
+    // baseline, avoiding a redundant full M1 search before ROI evaluation.
+    const result = mode === 'content-aware' && previousOutput
+      ? {...previousOutput,status:'within-target' as const,attempts:0}
+      : await optimizeAdaptive(source, encode, {
       targetBytes,
       allowResize,
       minimumShortSide: 640,
@@ -122,6 +129,15 @@ scope.onmessage = async (event: MessageEvent<Request>) => {
 
     let best = result;
     let evidence: { metric: 'milo'; rawError: number; baselineRawError: number; improved: boolean; scoredCandidates: number; comparisonLongSide: number } | undefined;
+    let contentEvidence: {
+      status:'complete'|'no-regions'|'degraded';
+      faceStatus:'detected'|'none'|'unavailable'|'skipped';
+      regions:ImportantRegion[];
+      globalError?:number;
+      baselineGlobalError?:number;
+      evaluatedCandidates:number;
+      improved:boolean;
+    } | undefined;
     if (mode === 'perceptual' && result.status === 'within-target') {
       const { scorePerceptualMilo } = await import('./perceptual-scorer.ts');
       // Compare against the exact file already visible to the user.
@@ -174,6 +190,61 @@ scope.onmessage = async (event: MessageEvent<Request>) => {
       evidence = { metric: 'milo', rawError: error, baselineRawError: baselineError, improved: improvements > 0, scoredCandidates, comparisonLongSide: 256 };
     }
 
+    if (mode === 'content-aware') {
+      if(!previousOutput || previousOutput.blob.size===0 || previousOutput.blob.size>targetBytes ||
+        (!allowResize && (previousOutput.width!==source.width || previousOutput.height!==source.height)))
+        throw new Error('Content-aware optimization requires a valid previous result.');
+      let faceStatus: 'detected'|'none'|'unavailable'|'skipped'='none';
+      let detected: ImportantRegion[]=[];
+      try{
+        const {detectFaces}=await import('./face-detector.ts');
+        const faces=await detectFaces(sourceCanvas);
+        detected=faces;
+        faceStatus=faces.length?'detected':'none';
+      }catch{
+        faceStatus='unavailable';
+      }
+      let textRegions:ImportantRegion[]=[];
+      try{
+        const {analyzeTextDetails}=await import('./content-analyzer.ts');
+        textRegions=analyzeTextDetails(sourceCanvas);
+      }catch{
+        // No false detector claim: manual focus and face ROI can still work.
+      }
+      const all=selectRegions([...(manualRegion?[manualRegion]:[]),...detected,...textRegions]);
+      best={...result,...previousOutput,status:'within-target' as const};
+      if(!all.length){
+        contentEvidence={status:'no-regions',faceStatus,regions:[],evaluatedCandidates:0,improved:false};
+      }else{
+        const {scoreContentAware}=await import('./region-scorer.ts');
+        const baselineScores=await scoreContentAware(sourceCanvas,previousOutput.blob,all);
+        let bestScores=baselineScores;
+        const planned=planPerceptualCandidates({source,baseline:previousOutput,allowResize,
+          minShortSide:640,maxCandidates:format==='image/avif'?3:4});
+        let scored=1,improved=false;
+        for(const candidate of planned){
+          if(Date.now()-started>35000)break;
+          const blob=await encode(candidate,candidate.quality);
+          scope.postMessage({type:'progress',attempts:scored++});
+          if(blob.size===0||blob.size>targetBytes)continue;
+          const scores=await scoreContentAware(sourceCanvas,blob,all);
+          const rank=assessContentCandidate(
+            {blob:best.blob,width:best.width,height:best.height,quality:best.quality,scores:bestScores},
+            {blob,width:candidate.width,height:candidate.height,quality:candidate.quality,scores},
+            all,targetBytes,allowResize,source);
+          if(rank.wins){
+            best={...result,...candidate,blob,status:'within-target' as const,
+              resized:candidate.width!==source.width || candidate.height!==source.height};
+            bestScores=scores;
+            improved=true;
+          }
+        }
+        contentEvidence={status:'complete',faceStatus,regions:all,
+          baselineGlobalError:baselineScores.globalError,globalError:bestScores.globalError,
+          evaluatedCandidates:scored,improved};
+      }
+    }
+
     scope.postMessage({
       type: 'result',
       result: {
@@ -185,6 +256,7 @@ scope.onmessage = async (event: MessageEvent<Request>) => {
         width: best.width,
         height: best.height,
         qualityEvidence: evidence,
+        contentEvidence,
         format,
         engine: usedBrowserFallback ? 'browser-fallback' : 'wasm'
       }

@@ -1,3 +1,4 @@
+import type {ImportantRegion} from '../core/content-regions.ts';
 import {
   MAX_IMAGE_PIXELS,
   MAX_INPUT_BYTES,
@@ -42,6 +43,7 @@ export interface EncodedImage extends TargetSizeResult, ImageInfo {
   resized: boolean;
   engine: 'wasm' | 'browser-fallback' | 'original';
   qualityEvidence?: { metric: 'milo'; rawError: number; baselineRawError?: number; improved: boolean; scoredCandidates: number; comparisonLongSide: number };
+  contentEvidence?: { status:'complete'|'no-regions'|'degraded';faceStatus:'detected'|'none'|'unavailable'|'skipped';regions:ImportantRegion[];globalError?:number;baselineGlobalError?:number;evaluatedCandidates:number;improved:boolean };
 }
 
 function validateFile(file: File): void {
@@ -74,8 +76,9 @@ export async function encodeImageToTarget(
   onAttempt?: (attempts: number) => void,
   signal?: AbortSignal,
   allowResize = false,
-  mode: 'standard' | 'perceptual' = 'standard',
-  previousOutput?: EncodedImage
+  mode: 'standard' | 'perceptual' | 'content-aware' = 'standard',
+  previousOutput?: EncodedImage,
+  manualRegion?:ImportantRegion
 ): Promise<EncodedImage> {
   validateFile(file);
   if (signal?.aborted) throw new DOMException('Compression canceled.', 'AbortError');
@@ -169,7 +172,8 @@ export async function encodeImageToTarget(
     if (signal?.aborted) { cancel(); return; }
     try {
       worker.postMessage({ file, format, targetBytes, allowResize, mode,
-      previousOutput: mode === 'perceptual' && previousOutput ? {
+      manualRegion:mode==='content-aware'?manualRegion:undefined,
+      previousOutput: mode !== 'standard' && previousOutput ? {
         blob: previousOutput.blob, width: previousOutput.width, height: previousOutput.height,
         quality: previousOutput.quality, resized: previousOutput.resized
       } : undefined });

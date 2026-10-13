@@ -1,3 +1,4 @@
+import {type ImportantRegion,normalizeRegion} from '../core/content-regions.ts';
 import { encodeImageToTarget, inspectImage, type EncodedImage, type ImageInfo } from '../adapters/browser-encoder.ts';
 import { MAX_TARGET_KB, MIN_TARGET_KB, targetBytesFromKB, type ImageOutputFormat } from '../core/target-size.ts';
 
@@ -16,7 +17,9 @@ export function createImageCompressController() {
   let error = $state('');
   let retryNotice = $state('');
   let optimizationNotice = $state('');
-  let runningMode = $state<'standard' | 'perceptual'>('standard');
+  let runningMode = $state<'standard' | 'perceptual' | 'content-aware'>('standard');
+  let manualRegion = $state<ImportantRegion | null>(null);
+  let contentReview = $state<EncodedImage['contentEvidence'] | null>(null);
   let attempts = $state(0);
   let revision = 0;
   let activeAbort: AbortController | null = null;
@@ -36,6 +39,7 @@ export function createImageCompressController() {
     attempts = 0;
     retryNotice = '';
     optimizationNotice = '';
+    contentReview = null;
   }
 
   function releaseImage(): void {
@@ -44,6 +48,7 @@ export function createImageCompressController() {
     originalUrl = '';
     file = null;
     info = null;
+    manualRegion = null;
   }
 
   function resetResult(): void {
@@ -112,7 +117,7 @@ export function createImageCompressController() {
   async function runCompression(
     resize: boolean,
     retainPrevious = false,
-    mode: 'standard' | 'perceptual' = 'standard'
+    mode: 'standard' | 'perceptual' | 'content-aware' = 'standard'
   ): Promise<void> {
     if (!file || !info || status === 'processing') return;
     const inputError = getTargetError();
@@ -133,6 +138,7 @@ export function createImageCompressController() {
     error = '';
     retryNotice = '';
     optimizationNotice = '';
+    contentReview = null;
     allowResize = resize;
     runningMode = mode;
     cancelRestores = preserve ? previousStatus : 'ready';
@@ -149,10 +155,21 @@ export function createImageCompressController() {
         abort.signal,
         resize,
         mode,
-        mode === 'perceptual' ? output ?? undefined : undefined
+        mode !== 'standard' ? output ?? undefined : undefined,
+        mode === 'content-aware' ? manualRegion ?? undefined : undefined
       );
       if (run !== revision) return;
 
+      if (mode === 'content-aware' && preserve){
+        contentReview=encoded.contentEvidence??null;
+        if(encoded.status !== 'within-target' || !encoded.contentEvidence?.improved){
+          status=previousStatus;
+          optimizationNotice=encoded.contentEvidence?.status==='no-regions'
+            ? 'No important details found. Select a focus area to guide optimization.'
+            : 'No better result for important details. Your previous image was kept.';
+          return;
+        }
+      }
       if (mode === 'perceptual' && preserve &&
           (encoded.status !== 'within-target' || !encoded.qualityEvidence?.improved)) {
         status = previousStatus;
@@ -202,6 +219,18 @@ export function createImageCompressController() {
     return runCompression(allowResize, true, 'perceptual');
   }
 
+  function setManualRegion(bounds:ImportantRegion['bounds'] | null):void {
+    manualRegion=bounds?normalizeRegion({id:'manual',kind:'manual',source:'user',confidence:1,bounds}):null;
+    // The selected area affects ranking, never changes the existing output.
+    contentReview=null;
+    optimizationNotice='';
+  }
+
+  function optimizeImportantDetails(): Promise<void> {
+    if(status!=='complete'||!output||!outputUrl||!file||!info)return Promise.resolve();
+    return runCompression(allowResize,true,'content-aware');
+  }
+
   function recompressWithResize(): Promise<void> {
     if (status !== 'quality-limited' || allowResize || !file || !info || !output || !outputUrl) {
       return Promise.resolve();
@@ -240,8 +269,10 @@ export function createImageCompressController() {
     get retryNotice() { return retryNotice; },
     get optimizationNotice() { return optimizationNotice; },
     get runningMode() { return runningMode; },
+    get manualRegion() { return manualRegion; },
+    get contentReview() { return contentReview; },
     get attempts() { return attempts; },
     get targetError() { return getTargetError(); },
-    setFile, setTargetInput, setFormat, setAllowResize, compress, cancel, recompressWithResize, optimizeVisualQuality, download, dispose
+    setFile, setTargetInput, setFormat, setAllowResize, setManualRegion, compress, cancel, recompressWithResize, optimizeVisualQuality, optimizeImportantDetails, download, dispose
   };
 }
