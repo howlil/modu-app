@@ -249,7 +249,11 @@
           <p class="mt-2 text-meta text-muted-foreground">
             Evaluated {controller.output.qualityEvidence.scoredCandidates} candidates using MILO at
             {controller.output.qualityEvidence.comparisonLongSide}px display size.
-            Raw error {controller.output.qualityEvidence.rawError.toFixed(5)} (lower is better; not a quality percentage).
+            Raw error {controller.output.qualityEvidence.rawError.toFixed(5)}
+            {#if controller.output.qualityEvidence.baselineRawError !== undefined}
+              vs baseline {controller.output.qualityEvidence.baselineRawError.toFixed(5)}
+            {/if}
+            (lower is better; not a quality percentage).
           </p>
         {/if}
         {#if controller.error}
