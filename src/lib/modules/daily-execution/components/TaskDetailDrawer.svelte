@@ -3,12 +3,13 @@
  import { onMount } from 'svelte';
  import { Button } from '#lib/components/ui/button/index.js';
  import type { ExecutionTask } from '../core/planning.ts';
- let { task, onClose, onSave, onArchive, onRemoveFromToday }: {
+ let { task, onClose, onSave, onArchive, onRemoveFromToday, onDetach }: {
    task: ExecutionTask;
    onClose: () => void;
    onSave: (fields: { title: string; context: string; nextAction: string; estimateMinutes: number; dueDate: string }) => boolean;
    onArchive: () => void;
    onRemoveFromToday?: () => void;
+   onDetach?: () => void;
  } = $props();
  let title = $state('');
  let context = $state('');
@@ -63,6 +64,20 @@
      <Button variant="ghost" size="icon" aria-label="Close" onclick={onClose}><X class="size-4"/></Button>
    </header>
    <form onsubmit={submit} class="grid gap-4 p-5">
+     {#if task.source}
+       <div class="rounded-lg border border-border bg-muted/30 p-3 text-meta text-muted-foreground">
+         <p class="font-medium text-foreground">Linked from {task.source.providerId}</p>
+         <p class="mt-1">Completion here is local. The original task will not be changed.</p>
+         <div class="mt-2 flex items-center gap-3">
+           {#if task.source.url}
+             <a href={task.source.url} target="_blank" rel="noopener noreferrer" class="font-medium text-primary underline underline-offset-2">Open original</a>
+           {/if}
+           {#if onDetach}
+             <button type="button" class="font-medium text-muted-foreground underline underline-offset-2" onclick={onDetach}>Detach source</button>
+           {/if}
+         </div>
+       </div>
+     {/if}
      <label class="grid gap-1 text-meta font-medium">Activity
        <input class="h-10 rounded-lg border border-input bg-card px-3 text-ui" bind:value={title} maxlength="120" required/>
      </label>
