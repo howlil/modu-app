@@ -275,7 +275,8 @@
                   {controller.contentReview.globalError?.toFixed(5) ?? 'n/a'}.
                 </p>
                 {#each controller.contentReview.regions as region (region.id)}
-                  <p>{region.kind}:
+                  <p data-roi-id={region.id} data-roi-kind={region.kind}
+                    data-roi-bounds={JSON.stringify(region.bounds)}>{region.kind}:
                     {controller.contentReview.baselineRegionErrors?.find((e) => e.regionId === region.id)?.error.toFixed(5) ?? 'n/a'} →
                     {controller.contentReview.regionErrors?.find((e) => e.regionId === region.id)?.error.toFixed(5) ?? 'n/a'}.
                   </p>
