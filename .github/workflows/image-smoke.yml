@@ -18,8 +18,9 @@ jobs:
           bunx playwright install --with-deps chromium
       - name: Exercise WASM encoding and adaptive resize
         run: |
-          bun run dev -- --host 127.0.0.1 > /tmp/modu-vite.log 2>&1 &
-          for i in $(seq 1 40); do curl -fs http://127.0.0.1:5173/image/compress >/dev/null && break; sleep 1; done
+          bun run build
+          bunx wrangler dev --port 8787 > /tmp/modu-wrangler.log 2>&1 &
+          for i in $(seq 1 50); do curl -fs http://127.0.0.1:8787/image/compress >/dev/null && break; sleep 1; done
           node --input-type=module <<'JS'
           import { chromium } from 'playwright';
           import { stat } from 'node:fs/promises';
@@ -27,8 +28,9 @@ jobs:
           const page = await browser.newPage({ acceptDownloads: true });
           const errors = [];
           page.on('pageerror', (error) => errors.push(error.message));
+          page.on('framenavigated', (frame) => console.log('Browser navigation:',frame.url()));
           try {
-            await page.goto('http://127.0.0.1:5173/image/compress', { waitUntil: 'networkidle' });
+            await page.goto('http://127.0.0.1:8787/image/compress', { waitUntil: 'networkidle' });
             const pixels = await page.evaluate(async () => {
               const canvas = document.createElement('canvas');
               canvas.width = 1600;
