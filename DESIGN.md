@@ -469,6 +469,18 @@ If there is no concrete answer, do not add it yet.
 Daily is an agnostic, local-first execution workspace. Quick capture requires only a title; the user explicitly selects activities into a dated Today list, can choose the next task, and can complete it without a mandatory outcome. Goal, context, time estimates, and old capacity budgets are optional/legacy detail rather than onboarding gates. Today uses an adaptive two-column layout (chosen tasks + existing activity shelf) and collapses into a single column on mobile. Review shows a short summary by default and keeps existing evidence, source and intelligence functionality behind progressive disclosure. Pomodoro remains the exclusive focus timer, break controller, and focus-protection owner. Completed focus sessions are persisted once in the existing `module-pomodoro-activity` database by the shared session repository. A focus session may optionally refer to a task ID. A task does not become Done merely because a focus session completes. Daily Execution estimates/work budgets are not automatically actual hours worked: Review labels recorded Pomodoro focus time explicitly. Legacy unassigned sessions must remain valid. Focus time remains available in Pomodoro Activity; no duplicate activity heatmap or timer is allowed in Daily Execution.
 
 
+### Connected Daily M3 contract
+
+- Linked activities retain their original stable Modu `ExecutionTask.id`; `source` is an optional read-only provider reference. Completion, checkpoint and Pomodoro focus remain local; no provider write-back occurs.
+- Deduplication identity is the tuple `(providerId, connectionId, externalId)`, never title or URL. A second selection must select the existing local task, not create another.
+- Candidates only become Modu tasks on explicit selection. Today uses existing `days[date].taskIds` and session handoff unchanged.
+- Sources are strictly opt-in. Available providers: local JSON file (<=250 items, <=256 KB), manually supplied HTTPS link, and public GitHub Issues without credentials. GitHub initial sync is a full bounded pagination (max 1,000 remote issues); subsequent refreshes use `since` with overlap and merge. Failed or incomplete fetches do not commit new candidates/cursors; missing records are not silently interpreted as deletions.
+- Metadata is stored alongside the existing `modu-daily-execution-v1` localStorage record with validation, backward compatibility and stale-write detection. Account tokens, client secrets and authentication data are **never** stored there.
+- Disconnect removes available candidate cache and source connection, retaining any already linked task and its focus history. Detach removes only the source reference, preserving task identity and execution history.
+- The app has no authenticated user/session or OAuth credential vault. Google Tasks, Todoist, Notion and private GitHub connections are **not** supported; do not display fake connection controls or request API secrets. Authenticated providers require a separate BFF with session identity, PKCE/state, encrypted server-side credentials, narrow scopes and explicit revocation before being enabled.
+- Existing Evidence `SourcesView` JSON imports are not task imports; keep evidence and activity source contracts separate.
+- Browser regression suite must cover M3 manual source linking, local file import, detach and local completion, alongside existing cross-tab/Pomodoro scenarios.
+
 ### Floating Focus Companion (Chromium extension)
 
 - The opt-in floating widget is a presentation surface, not a second Pomodoro timer or a Daily task manager.
