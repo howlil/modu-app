@@ -73,5 +73,13 @@ if __name__ == "__main__":
     destination = Path("m2-reference-report.json")
     destination.write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report["summary"], indent=2))
-    # A perceptual score comparison is advisory while we calibrate MILO
-    # against this reference and human visual review.
+    # Initial release guardrail, NOT metric parity: MILO and SSIMULACRA2
+    # need not rank every content type identically. Flag substantial
+    # independent regressions among results the optimizer claimed improved.
+    tolerance = 0.5
+    bad = [s for s in report["samples"]
+           if s["case"].get("improved") and s["delta"] < -tolerance]
+    if bad:
+        print(json.dumps({"referenceRegressionsBeyondTolerance": bad}, indent=2))
+        raise SystemExit(f"{len(bad)} claimed M2 improvements regress SSIMULACRA2 by more than {tolerance} points")
+    print(f"Reference regression gate passed (tolerance {tolerance} SSIMULACRA2 points).")

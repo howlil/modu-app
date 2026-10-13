@@ -6,6 +6,7 @@ on:
     paths:
       - '.github/workflows/image-m2-quality.yml'
       - 'test/benchmarks/image-compress-m2.mjs'
+      - 'test/benchmarks/image-m2-reference.py'
   schedule:
     - cron: '17 3 * * 0'
 

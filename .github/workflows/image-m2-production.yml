@@ -5,6 +5,8 @@ on:
     branches: [master]
     paths:
       - '.github/workflows/image-m2-production.yml'
+      - 'src/lib/modules/image-compress/**'
+      - 'test/e2e/image-compress-m2.mjs'
 jobs:
   production:
     runs-on: ubuntu-latest
