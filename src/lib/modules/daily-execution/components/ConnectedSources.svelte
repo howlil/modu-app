@@ -1,9 +1,14 @@
 <script lang="ts">
  import { Link2, Github, FileJson, RefreshCw, Search, Plus, ExternalLink, Pause, Play, Unplug } from 'lucide-svelte';
+ import { onMount } from 'svelte';
  import { Button } from '#lib/components/ui/button/index.js';
  import type { DailyExecutionController } from '../controller/daily-execution.svelte.ts';
 
  let { controller }: { controller: DailyExecutionController } = $props();
+ onMount(() => {
+   if(new URLSearchParams(window.location.search).get('google')!=='connected')
+     void controller.loadGoogleStatus();
+ });
  let repository = $state('');
  let manualTitle = $state('');
  let manualUrl = $state('');
@@ -56,6 +61,41 @@
    </div>
  </div>
 
+ <section class="mt-3 rounded-xl border border-border p-3" aria-label="Google Tasks account">
+   <div class="flex flex-wrap items-start justify-between gap-2">
+     <div>
+       <h3 class="text-ui font-medium">Google Tasks</h3>
+       <p class="mt-1 max-w-[520px] text-meta text-muted-foreground">Optional read-only account connection. Modu never completes or edits tasks in Google.</p>
+     </div>
+     {#if !controller.googleChecked}
+       <span class="text-meta text-muted-foreground">Checking availability…</span>
+     {:else if !controller.googleStatus.available}
+       <span class="text-meta text-muted-foreground">Not configured</span>
+     {:else if controller.googleStatus.connected}
+       <span class="text-meta text-muted-foreground">Connected in this browser</span>
+     {:else}
+       <span class="text-meta text-muted-foreground">Disconnected</span>
+     {/if}
+   </div>
+   {#if controller.googleStatus.available}
+     <div class="mt-3 flex flex-wrap gap-2">
+       {#if controller.googleStatus.connected}
+         <Button size="sm" variant="outline" class="min-h-10 rounded-lg" disabled={controller.googleBusy || controller.sourceSyncing!==null}
+           onclick={() => controller.refreshGoogle()}>
+           <RefreshCw class="mr-1 size-4"/>{controller.googleBusy?'Loading…':'Refresh Google Tasks'}
+         </Button>
+         <Button size="sm" variant="ghost" class="min-h-10 rounded-lg text-muted-foreground" disabled={controller.googleBusy}
+           onclick={() => controller.disconnectGoogle()}>Disconnect Google</Button>
+       {:else}
+         <Button size="sm" variant="outline" class="min-h-10 rounded-lg" disabled={controller.googleBusy}
+           onclick={() => controller.connectGoogle()}>{controller.googleBusy?'Connecting…':'Connect Google Tasks'}</Button>
+       {/if}
+     </div>
+   {:else if controller.googleChecked}
+     <p class="mt-2 text-meta text-muted-foreground">Requires the secure Google OAuth and Cloudflare D1 setup. Public GitHub Issues and local activities work without it.</p>
+   {/if}
+ </section>
+
  <form class="mt-3 rounded-xl border border-border p-3" onsubmit={(e)=>{e.preventDefault();addLink();}}>
    <div class="flex items-center gap-2 text-ui font-medium"><Link2 class="size-4"/> Add by link</div>
    <p class="mt-1 text-meta text-muted-foreground">One title and one HTTPS link. Adds directly to Today.</p>
@@ -84,7 +124,7 @@
          <div class="flex min-w-0 flex-wrap items-center gap-2 py-3">
            <div class="min-w-0 flex-1">
              <p class="truncate text-ui font-medium">{connection.label}</p>
-             <p class="text-meta text-muted-foreground">{connection.providerId==='github'?'GitHub Issues':connection.providerId==='import'?'Local JSON':'Manual links'} · {connection.status==='up-to-date'?'Up to date':connection.status}
+             <p class="text-meta text-muted-foreground">{connection.providerId==='github'?'GitHub Issues':connection.providerId==='import'?'Local JSON':connection.providerId==='google-tasks'?'Google Tasks':'Manual links'} · {connection.status==='up-to-date'?'Up to date':connection.status}
                {#if connection.lastSyncedAt} · {new Date(connection.lastSyncedAt).toLocaleString()}{/if}
              </p>
            </div>
@@ -98,8 +138,10 @@
                {#if connection.status==='paused'}<Play class="size-4"/>{:else}<Pause class="size-4"/>{/if}
              </Button>
            {/if}
-           <Button size="icon" variant="ghost" class="size-10 rounded-lg" aria-label={'Disconnect '+connection.label}
-             onclick={() => controller.removeConnection(connection.id)}><Unplug class="size-4"/></Button>
+           {#if connection.providerId!=='google-tasks'}
+             <Button size="icon" variant="ghost" class="size-10 rounded-lg" aria-label={'Disconnect '+connection.label}
+               onclick={() => controller.removeConnection(connection.id)}><Unplug class="size-4"/></Button>
+           {/if}
          </div>
        {/each}
      </div>
