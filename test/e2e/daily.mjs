@@ -93,13 +93,13 @@ try {
   await sources.getByRole('textbox', { name: 'Original HTTPS URL' }).fill('https://example.com/reference');
   await sources.getByRole('button', { name: 'Add to Today' }).click();
   await nav.getByRole('button', { name: 'Today' }).click();
-  await activePage.getByRole('button', { name: 'Read reference document', exact: true }).click();
+  await activePage.getByRole('button', { name: /^Read reference document/ }).click();
   const linkedDetails=activePage.getByRole('dialog', { name: 'Activity details' });
   await linkedDetails.getByRole('link', { name: 'Open original' }).waitFor();
   await linkedDetails.getByRole('button', { name: 'Detach source' }).click();
   await linkedDetails.waitFor({ state: 'hidden' });
   await activePage.reload();
-  await activePage.getByRole('button', { name: 'Read reference document', exact: true }).waitFor();
+  await activePage.getByRole('button', { name: /^Read reference document/ }).waitFor();
   record('DLY-M3-01 manual HTTPS link, local Today task and detach preserving ID');
 
   await activePage.getByRole('navigation', { name: 'Daily views' }).getByRole('button', { name: 'All' }).click();
@@ -112,7 +112,7 @@ try {
   await pick.waitFor();
   await pick.click();
   await activePage.getByRole('navigation', { name: 'Daily views' }).getByRole('button', { name: 'Today' }).click();
-  await activePage.getByRole('button', { name: 'File imported activity', exact: true }).waitFor();
+  await activePage.getByRole('button', { name: /^File imported activity/ }).waitFor();
   await activePage.getByRole('button', { name: 'Complete File imported activity' }).click();
   await activePage.getByRole('button', { name: 'Completed (1)' }).click();
   await activePage.getByRole('button', { name: 'Reopen File imported activity' }).click();
