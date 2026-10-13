@@ -219,6 +219,60 @@ describe('image compressor one-click recovery', () => {
     controller.dispose();
   });
 
+  it('M3 preserves previous result and shows content evidence when no region improves', async () => {
+    const controller=createImageCompressController();
+    await controller.setFile(new File(['img'],'photo.png',{type:'image/png'}));
+    adapters.encode.mockResolvedValueOnce(makeResult('within-target',49_000));
+    await controller.compress();
+    const previous=controller.output;
+    controller.setManualRegion({x:.25,y:.2,width:.3,height:.4});
+    adapters.encode.mockResolvedValueOnce({
+      ...makeResult('within-target',48_000),
+      contentEvidence:{status:'complete',faceStatus:'unavailable',
+        regions:[{id:'manual',kind:'manual',source:'user',confidence:1,bounds:{x:.25,y:.2,width:.3,height:.4}}],
+        baselineGlobalError:.015,globalError:.014,evaluatedCandidates:4,improved:false}
+    });
+    await controller.optimizeImportantDetails();
+    expect(adapters.encode.mock.calls.at(-1)?.[6]).toBe('content-aware');
+    expect(adapters.encode.mock.calls.at(-1)?.[7]?.blob).toBe(previous?.blob);
+    expect(adapters.encode.mock.calls.at(-1)?.[8]?.kind).toBe('manual');
+    expect(controller.output).toBe(previous);
+    expect(controller.contentReview?.faceStatus).toBe('unavailable');
+    expect(controller.optimizationNotice).toContain('previous image was kept');
+    controller.dispose();
+  });
+
+  it('M3 atomically updates output only when region-aware comparison improves',async()=>{
+    const controller=createImageCompressController();
+    await controller.setFile(new File(['img'],'photo.png',{type:'image/png'}));
+    adapters.encode.mockResolvedValueOnce(makeResult('within-target',49_000));
+    await controller.compress();
+    adapters.encode.mockResolvedValueOnce({
+      ...makeResult('within-target',48_500),
+      contentEvidence:{status:'complete',faceStatus:'none',regions:[],
+        baselineGlobalError:.014,globalError:.013,evaluatedCandidates:3,improved:true}
+    });
+    await controller.optimizeImportantDetails();
+    expect(controller.output?.blob.size).toBe(48_500);
+    expect(controller.contentReview?.improved).toBe(true);
+    expect(controller.status).toBe('complete');
+    controller.dispose();
+  });
+
+  it('M3 preserves the last downloadable output when the face/scoring worker fails',async()=>{
+    const controller=createImageCompressController();
+    await controller.setFile(new File(['img'],'photo.png',{type:'image/png'}));
+    adapters.encode.mockResolvedValueOnce(makeResult('within-target',49_000));
+    await controller.compress();
+    const old=controller.output;
+    adapters.encode.mockRejectedValueOnce(new Error('ROI metric unavailable'));
+    await controller.optimizeImportantDetails();
+    expect(controller.output).toBe(old);
+    expect(controller.error).toContain('ROI metric unavailable');
+    expect(controller.status).toBe('complete');
+    controller.dispose();
+  });
+
   it('refuses recovery unless a prior quality-limited result exists', async () => {
     const controller = createImageCompressController();
     await controller.recompressWithResize();
