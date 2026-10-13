@@ -3,8 +3,8 @@
 </script>
 
 <svelte:head>
-  <title>Daily Execution — Modu</title>
-  <meta name="description" content="Focus on your next valuable action. Plan, execute and review." />
+  <title>Daily — Modu</title>
+  <meta name="description" content="Choose what matters today, focus on one activity, and review your progress." />
 </svelte:head>
 
 <DailyExecutionWorkspace />
