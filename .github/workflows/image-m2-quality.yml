@@ -1,0 +1,100 @@
+name: Image M2 Rate-Distortion Benchmark
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/image-m2-quality.yml'
+      - 'test/benchmarks/image-compress-m2.mjs'
+  schedule:
+    - cron: '17 3 * * 0'
+
+concurrency:
+  group: image-m2-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    name: Image benchmark / ${{ matrix.kind }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        kind: [portrait, earthrise, screenshot, transparent, noisy]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.2.15'
+      - name: Install app dependencies
+        run: bun install --frozen-lockfile
+      - name: Install Chromium harness
+        run: |
+          bun add -d playwright
+          bunx playwright install --with-deps chromium
+      - name: Fetch attributed public image fixtures
+        if: matrix.kind == 'portrait' || matrix.kind == 'earthrise'
+        run: |
+          mkdir -p test/fixtures/image-compress
+          if [ "${{ matrix.kind }}" = 'portrait' ]; then
+            curl --fail --location --retry 3 --max-time 100 \
+              --user-agent 'ModuImageBench/2.0 (Open-source QA)' \
+              'https://commons.wikimedia.org/wiki/Special:Redirect/file/Portrait_of_woman.jpg?width=1280' \
+              -o test/fixtures/image-compress/portrait.jpg
+          else
+            curl --fail --location --retry 3 --max-time 100 \
+              --user-agent 'ModuImageBench/2.0 (Open-source QA)' \
+              'https://images-assets.nasa.gov/image/as16-120-19187/as16-120-19187~orig.jpg' \
+              -o test/fixtures/image-compress/earthrise.jpg
+          fi
+          file test/fixtures/image-compress/*.jpg
+      - name: Build production bundle
+        run: bun run build
+      - name: Start local Cloudflare Worker
+        run: |
+          bunx wrangler dev --port 8787 > /tmp/modu-m2-quality.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl -fs http://127.0.0.1:8787/image/compress >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          tail -100 /tmp/modu-m2-quality.log
+          exit 1
+      - name: Compare M1 vs M2 / 24 combinations
+        env:
+          MODU_BENCH_KIND: ${{ matrix.kind }}
+        run: node test/benchmarks/image-compress-m2.mjs
+      - name: Upload results for visual/reference metric review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-m2-${{ matrix.kind }}
+          path: m2-quality-results/${{ matrix.kind }}/
+          retention-days: 14
+          if-no-files-found: warn
+      - name: Show worker logs on failure
+        if: failure()
+        run: tail -100 /tmp/modu-m2-quality.log || true
+
+  reference-quality:
+    name: SSIMULACRA2 reference check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [benchmark]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: image-m2-*
+          path: m2-artifacts/
+      - name: Install reference quality CLI
+        run: cargo install ssimulacra2_rs --version 0.5.2 --locked
+      - name: Compare before and after at identical display dimensions
+        run: python3 test/benchmarks/image-m2-reference.py m2-artifacts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: image-m2-reference-report
+          path: m2-reference-report.json
+          retention-days: 14
+          if-no-files-found: warn
