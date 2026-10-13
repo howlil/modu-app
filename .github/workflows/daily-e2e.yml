@@ -13,6 +13,17 @@ on:
       - 'bun.lock'
       - 'vite.config.ts'
       - 'wrangler.jsonc'
+  pull_request:
+    paths:
+      - 'src/lib/modules/daily-execution/**'
+      - 'src/lib/shared/focus-sessions/**'
+      - 'src/lib/modules/pomodoro/**'
+      - 'test/e2e/daily.mjs'
+      - '.github/workflows/daily-e2e.yml'
+      - 'package.json'
+      - 'bun.lock'
+      - 'vite.config.ts'
+      - 'wrangler.jsonc'
   workflow_dispatch:
 
 jobs:
