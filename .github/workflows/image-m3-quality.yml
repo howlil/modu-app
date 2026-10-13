@@ -1,0 +1,92 @@
+name: Image M3 Content Quality Benchmark
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/image-m3-quality.yml'
+      - 'test/benchmarks/image-compress-m3.mjs'
+      - 'test/benchmarks/image-m3-reference.py'
+  schedule:
+    - cron: '47 4 * * 0'
+concurrency:
+  group: image-m3-quality-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        kind: [portrait, screenshot, earthrise]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.2.15'
+      - run: bun install --frozen-lockfile
+      - name: Install Chromium benchmark driver
+        run: |
+          bun add -d playwright
+          bunx playwright install --with-deps chromium
+      - name: Fetch attributed natural image fixtures
+        if: matrix.kind == 'portrait' || matrix.kind == 'earthrise'
+        run: |
+          mkdir -p test/fixtures/image-compress
+          if [ "${{ matrix.kind }}" = "portrait" ]; then
+            curl --fail --location --retry 3 --max-time 100 \
+              --user-agent 'ModuImageBench/3.0 (Open-source QA)' \
+              'https://commons.wikimedia.org/wiki/Special:Redirect/file/Portrait_of_woman.jpg?width=1280' \
+              -o test/fixtures/image-compress/portrait.jpg
+          else
+            curl --fail --location --retry 3 --max-time 100 \
+              --user-agent 'ModuImageBench/3.0 (Open-source QA)' \
+              'https://images-assets.nasa.gov/image/as16-120-19187/as16-120-19187~orig.jpg' \
+              -o test/fixtures/image-compress/earthrise.jpg
+          fi
+      - run: bun run build
+      - name: Start Cloudflare Worker preview
+        run: |
+          bunx wrangler dev --port 8787 > /tmp/modu-m3-bench.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl -fs http://127.0.0.1:8787/image/compress >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/modu-m3-bench.log
+          exit 1
+      - name: Compare M2 baseline and content-aware results
+        env:
+          MODU_BENCH_KIND: ${{ matrix.kind }}
+        run: node test/benchmarks/image-compress-m3.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: image-m3-${{ matrix.kind }}
+          path: m3-quality-results/${{ matrix.kind }}/
+          retention-days: 14
+          if-no-files-found: warn
+      - name: Worker logs on failure
+        if: failure()
+        run: tail -100 /tmp/modu-m3-bench.log || true
+  reference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    needs: [benchmark]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: image-m3-*
+          path: m3-artifacts/
+      - name: Install reference SSIMULACRA2 CLI
+        run: cargo install ssimulacra2_rs --version 0.5.2 --locked --no-default-features
+      - name: Check ROI and global visual regressions
+        run: python3 test/benchmarks/image-m3-reference.py m3-artifacts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: image-m3-reference-report
+          path: m3-reference-report.json
+          retention-days: 14
+          if-no-files-found: warn
