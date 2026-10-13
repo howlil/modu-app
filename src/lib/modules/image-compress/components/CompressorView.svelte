@@ -2,6 +2,7 @@
   import { ArrowDown, Download, FileImage, ImageUp, RefreshCcw, WandSparkles, X } from 'lucide-svelte';
   import { Button } from '#lib/components/ui/button/index.js';
   import { Switch } from '#lib/components/ui/switch/index.js';
+  import FocusRegionOverlay from './FocusRegionOverlay.svelte';
   import { formatBytes, type ImageOutputFormat } from '../core/target-size.ts';
   import type { createImageCompressController } from '../controller/image-compress.svelte.ts';
 
@@ -10,6 +11,7 @@
   const presets = [50, 100, 200, 500];
   let previewMode = $state<'compare' | 'original' | 'result'>('compare');
   let zoom = $state<'fit' | 100 | 200>('fit');
+  let choosingFocus = $state(false);
 
   function picked(event: Event): void {
     const input = event.currentTarget as HTMLInputElement;
@@ -212,7 +214,7 @@
 
       <div role="status" aria-live="polite" class="mt-5">
         {#if controller.status === 'processing'}
-          <p class="text-ui">{controller.runningMode === 'perceptual' ? 'Comparing visual quality…' : controller.output ? 'Resizing and recompressing…' : 'Optimizing image…'}</p>
+          <p class="text-ui">{controller.runningMode === 'content-aware' ? 'Checking important details…' : controller.runningMode === 'perceptual' ? 'Comparing visual quality…' : controller.output ? 'Resizing and recompressing…' : 'Optimizing image…'}</p>
           <p class="mt-1 text-meta text-muted-foreground">
             {controller.output
               ? 'Your previous result remains available during this attempt.'
@@ -256,12 +258,57 @@
             (lower is better; not a quality percentage).
           </p>
         {/if}
+        {#if controller.contentReview}
+          <p class="mt-2 text-meta text-muted-foreground">
+            Important details checked: {controller.contentReview.regions.filter((r) => r.kind === 'face').length} face,
+            {controller.contentReview.regions.filter((r) => r.kind === 'text-like').length} text-like,
+            {controller.contentReview.regions.filter((r) => r.kind === 'manual').length} selected.
+            {controller.contentReview.faceStatus === 'unavailable' ? 'Automatic face detection unavailable.' : ''}
+            {controller.contentReview.improved ? 'A better matching result was found.' : 'Previous result retained.'}
+          </p>
+        {/if}
         {#if controller.error}
           <p role="alert" class="mt-2 text-ui text-destructive">{controller.error}</p>
         {/if}
       </div>
 
       {#if controller.output}
+        {#if controller.status === 'complete' && controller.originalUrl}
+          <div class="mt-5 space-y-3 border-t border-border pt-5">
+            <div class="flex items-center justify-between gap-2">
+              <div class="min-w-0">
+                <p class="text-ui font-medium">Important details</p>
+                <p class="mt-1 text-meta text-muted-foreground">Check faces, text-like strokes or one selected area.</p>
+              </div>
+              <Button size="sm" variant="outline" aria-expanded={choosingFocus}
+                onclick={() => choosingFocus = !choosingFocus}>
+                {choosingFocus ? 'Close focus' : 'Choose focus'}
+              </Button>
+            </div>
+            {#if choosingFocus}
+              <FocusRegionOverlay src={controller.originalUrl}
+                bounds={controller.manualRegion?.bounds ?? null}
+                onSelect={(bounds) => controller.setManualRegion(bounds)} />
+              <div class="flex flex-wrap items-center gap-2">
+                <Button size="sm" variant="outline"
+                  onclick={() => controller.setManualRegion({x:.3,y:.3,width:.4,height:.4})}>Center</Button>
+                <Button size="sm" variant="outline"
+                  onclick={() => controller.setManualRegion({x:.2,y:.05,width:.6,height:.35})}>Top</Button>
+                <Button size="sm" variant="outline" disabled={!controller.manualRegion}
+                  onclick={() => controller.setManualRegion(null)}>Clear focus</Button>
+              </div>
+              <p class="text-meta text-muted-foreground">
+                Drag to select an area, or use the preset buttons. The original image stays unchanged.
+              </p>
+            {/if}
+            {#if !controller.contentReview && !controller.output.contentEvidence}
+              <Button class="w-full" variant="outline" onclick={() => void controller.optimizeImportantDetails()}>
+                <WandSparkles class="size-4" strokeWidth={1.8} />
+                Optimize important details
+              </Button>
+            {/if}
+          </div>
+        {/if}
         <div class="mt-5 flex flex-col gap-3 border-t border-border pt-5">
           {#if controller.status === 'quality-limited' && !controller.allowResize}
             <p class="text-meta text-muted-foreground">
