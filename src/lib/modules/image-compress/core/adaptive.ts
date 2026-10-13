@@ -22,14 +22,11 @@ export async function optimizeAdaptive(
       source.width < 1 || source.height < 1) throw new Error('Invalid source dimensions.');
 
   let attempts = 0;
-  const measured = new Map<string, Blob>();
+  // Retain only the best candidate from each bounded search.
+  // Never cache every encoded Blob: large inputs can exhaust browser memory.
   const measure = async (dimensions: Dimensions, quality: number): Promise<Blob> => {
-    const key = dimensions.width + 'x' + dimensions.height + '@' + Math.round(quality * 1000);
-    const cached = measured.get(key);
-    if (cached) return cached;
     const blob = await encode(dimensions, quality);
     if (blob.size === 0) throw new Error('The encoder returned an empty image.');
-    measured.set(key, blob);
     options.onAttempt?.(++attempts);
     return blob;
   };
