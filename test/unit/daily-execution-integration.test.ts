@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadFocusSessions, saveFocusSession, assignFocusSession, clearFocusSessions } from '../../src/lib/shared/focus-sessions/repository.ts';
-import { consumePendingFocusTask, writePendingFocusTask } from '../../src/lib/shared/focus-sessions/context.ts';
+import { consumePendingFocusTask, writePendingFocusTask, canAcceptPendingFocusTask } from '../../src/lib/shared/focus-sessions/context.ts';
 import type { FocusActivitySession } from '../../src/lib/shared/focus-sessions/types.ts';
 import { normalizePomodoroSnapshot } from '../../src/lib/modules/pomodoro/adapters/persistence.ts';
 
@@ -74,6 +74,20 @@ describe('Daily Execution ↔ Pomodoro session integration', () => {
     }, 100_000);
     expect(restored.linkedTask).toEqual({ id: 'task-123', title: 'Verify duplicate callbacks' });
     expect(normalizePomodoroSnapshot({}, 100_000).linkedTask).toBeNull();
+  });
+
+  it('accepts pending focus only when timer is idle and never overwrites active sessions', () => {
+    const task = { id:'work-1', title:'Pay bill', autoStart:true };
+    expect(canAcceptPendingFocusTask(task,'focus','idle')).toBe(true);
+    expect(canAcceptPendingFocusTask(task,'focus','running')).toBe(false);
+    expect(canAcceptPendingFocusTask(task,'focus','paused')).toBe(false);
+    expect(canAcceptPendingFocusTask(task,'short','idle')).toBe(false);
+    expect(canAcceptPendingFocusTask(null,'focus','idle')).toBe(false);
+  });
+
+  it('does not silently lose the task when session storage is blocked', () => {
+    vi.stubGlobal('sessionStorage', undefined);
+    expect(() => writePendingFocusTask({ id:'x',title:'Task',autoStart:true })).toThrow('Session storage unavailable');
   });
 
   it('treats an explicit start request as one-shot and keeps older handoffs compatible', () => {
