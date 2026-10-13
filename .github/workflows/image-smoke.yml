@@ -56,7 +56,16 @@ jobs:
             await page.getByLabel('Allow smart resize').click();
             await page.locator('#modu-target-kb').fill('50');
             await page.getByRole('button',{name:/Compress image/}).click();
-            await page.getByText('Target reached').waitFor({timeout:120000});
+            await page.waitForFunction(() => {
+              const text = document.body.innerText;
+              return text.includes('Target reached') || text.includes('Target cannot be reached') ||
+                text.includes('Image encoder failed') || text.includes('Compression failed') ||
+                text.includes('The encoder returned') || text.includes('WebP encoding is unsupported');
+            }, null, {timeout:45000}).catch(() => undefined);
+            console.log('Status after compression:', (await page.locator('body').innerText()).slice(-3000));
+            console.log('Browser errors:', errors);
+            const achieved = await page.getByText('Target reached').count();
+            if (!achieved) throw new Error('Target not reached; inspect status above');
             const sizeText = await page.locator('figcaption').last().innerText();
             console.log('WebP UI result:',sizeText);
             const preview = await page.getByAltText('Compressed image preview').evaluate(img=>({
