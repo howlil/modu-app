@@ -27,7 +27,7 @@ jobs:
           mkdir -p test/fixtures/image-compress
           curl --fail --location --retry 3 --max-time 100 \
             --user-agent 'ModuImageBench/3.0 (Open-source QA)' \
-            'https://commons.wikimedia.org/wiki/Special:Redirect/file/Portrait_of_woman.jpg?width=1280' \
+            'https://commons.wikimedia.org/wiki/Special:Redirect/file/Grace_Hopper.jpg' \
             -o test/fixtures/image-compress/portrait.jpg
       - name: Verify live ROI and local face detection
         env:
