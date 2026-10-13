@@ -1,10 +1,13 @@
 // @ts-nocheck — executed by the separate Playwright job; not part of the Svelte application typecheck.
-import { chromium } from 'playwright';
+import { chromium, firefox, webkit } from 'playwright';
 import { stat } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 
 const host = process.env.MODU_E2E_URL || 'http://127.0.0.1:8787/image/compress';
-const browser = await chromium.launch({ headless: true });
+const type = process.env.MODU_E2E_BROWSER || 'chromium';
+const browserType = { chromium, firefox, webkit }[type];
+if (!browserType) throw new Error('Unknown browser: ' + type);
+const browser = await browserType.launch({ headless: true });
 const page = await browser.newPage({ acceptDownloads: true });
 const browserErrors = [];
 page.on('pageerror', (error) => browserErrors.push(error.message));
