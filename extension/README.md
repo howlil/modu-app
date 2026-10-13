@@ -2,7 +2,7 @@
 
 Chromium Manifest V3 extension for Modu Pomodoro and Daily Execution. Two independent, opt-in features:
 
-- **Floating focus widget** — an optional countdown and linked task in a Shadow DOM. Starts collapsed with a compact timer, expands to show the next action, and uses Modu's original logo, color tokens and Lucide-style icons. Injected only when enabled.
+- **Floating focus widget** — an optional Quiet Dock countdown and linked task in a Shadow DOM. Mini (216px) shows status dot, countdown, task and progress without repeated branding; expanded (276px) shows Modu branding, current task, timer/status, elapsed/total progress and a quiet Open timer link. Opt-in only.
 - **Focus Protection** — blocks user-selected distracting sites during Focus, including SPA navigations and already-open tabs. Blocking continues during Pause/Overtime and ends on Break/Reset/Skip.
 
 The web app owns timer transitions and recorded session history; the extension never automatically creates completed sessions.

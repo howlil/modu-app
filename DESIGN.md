@@ -475,8 +475,8 @@ Daily is an agnostic, local-first execution workspace. Quick capture requires on
 - Daily owns tasks and next actions; Pomodoro owns timer state, session completion and activity recording.
 - The extension receives a versioned read-only snapshot through the existing trusted bridge and never counts a session as completed merely because the deadline passed.
 - Floating visibility is independent of website blocking. Disabled is the initial setting. Users may hide task text and exclude website hostnames.
-- The floating widget starts collapsed (~190px wide), expands into a single white 300px card, anchors bottom-right with 24px gutter where possible, and respects narrow viewports and reduced-motion settings.
-- Shadow DOM styles mirror Modu app.css: white card, #252525 ink, #2468f2 primary, #eaf1ff secondary, #7a7a7a muted, #e7e7e2 border, 12/14px semantic text, 4px spacing rhythm, 20px expanded radius.
+- Quiet Dock floating design: collapsed width 216px, with a status dot, readable countdown, one-line task and 3px progress; no repeated logo in mini. Expanded width 276px: shallow logo/title header, minimize/hide controls, focus context, large countdown and status, progress with elapsed/total labels and a secondary Open timer link. The surface is draggable and its normalized position persists across tabs; default placement is bottom-right with 24px gutter where possible. Respect narrow viewports and reduced motion.
+- Shadow DOM styles mirror Modu app.css: white card, #252525 ink, #2468f2 primary, #eaf1ff secondary, #7a7a7a muted, #e7e7e2 border, system type and 4px spacing rhythm, 14px mini radius and 16px expanded radius.
 - One card presents task, next action, mode, countdown, optional quiet progress, expand/minimize and Open Modu. No streaks, dashboards, timer rings or intrusive prompts.
 - Content scripts are registered only when enabled, do not inject on Modu control pages, unmount on disable, and hide stale snapshots.
 - Never collect visited URLs, page content, page titles or browsing history. Do not use host page text or scripts to drive widget state.

@@ -103,7 +103,10 @@ describe('Modu Floating Focus', () => {
       expect(appStyles.toLowerCase()).toContain(color);
       expect(widgetStyles.toLowerCase()).toContain(color);
     }
-    expect(widgetStyles).toContain('border-radius: 20px');
+    expect(widgetStyles).toContain('width: min(216px, calc(100vw - 16px))');
+    expect(widgetStyles).toContain('width: min(276px, calc(100vw - 16px))');
+    expect(widgetStyles).toContain('border-radius: 14px');
+    expect(widgetStyles).toContain('border-radius: 16px');
     expect(widgetSource).toContain("attachShadow({ mode: 'closed' })");
     expect(widgetSource).toContain("MODU_FLOATING_RESTORE");
     expect(widgetSource).toContain("modu-logo.svg");
@@ -115,9 +118,18 @@ describe('Modu Floating Focus', () => {
     expect(widgetSource).toContain("setPointerCapture");
     expect(widgetSource).toContain("pointercancel");
     expect(widgetSource).toContain("normalizePosition");
-    expect(widgetSource).toContain("id=\"mini-task\"");
+    expect(widgetSource).toContain('id="mini-task"');
     expect(widgetStyles).toContain(".modu-mini-expand");
     expect(widgetStyles).toContain("touch-action: none");
+    const miniMarkup = widgetSource.split("if (kind === 'mini') {")[1]?.split("} else {")[0] ?? '';
+    expect(miniMarkup).toContain('modu-mini-led');
+    expect(miniMarkup).toContain('modu-mini-digits');
+    expect(miniMarkup).not.toContain('BRAND_IMAGE');
+    expect(widgetSource).toContain('modu-session-label');
+    expect(widgetSource).toContain('id="elapsed"');
+    expect(widgetSource).toContain('id="duration"');
+    expect(widgetSource).not.toContain('Focus at your pace');
+    expect(widgetSource).toContain('MODU_FLOATING_RESTORE');
 
   });
 
@@ -154,8 +166,8 @@ describe('Modu Floating Focus', () => {
       },
       attachShadow: (_options: unknown) => shadow,
       getBoundingClientRect: () => {
-        const width = panel.className.includes('mini') ? 260 : 320;
-        const height = panel.className.includes('mini') ? 65 : 320;
+        const width = panel.className.includes('mini') ? 216 : 276;
+        const height = panel.className.includes('mini') ? 64 : 230;
         return {
           width, height,
           left: styles.has('left') ? Number.parseFloat(styles.get('left')!) : viewport.width - width - 24,
@@ -204,6 +216,8 @@ describe('Modu Floating Focus', () => {
     await Promise.resolve();
 
     expect(panel.innerHTML).toContain('mini-task');
+    expect(panel.innerHTML).toContain('modu-mini-led');
+    expect(panel.innerHTML).not.toContain('modu-logo');
     const fire = (type: string, x: number, y: number, interactive = false) => {
       const event: Pointer = {
         pointerId: 5, clientX: x, clientY: y, isPrimary: true, button: 0,

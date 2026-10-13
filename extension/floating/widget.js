@@ -60,7 +60,10 @@
     const text = t.status === 'overtime' ? '+' + fmt(elapsed) : fmt(remaining);
     const progress = t.status === 'complete' || reached || t.status === 'overtime'
       ? 100 : Math.min(100, Math.max(0, 100 * (t.durationMs - remaining) / Math.max(1, t.durationMs)));
-    return { label, text, progress, status: t.status };
+    const elapsedMs = t.status === 'overtime'
+      ? t.durationMs + elapsed
+      : Math.min(t.durationMs, Math.max(0, t.durationMs - remaining));
+    return { label, text, progress, status: t.status, elapsedMs, durationMs: t.durationMs };
   };
 
   // Fractions of available space keep placement visible across viewport sizes.
@@ -170,20 +173,18 @@
     panel.className = kind === 'mini' ? 'modu-widget mini' : 'modu-widget';
 
     if (kind === 'mini') {
+      // Quiet Dock: no duplicated product identity in the always-visible mini surface.
       panel.innerHTML =
         '<div class="modu-mini">' +
-          '<div class="modu-mini-main" title="Drag to move">' +
-            '<span class="modu-mini-brand">' + BRAND_IMAGE + '</span>' +
-            '<span class="modu-mini-details">' +
-              '<span class="modu-mini-top"><strong id="time" class="modu-mini-time" role="timer"></strong>' +
-                '<span class="modu-mini-status"><span class="modu-status-dot" aria-hidden="true"></span><span id="state"></span></span>' +
-              '</span>' +
-              '<span class="modu-mini-task" id="mini-task"></span>' +
+          '<div class="modu-mini-grab" title="Drag to move">' +
+            '<span class="modu-mini-led" aria-hidden="true"></span>' +
+            '<span class="modu-mini-info">' +
+              '<strong id="time" class="modu-mini-digits" role="timer"></strong>' +
+              '<span id="mini-task" class="modu-mini-caption"></span>' +
             '</span>' +
           '</div>' +
-          '<button id="expand" class="modu-mini-expand" type="button" title="Expand focus timer" aria-label="Expand Modu floating timer">' +
-            icon('chevron-up') +
-          '</button>' +
+          '<button id="expand" class="modu-mini-expand" type="button" aria-label="Expand focus timer" title="Expand">' +
+            icon('chevron-up') + '</button>' +
         '</div>' +
         '<div class="modu-mini-progress" aria-hidden="true"><span id="progress"></span></div>';
       panel.querySelector('#expand').addEventListener('click', () => { mini = false; render(); });
@@ -191,23 +192,27 @@
       panel.innerHTML =
         '<header class="modu-header">' +
           '<div class="modu-brand" title="Drag to move">' +
-            BRAND_IMAGE + '<span class="modu-brand-copy"><strong>Modu</strong><span>Focus companion</span></span></div>' +
+            BRAND_IMAGE + '<strong>Modu</strong></div>' +
           '<div class="modu-controls">' +
-            '<button id="collapse" class="modu-icon-button" type="button" title="Minimize" aria-label="Minimize floating timer">' + icon('chevron-down') + '</button>' +
-            '<button id="hide" class="modu-icon-button" type="button" title="Hide until next session · click the extension toolbar icon to restore" aria-label="Hide floating timer until next session. Use the extension toolbar icon to restore.">' + icon('eye-off') + '</button>' +
+            '<button id="collapse" class="modu-icon-button" type="button" title="Minimize" aria-label="Minimize floating timer">' +
+              icon('chevron-down') + '</button>' +
+            '<button id="hide" class="modu-icon-button" type="button" title="Hide until next session. Click the extension toolbar icon to restore." aria-label="Hide floating timer until next session. Use the extension toolbar icon to restore.">' +
+              icon('eye-off') + '</button>' +
           '</div>' +
         '</header>' +
         '<div class="modu-content">' +
-          '<div id="heading" class="modu-section-label"></div>' +
+          '<div class="modu-session-label">Focus session</div>' +
           '<div id="task" class="modu-task"></div>' +
-          '<div id="next" class="modu-next" hidden></div>' +
-          '<div class="modu-timer-row"><strong id="time" class="modu-timer" role="timer"></strong>' +
+          '<div class="modu-timer-row">' +
+            '<strong id="time" class="modu-timer" role="timer"></strong>' +
             '<span class="modu-status"><span class="modu-status-dot" aria-hidden="true"></span><span id="state"></span></span>' +
           '</div>' +
           '<div class="modu-progress" aria-hidden="true"><span id="progress"></span></div>' +
+          '<div class="modu-progress-labels"><span id="elapsed"></span><span id="duration"></span></div>' +
         '</div>' +
-        '<footer class="modu-footer"><span class="modu-footer-copy">Focus at your pace</span>' +
-          '<a class="modu-open" href="' + MODU_URL + '" target="_blank" rel="noopener noreferrer">Open timer ' + icon('arrow-up-right') + '</a>' +
+        '<footer class="modu-footer">' +
+          '<a class="modu-open" href="' + MODU_URL + '" target="_blank" rel="noopener noreferrer">' +
+            'Open timer ' + icon('arrow-up-right') + '</a>' +
         '</footer>';
       panel.querySelector('#collapse').addEventListener('click', () => { mini = true; render(); });
       panel.querySelector('#hide').addEventListener('click', () => {
@@ -231,21 +236,19 @@
     const values = timerValues();
     panel.dataset.status = values.status;
     panel.querySelector('#time').textContent = values.text;
-    panel.querySelector('#state').textContent = values.label;
     panel.querySelector('#progress').style.width = values.progress + '%';
+    const hasTask = Boolean(settings.showTask && snapshot.timer.mode === 'focus' && snapshot.task?.title);
     if (mini) {
-      const hasTask = settings.showTask && snapshot.timer.mode === 'focus' && snapshot.task?.title;
       panel.querySelector('#mini-task').textContent = hasTask ? snapshot.task.title :
-        snapshot.timer.mode === 'focus' ? 'Focus session' : 'Take a break';
+        values.status === 'paused' ? 'Paused' : snapshot.timer.mode === 'focus' ? 'Focus session' : 'Take a break';
     } else {
-      const hasTask = settings.showTask && snapshot.timer.mode === 'focus' && snapshot.task?.title;
-      const nextAction = hasTask ? snapshot.task.nextAction || '' : '';
-      const next = panel.querySelector('#next');
-      panel.querySelector('#heading').textContent = snapshot.timer.mode === 'focus' ? 'CURRENT FOCUS' : 'BREAK';
       panel.querySelector('#task').textContent = hasTask ? snapshot.task.title :
-        snapshot.timer.mode === 'focus' ? 'Focus session' : 'Take a short break';
-      next.textContent = nextAction;
-      next.hidden = !nextAction;
+        snapshot.timer.mode === 'focus' ? 'Untitled focus' : 'Break session';
+      panel.querySelector('#state').textContent = values.label;
+      panel.querySelector('.modu-session-label').textContent =
+        snapshot.timer.mode === 'focus' ? 'Focus session' : 'Break session';
+      panel.querySelector('#elapsed').textContent = fmt(values.elapsedMs) + ' elapsed';
+      panel.querySelector('#duration').textContent = fmt(values.durationMs) + ' total';
     }
   }
 
