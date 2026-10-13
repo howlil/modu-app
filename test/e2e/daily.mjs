@@ -88,6 +88,7 @@ try {
   await activePage.getByRole('button', { name: 'Start focus' }).click();
   await activePage.waitForURL(/\/pomodoro\?taskId=/);
   await activePage.getByRole('timer').waitFor();
+  await activePage.getByRole('button', { name: 'Pause', exact: true }).waitFor({ timeout: 10000 });
   await activePage.goto(url);
   await activePage.getByRole('button', { name: 'Complete Read 10 pages' }).waitFor();
   record('DLY-06 one-shot Pomodoro route handoff without completing a task');
