@@ -1,6 +1,6 @@
 import type { ExecutionState, ExecutionTask } from './planning.ts';
 
-export type SourceProvider = 'github' | 'import' | 'link';
+export type SourceProvider = 'github' | 'import' | 'link' | 'google-tasks';
 export type RemoteStatus = 'open' | 'completed' | 'unavailable' | 'unknown';
 export type ConnectionStatus = 'idle' | 'up-to-date' | 'offline' | 'error' | 'paused';
 
@@ -45,7 +45,7 @@ export function validatePublicUrl(value: string): string | undefined {
 export function isSourceReference(value: unknown): value is SourceReference {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const s = value as Partial<SourceReference>;
-  return ['github','import','link'].includes(s.providerId ?? '') &&
+  return ['github','import','link','google-tasks'].includes(s.providerId ?? '') &&
     typeof s.connectionId === 'string' && s.connectionId.length > 0 && s.connectionId.length <= 180 &&
     typeof s.externalId === 'string' && s.externalId.length > 0 && s.externalId.length <= 256 &&
     ['open','completed','unavailable','unknown'].includes(s.remoteStatus ?? '') &&
@@ -58,7 +58,7 @@ export function isSourceConnection(value: unknown): value is SourceConnection {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const c = value as Partial<SourceConnection>;
   return typeof c.id === 'string' && c.id.length > 0 && c.id.length <= 180 &&
-    ['github','import','link'].includes(c.providerId ?? '') &&
+    ['github','import','link','google-tasks'].includes(c.providerId ?? '') &&
     typeof c.label === 'string' && c.label.length <= 160 &&
     ['idle','up-to-date','offline','error','paused'].includes(c.status ?? '') &&
     (c.repository === undefined || (typeof c.repository === 'string' && /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(c.repository))) &&
