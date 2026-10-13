@@ -1,0 +1,78 @@
+name: Image M1 Browser Smoke
+on:
+  push:
+    branches: [feat/image-adaptive-m1]
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.2.15'
+      - run: bun install --frozen-lockfile
+      - name: Install browser harness
+        run: |
+          bun add -d playwright
+          bunx playwright install --with-deps chromium
+      - name: Exercise WASM encoding and adaptive resize
+        run: |
+          bun run dev -- --host 127.0.0.1 > /tmp/modu-vite.log 2>&1 &
+          for i in $(seq 1 40); do curl -fs http://127.0.0.1:5173/image/compress >/dev/null && break; sleep 1; done
+          node --input-type=module <<'JS'
+          import { chromium } from 'playwright';
+          import { stat } from 'node:fs/promises';
+          const browser = await chromium.launch({ headless: true });
+          const page = await browser.newPage({ acceptDownloads: true });
+          const errors = [];
+          page.on('pageerror', (error) => errors.push(error.message));
+          try {
+            await page.goto('http://127.0.0.1:5173/image/compress', { waitUntil: 'networkidle' });
+            const pixels = await page.evaluate(async () => {
+              const canvas = document.createElement('canvas');
+              canvas.width = 1600;
+              canvas.height = 1200;
+              const ctx = canvas.getContext('2d');
+              const gradient = ctx.createLinearGradient(0,0,1600,1200);
+              gradient.addColorStop(0,'#d1c3b8');
+              gradient.addColorStop(1,'#293d56');
+              ctx.fillStyle = gradient;
+              ctx.fillRect(0,0,1600,1200);
+              let seed = 42;
+              const rand = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
+              for (let n = 0; n < 2500; n++) {
+                ctx.fillStyle = 'rgba(' + Math.floor(rand()*255) + ',40,90,0.4)';
+                ctx.beginPath();
+                ctx.arc(rand()*1600,rand()*1200,1+rand()*3,0,Math.PI*2);
+                ctx.fill();
+              }
+              const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+              return [...new Uint8Array(await blob.arrayBuffer())];
+            });
+            await page.locator('#modu-image-input').setInputFiles({
+              name: 'synthetic-photo.png', mimeType: 'image/png', buffer: Buffer.from(pixels)
+            });
+            await page.getByLabel('Allow smart resize').click();
+            await page.locator('#modu-target-kb').fill('50');
+            await page.getByRole('button',{name:/Compress image/}).click();
+            await page.getByText('Target reached').waitFor({timeout:120000});
+            const sizeText = await page.locator('figcaption').last().innerText();
+            console.log('WebP UI result:',sizeText);
+            const preview = await page.getByAltText('Compressed image preview').evaluate(img=>({
+              width:img.naturalWidth,height:img.naturalHeight
+            }));
+            if (!preview.width || !preview.height || preview.width>1600 || preview.height>1200) {
+              throw new Error('Invalid preview dimensions '+JSON.stringify(preview));
+            }
+            const [download] = await Promise.all([
+              page.waitForEvent('download'),
+              page.getByRole('button',{name:'Download image'}).click()
+            ]);
+            const file = await download.path();
+            const byteSize = (await stat(file)).size;
+            if (byteSize>50000) throw new Error('WebP output over 50 KB: '+byteSize);
+            console.log('WebP bytes:',byteSize, 'dimensions:',preview);
+            if (errors.length) throw new Error('Browser errors: '+errors.join('; '));
+          } finally { await browser.close(); }
+          JS
