@@ -6,7 +6,9 @@ const pageUrl=process.env.MODU_BENCH_URL||'http://127.0.0.1:8787/image/compress'
 const browser=await chromium.launch({headless:true});
 const page=await browser.newPage({acceptDownloads:true});
 const report={schemaVersion:1,metric:'MILO runtime; SSIMULACRA2 reference for retained samples',results:[],failures:[]};
-const root='m2-quality-results';
+const selectedCase=process.env.MODU_BENCH_KIND;
+const cases=selectedCase?[selectedCase]:['portrait','earthrise','screenshot','transparent','noisy'];
+const root='m2-quality-results/'+(selectedCase||'all');
 await mkdir(root+'/reference',{recursive:true});
 const targetSet=[50,100,200,500];
 const codecs=['WebP','JPEG','AVIF'];
@@ -55,17 +57,15 @@ async function download(buttonName){
   const [d]=await Promise.all([page.waitForEvent('download'),page.getByRole('button',{name:buttonName,exact:true}).click()]);
   return readFile(await d.path());
 }
-async function normalizedPNG(bytes,reference=false){
+async function normalizedPNG(bytes,width,height){
   return page.evaluate(async(bytes)=>{
     const b=await createImageBitmap(new Blob([new Uint8Array(bytes)]));
-    const w=Math.max(16,Math.round(b.width*256/Math.max(b.width,b.height)));
-    const h=Math.max(16,Math.round(b.height*256/Math.max(b.width,b.height)));
-    const c=document.createElement('canvas');c.width=w;c.height=h;
-    const x=c.getContext('2d');x.fillStyle='white';x.fillRect(0,0,w,h);
-    x.drawImage(b,0,0,w,h);b.close();
+    const c=document.createElement('canvas');c.width=width;c.height=height;
+    const x=c.getContext('2d');x.fillStyle='white';x.fillRect(0,0,width,height);
+    x.drawImage(b,0,0,width,height);b.close();
     const png=await new Promise(resolve=>c.toBlob(resolve,'image/png'));
     return [...new Uint8Array(await png.arrayBuffer())];
-  },[...bytes]);
+  },[...bytes],width,height);
 }
 let sample=0;
 async function runCase(kind,original,format,targetKB,resize){
@@ -109,21 +109,30 @@ async function runCase(kind,original,format,targetKB,resize){
   row.optimizedMs=Math.round(performance.now()-optimizeStarted);
   row.optimizedBytes=output.length;
   row.improved=text.includes('Raw error');
+  if(row.improved && output.length===baselineBytes.length && Buffer.compare(output,baselineBytes)===0) {
+    throw new Error('M2 falsely reported improvement without changing output');
+  }
   const m=text.match(/Raw error ([0-9.]+)/);
   row.miloRawError=m?Number(m[1]):null;
   report.results.push(row);
   if(row.improved&&sample<24){
     const id=String(sample++).padStart(2,'0');
-    await writeFile(root+'/reference/'+id+'-original.png',Buffer.from(await normalizedPNG(original)));
-    await writeFile(root+'/reference/'+id+'-baseline.png',Buffer.from(await normalizedPNG(baselineBytes)));
-    await writeFile(root+'/reference/'+id+'-optimized.png',Buffer.from(await normalizedPNG(output)));
+    const sourceSize=await page.getByAltText('Original preview').evaluate(img=>({
+      width:img.naturalWidth,height:img.naturalHeight
+    }));
+    const longSide=Math.max(sourceSize.width,sourceSize.height);
+    const width=Math.max(16,Math.round(sourceSize.width*256/longSide));
+    const height=Math.max(16,Math.round(sourceSize.height*256/longSide));
+    await writeFile(root+'/reference/'+id+'-original.png',Buffer.from(await normalizedPNG(original,width,height)));
+    await writeFile(root+'/reference/'+id+'-baseline.png',Buffer.from(await normalizedPNG(baselineBytes,width,height)));
+    await writeFile(root+'/reference/'+id+'-optimized.png',Buffer.from(await normalizedPNG(output,width,height)));
     row.referenceId=id;
   }
   console.log('M2_BENCH',JSON.stringify(row));
 }
 try{
   await page.goto(pageUrl,{waitUntil:'networkidle'});
-  for(const kind of ['portrait','earthrise','screenshot','transparent','noisy']){
+  for(const kind of cases){
     const original=await sourceImage(kind);
     for(const format of codecs)for(const target of targetSet)for(const resize of [false,true]){
       try{await runCase(kind,original,format,target,resize);}
