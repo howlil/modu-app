@@ -1,5 +1,5 @@
 <script lang="ts">
- import { Play, Check, ChevronRight, ChevronDown, PanelRightClose, PanelRightOpen, Plus, Search, ArrowUp, ArrowDown } from 'lucide-svelte';
+ import { Play, Check, ChevronRight, ChevronDown, PanelRightClose, PanelRightOpen, Plus, Search, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-svelte';
  import { Button } from '#lib/components/ui/button/index.js';
  import QuickCapture from './QuickCapture.svelte';
  import TaskDetailDrawer from './TaskDetailDrawer.svelte';
@@ -10,6 +10,10 @@
  let showShelf = $state(true);
  let mobileShelf = $state(false);
  let showDone = $state(false);
+ let arranging = $state(false);
+ let showAllYesterday = $state(false);
+ let visibleCount = $state(5);
+ let orderNotice = $state('');
  let query = $state('');
  let editing = $state<ExecutionTask | null>(null);
  const planned = $derived(controller.todayTasks);
@@ -17,9 +21,21 @@
  const completed = $derived(planned.filter(task => task.status === 'done'));
  const current = $derived(controller.selectedTodayTask);
  const yesterdayIds = $derived(new Set(controller.yesterdayTasks.map(task => task.id)));
- const available = $derived(controller.availableTasks.filter(task =>
-   !yesterdayIds.has(task.id) && (task.title + ' ' + (task.context ?? '')).toLowerCase().includes(query.toLowerCase())
+ const matchingYesterday = $derived(controller.yesterdayTasks.filter(task =>
+   (task.title + ' ' + (task.context ?? '')).toLowerCase().includes(query.trim().toLowerCase())
  ));
+ const available = $derived(controller.availableTasks.filter(task =>
+   !yesterdayIds.has(task.id) && (task.title + ' ' + (task.context ?? '')).toLowerCase().includes(query.trim().toLowerCase())
+ ));
+ const visibleYesterday = $derived(matchingYesterday.slice(0, showAllYesterday ? matchingYesterday.length : 3));
+ const visibleAvailable = $derived(available.slice(0, visibleCount));
+ function move(task: ExecutionTask, direction: -1 | 1) {
+   if (controller.moveToday(task.id, direction)) orderNotice = task.title + (direction < 0 ? ' moved up.' : ' moved down.');
+ }
+ function searchChanged() {
+   visibleCount = 5;
+   showAllYesterday = false;
+ }
  function meta(task: ExecutionTask) {
    return [task.context ?? (task.workstream !== 'general' ? task.workstream : ''),
      task.dueDate === controller.dayKey ? 'Due today' : task.dueDate,
@@ -38,10 +54,18 @@
 </header>
 <div class={showShelf ? 'grid gap-3 min-[760px]:grid-cols-[minmax(0,1fr)_272px]' : 'grid gap-3'}>
  <section class="min-w-0 rounded-[20px] border border-border bg-card p-4 sm:p-5">
-   <div class="flex items-center justify-between gap-2">
+   <div class="flex flex-wrap items-center justify-between gap-2">
      <h2 class="text-title font-medium">Your day</h2>
-     <span class="text-meta text-muted-foreground">{completed.length} / {planned.length} completed</span>
+     <div class="flex items-center gap-2">
+       <span class="text-meta text-muted-foreground">{completed.length} / {planned.length} completed</span>
+       {#if ready.length > 1}
+         <Button size="sm" variant={arranging ? 'secondary' : 'ghost'} class="h-8 rounded-lg px-2 text-meta" aria-pressed={arranging} onclick={() => arranging = !arranging}>
+           <ArrowUpDown class="mr-1 size-3.5"/> {arranging ? 'Done' : 'Arrange'}
+         </Button>
+       {/if}
+     </div>
    </div>
+   <p class="sr-only" role="status">{orderNotice}</p>
    <QuickCapture onAdd={title => controller.quickAdd(title, 'today')}/>
    <p class="mb-2 mt-6 text-meta font-semibold uppercase tracking-wider text-muted-foreground">Planned for today</p>
    <div class="divide-y divide-border border-t border-border">
@@ -55,16 +79,13 @@
            {#if meta(task)}<span class="block text-meta text-muted-foreground">{meta(task)}</span>{/if}
          </button>
          <div class="flex shrink-0 items-center gap-0.5">
-           {#if current?.id === task.id}
-             <span class="px-1 text-meta font-medium text-primary">Next</span>
+           {#if arranging && ready.length > 1}
+             <Button size="icon" variant="ghost" class="size-8 rounded-lg text-muted-foreground" aria-label={'Move ' + task.title + ' up'} title="Move up" disabled={index === 0} onclick={() => move(task,-1)}><ArrowUp class="size-4"/></Button>
+             <Button size="icon" variant="ghost" class="size-8 rounded-lg text-muted-foreground" aria-label={'Move ' + task.title + ' down'} title="Move down" disabled={index === ready.length - 1} onclick={() => move(task,1)}><ArrowDown class="size-4"/></Button>
+           {:else if current?.id === task.id}
+             <span class="px-2 text-meta font-medium text-primary">Next</span>
            {:else}
-             <Button size="sm" variant="ghost" class="h-8 rounded-lg px-1.5 text-meta text-muted-foreground" onclick={() => controller.chooseNext(task.id)}>Next</Button>
-           {/if}
-           {#if ready.length > 1}
-             <div class="flex items-center sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
-               <Button size="icon" variant="ghost" class="size-7 rounded-lg text-muted-foreground" aria-label={'Move ' + task.title + ' up'} title="Move up" disabled={index === 0} onclick={() => controller.moveToday(task.id,-1)}><ArrowUp class="size-3.5"/></Button>
-               <Button size="icon" variant="ghost" class="size-7 rounded-lg text-muted-foreground" aria-label={'Move ' + task.title + ' down'} title="Move down" disabled={index === ready.length - 1} onclick={() => controller.moveToday(task.id,1)}><ArrowDown class="size-3.5"/></Button>
-             </div>
+             <Button size="sm" variant="ghost" class="h-8 rounded-lg px-2 text-meta text-muted-foreground" aria-label={'Make ' + task.title + ' next'} onclick={() => controller.chooseNext(task.id)}>Next</Button>
            {/if}
          </div>
        </div>
@@ -110,43 +131,55 @@
          <div><h2 class="text-title font-medium">From your list</h2><p class="mt-1 text-meta text-muted-foreground">Add existing activities</p></div>
          <span class="text-meta text-muted-foreground">{controller.availableTasks.length}</span>
        </div>
-       {#if controller.yesterdayTasks.length}
-         <div class="mt-4 border-b border-border pb-4">
-           <div class="flex items-center justify-between gap-2">
-             <div class="min-w-0">
-               <p class="text-ui font-medium">From yesterday</p>
-               <p class="text-meta text-muted-foreground">{controller.yesterdayTasks.length} unfinished</p>
-             </div>
-             <Button size="sm" variant="outline" class="h-8 shrink-0 rounded-lg px-2 text-meta" onclick={() => controller.carryYesterday()}>Add all</Button>
-           </div>
-           <div class="mt-2 space-y-1 text-meta text-muted-foreground">
-             {#each controller.yesterdayTasks.slice(0,3) as task (task.id)}
-               <p class="truncate">{task.title}</p>
-             {/each}
-             {#if controller.yesterdayTasks.length > 3}
-               <p>+{controller.yesterdayTasks.length - 3} more</p>
-             {/if}
-           </div>
-         </div>
-       {/if}
        <div class="relative mt-4">
          <Search class="absolute left-3 top-3 size-4 text-muted-foreground"/>
-         <input bind:value={query} aria-label="Search available activities" placeholder="Search activities..."
+         <input bind:value={query} oninput={searchChanged} aria-label="Search available activities" placeholder="Search activities..."
            class="h-10 w-full rounded-lg border border-input bg-muted/25 pl-9 pr-3 text-ui outline-none focus:border-primary"/>
        </div>
+       {#if matchingYesterday.length}
+         <div class="mt-4 border-b border-border pb-3">
+           <div class="flex items-center justify-between gap-2">
+             <div class="min-w-0">
+               <h3 class="text-meta font-medium">From yesterday</h3>
+               <p class="text-meta text-muted-foreground">{matchingYesterday.length} unfinished</p>
+             </div>
+             {#if !query.trim()}
+               <Button size="sm" variant="outline" class="h-8 shrink-0 rounded-lg px-2 text-meta" onclick={() => controller.carryYesterday()}>Add all</Button>
+             {/if}
+           </div>
+           <div class="mt-2 divide-y divide-border">
+             {#each visibleYesterday as task (task.id)}
+               <div class="flex min-h-11 items-center gap-2 py-1.5">
+                 <p class="min-w-0 flex-1 truncate text-ui">{task.title}</p>
+                 <Button size="icon" variant="ghost" class="size-8 shrink-0 rounded-lg" aria-label={'Add ' + task.title + ' to Today'} onclick={() => controller.addToToday(task.id)}><Plus class="size-4"/></Button>
+               </div>
+             {/each}
+           </div>
+           {#if matchingYesterday.length > visibleYesterday.length}
+             <Button size="sm" variant="ghost" class="mt-1 h-8 rounded-lg px-2 text-meta text-muted-foreground" onclick={() => showAllYesterday = true}>
+               Show {matchingYesterday.length - visibleYesterday.length} more
+             </Button>
+           {/if}
+         </div>
+       {/if}
        <div class="mt-2 divide-y divide-border">
-         {#each available as task (task.id)}
-           <div class="flex min-h-14 items-center gap-2 py-2">
+         {#each visibleAvailable as task (task.id)}
+           <div class="flex min-h-12 items-center gap-2 py-2">
              <div class="min-w-0 flex-1">
                <p class="truncate text-ui font-medium">{task.title}</p>
                {#if task.context}<p class="text-meta text-muted-foreground">{task.context}</p>{/if}
              </div>
-             <Button variant="ghost" size="icon" class="size-8 rounded-lg" aria-label={'Add ' + task.title + ' to Today'} onclick={() => controller.addToToday(task.id)}><Plus class="size-4"/></Button>
+             <Button variant="ghost" size="icon" class="size-8 shrink-0 rounded-lg" aria-label={'Add ' + task.title + ' to Today'} onclick={() => controller.addToToday(task.id)}><Plus class="size-4"/></Button>
            </div>
-         {:else}
-           <p class="py-5 text-meta text-muted-foreground">No activities to add.</p>
          {/each}
        </div>
+       {#if available.length > visibleAvailable.length}
+         <Button size="sm" variant="ghost" class="mt-2 h-8 rounded-lg px-2 text-meta text-muted-foreground" onclick={() => visibleCount += 5}>
+           Show {Math.min(5, available.length - visibleAvailable.length)} more
+         </Button>
+       {:else if !available.length && !matchingYesterday.length}
+         <p class="py-4 text-meta text-muted-foreground">{query.trim() ? 'No matching activities.' : 'Nothing to add yet.'}</p>
+       {/if}
      </section>
    </aside>
  {/if}
@@ -155,6 +188,7 @@
  {#key editing.id}
    <TaskDetailDrawer task={editing} onClose={() => editing = null}
      onSave={fields => controller.editSimple(editing?.id ?? '', fields, editing ?? undefined)}
-     onArchive={() => { controller.archiveSimple(editing?.id ?? ''); editing = null; }}/>
+     onRemoveFromToday={() => { if (controller.removeFromToday(editing?.id ?? '')) editing = null; }}
+     onArchive={() => { if (controller.archiveSimple(editing?.id ?? '')) editing = null; }}/>
  {/key}
 {/if}
