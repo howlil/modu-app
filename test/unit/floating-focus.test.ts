@@ -16,6 +16,8 @@ function makeExtension() {
   const data = new Map<string, unknown>();
   const registered = new Set<string>();
   const injectedTabIds: number[] = [];
+  const restoredTabIds: number[] = [];
+  let actionClickHandler: ((tab: { id: number; url: string }) => void) | null = null;
   let handler: MessageHandler | null = null;
   const event = { addListener: () => undefined };
   const local = {
@@ -40,7 +42,17 @@ function makeExtension() {
       getSessionRules: async () => [],
       updateSessionRules: async () => undefined
     },
-    tabs: { query: async () => [
+    action: {
+      onClicked: {
+        addListener: (callback: (tab: { id: number; url: string }) => void) => {
+          actionClickHandler = callback;
+        }
+      }
+    },
+    tabs: { sendMessage: async (tabId: number, message: { type: string }) => {
+      if (message.type === 'MODU_FLOATING_RESTORE') restoredTabIds.push(tabId);
+      return { visible: true };
+    }, query: async () => [
       { id: 10, url: 'https://example.com/' },
       { id: 11, url: 'https://modu.howlil.site/pomodoro' },
       { id: 12, url: 'chrome://extensions/' }
@@ -58,7 +70,12 @@ function makeExtension() {
     if (!handler) throw new Error('Missing extension message handler');
     return new Promise((resolve) => handler!(message, { url: 'https://modu.howlil.site/pomodoro' }, resolve));
   }
-  return { send, data, registered, injectedTabIds };
+  return { send, data, registered, injectedTabIds, restoredTabIds,
+    clickAction(tab: { id: number; url: string }) {
+      if (!actionClickHandler) throw new Error('Missing toolbar handler');
+      actionClickHandler(tab);
+    }
+  };
 }
 
 function snapshot(updatedAt: number) {
@@ -88,6 +105,12 @@ describe('Modu Floating Focus', () => {
     }
     expect(widgetStyles).toContain('border-radius: 20px');
     expect(widgetSource).toContain("attachShadow({ mode: 'closed' })");
+    expect(widgetSource).toContain("MODU_FLOATING_RESTORE");
+    expect(widgetSource).toContain("modu-logo.svg");
+    expect(widgetSource).toContain("chevron-up");
+    expect(widgetSource).toContain("eye-off");
+    expect(widgetStyles).toContain("--modu-primary: #2468f2");
+    expect(widgetStyles).toContain(".modu-icon-button");
   });
 
   it('preserves Daily next action through the one-shot handoff and Pomodoro restore', () => {
@@ -146,6 +169,14 @@ describe('Modu Floating Focus', () => {
     await extension.send({ type: 'SET_FLOATING_SNAPSHOT', snapshot: snapshot(now + 1) });
     expect((extension.data.get('module-floating-focus-v1') as ReturnType<typeof snapshot>).task).toBeNull();
     expect((await extension.send({type:'SET_FLOATING_SNAPSHOT', snapshot:{...snapshot(now),timer:{mode:'invalid'}}})).ok).toBe(false);
+
+    extension.clickAction({ id: 10, url: 'https://example.com/' });
+    extension.clickAction({ id: 11, url: 'https://modu.howlil.site/pomodoro' });
+    extension.clickAction({ id: 12, url: 'brave://extensions/' });
+    extension.clickAction({ id: 13, url: 'https://news.ycombinator.com/' });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(extension.restoredTabIds).toEqual([13]);
+    expect(extension.injectedTabIds).toContain(13);
 
     expect((await extension.send({type:'SET_FLOATING_SETTINGS', settings:{enabled:false}})).ok).toBe(true);
     expect(extension.registered.size).toBe(0);
