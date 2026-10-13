@@ -6,7 +6,7 @@ import {
 } from '../../src/lib/modules/daily-execution/adapters/persistence.ts';
 import {
   emptyExecutionState, currentForDay, localDayKey,
-  selectForDay, tasksForDay, type ExecutionTask
+  selectForDay, tasksForDay, sameEditableTask, type ExecutionTask
 } from '../../src/lib/modules/daily-execution/core/planning.ts';
 
 function setup() {
@@ -78,6 +78,14 @@ describe('Daily M1.6 storage safety', () => {
     expect(entries.get(KEY)).toBe(raw);
     expect(tasksForDay(readExecutionSnapshot().state,'2026-10-13')[0].id).toBe('walk');
     expect(currentForDay(readExecutionSnapshot().state,'2026-10-14')).toBeNull();
+  });
+
+  it('rejects changes to fields a user is editing when another tab updated that activity', () => {
+    const original = task('one');
+    expect(sameEditableTask(original, {...original})).toBe(true);
+    expect(sameEditableTask(original, {...original,title:'Updated elsewhere'})).toBe(false);
+    expect(sameEditableTask(original, {...original,context:'Personal'})).toBe(false);
+    expect(sameEditableTask(original, {...original,status:'done'})).toBe(false);
   });
 
   it('preserves local calendar boundaries instead of carrying activity to a new date', () => {
