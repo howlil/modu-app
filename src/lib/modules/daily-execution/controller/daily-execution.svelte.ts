@@ -7,6 +7,8 @@ import { loadEvidenceRecords, saveEvidenceRecords, subscribeEvidence } from '../
 import { parseLocalEvidenceFile } from '../adapters/evidence-import.ts';
 import { githubConnection, loadPublicGithubIssues } from '../adapters/github-issues.ts';
 import { manualSource, parseActivityFile } from '../adapters/source-import.ts';
+import { beginGoogleConnection, fetchGoogleActivities, googleConnectionStatus, revokeGoogleConnection,
+  type GoogleConnectionStatus } from '../adapters/google-tasks.ts';
 import { detachActivity, disconnectSource, linkActivity, reconcileSource, sourceCandidates, sourceIdentity,
   type SourceCandidate, type SourceConnection } from '../core/connected-activities.ts';
 import { assignFocusSession, loadFocusSessions, subscribeFocusSessions } from '#lib/shared/focus-sessions/repository.ts';
@@ -42,6 +44,8 @@ export function createDailyExecutionController() {
   let sourceError = $state('');
   let sourceNotice = $state('');
   let sourceSyncing = $state<string | null>(null);
+  let googleStatus = $state<GoogleConnectionStatus>({available:false,connected:false});
+  let googleBusy = $state(false);
   let observedRaw: string | null = null;
   let refreshVersion = 0;
 
@@ -305,6 +309,80 @@ export function createDailyExecutionController() {
   }
 
 
+  async function loadGoogleStatus(refreshAfterConnect=false):Promise<void> {
+    try {
+      googleStatus=await googleConnectionStatus();
+      if(refreshAfterConnect && googleStatus.connected) await refreshGoogle();
+    }catch {
+      googleStatus={available:false,connected:false};
+      sourceError='Unable to check Google Tasks connection.';
+    }
+  }
+
+  async function connectGoogle():Promise<void> {
+    if(googleBusy)return;
+    googleBusy=true;
+    sourceError='';
+    try{
+      const authorizationUrl=await beginGoogleConnection();
+      window.location.assign(authorizationUrl);
+    }catch(e){
+      sourceError=e instanceof Error?e.message:'Could not start Google Tasks connection.';
+    }finally{googleBusy=false;}
+  }
+
+  async function refreshGoogle():Promise<boolean> {
+    if(googleBusy || sourceSyncing || !storageReady)return false;
+    googleBusy=true;
+    sourceSyncing='google-tasks';
+    sourceError='';
+    try{
+      const {connectionId,items}=await fetchGoogleActivities();
+      const existing=state.sourceConnections.find(c=>c.id===connectionId);
+      const connection=existing??{id:connectionId,providerId:'google-tasks' as const,
+        label:'Google Tasks',status:'idle' as const};
+      // Reconnecting to a different Google account gets a NEW source identity.
+      // Previous linked tasks remain local and become disconnected.
+      let staged=state;
+      for(const previous of staged.sourceConnections.filter(c=>
+        c.providerId==='google-tasks' && c.id!==connectionId))
+        staged=disconnectSource(staged,previous.id);
+      const next=reconcileSource(staged,connection,items,Date.now());
+      const saved=commit(next);
+      if(saved){
+        googleStatus={available:true,connected:true,connectionId};
+        sourceNotice=items.length+' Google Tasks available. Changes remain read-only.';
+      }
+      return saved;
+    }catch(e){
+      sourceError=e instanceof Error?e.message:'Unable to refresh Google Tasks.';
+      return false;
+    }finally{
+      googleBusy=false;
+      sourceSyncing=null;
+    }
+  }
+
+  async function disconnectGoogle():Promise<boolean> {
+    if(googleBusy)return false;
+    googleBusy=true;
+    sourceError='';
+    try{
+      await revokeGoogleConnection();
+      googleStatus={available:true,connected:false};
+      const connections=state.sourceConnections.filter(c=>c.providerId==='google-tasks');
+      let updated=state;
+      for(const connection of connections)updated=disconnectSource(updated,connection.id);
+      const saved=updated===state || commit(updated);
+      if(saved)sourceNotice='Google Tasks disconnected. Local tasks and focus history remain.';
+      else sourceError='Google access was removed, but the local cache could not be updated.';
+      return saved;
+    }catch(e){
+      sourceError=e instanceof Error?e.message:'Unable to disconnect Google Tasks.';
+      return false;
+    }finally{googleBusy=false;}
+  }
+
   function connectGithub(value:string):boolean {
     try {
       const next=githubConnection(value);
@@ -535,6 +613,13 @@ export function createDailyExecutionController() {
 
   onMount(() => {
     reloadFromStorage();
+    const oauthReturn=new URLSearchParams(window.location.search).get('google');
+    if(oauthReturn==='connected' || oauthReturn==='failed'){
+      view='priorities';
+      sourcePanelOpen=true;
+      if(oauthReturn==='failed') sourceError='Google authorization was not completed.';
+      else void loadGoogleStatus(true);
+    }
     const requested = new URLSearchParams(window.location.search).get('checkpointTaskId');
     if (requested && state.tasks.some((task) => task.id === requested)) checkpointPromptId = requested;
     dayKey = localDayKey(Date.now());
@@ -578,6 +663,8 @@ export function createDailyExecutionController() {
     get sourceError(){return sourceError;},
     get sourceNotice(){return sourceNotice;},
     get sourceSyncing(){return sourceSyncing;},
+    get googleStatus(){return googleStatus;},
+    get googleBusy(){return googleBusy;},
     get dayNote(){return state.dayNotes[dayKey]??'';},
     get sessions() { return sessions; },
     get evidenceRecords() { return evidenceRecords; },
@@ -610,6 +697,7 @@ export function createDailyExecutionController() {
     get storageReady() { return storageReady; },
     get syncNotice() { return syncNotice; },
     reloadFromStorage,
+    connectGoogle,loadGoogleStatus,refreshGoogle,disconnectGoogle,
     connectGithub,importActivities,addManualLink,linkCandidate,detachLinked,removeConnection,pauseConnection,refreshConnection,
     quickAdd,addToToday,removeFromToday,chooseNext,moveToday,carryYesterday,completeQuick,reopenQuick,editSimple,archiveSimple,saveDayNote,
     setGoal, setMode, setAllocation, addTask, updateTask, setTaskStatus, completeTask,
