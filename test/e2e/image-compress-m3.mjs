@@ -12,6 +12,7 @@ try{
   await page.goto(process.env.MODU_E2E_URL||'http://127.0.0.1:8787/image/compress',{waitUntil:'networkidle'});
   for(const resource of [
     '/models/image-compress/blaze_face_short_range.tflite',
+    '/models/image-compress/vision_bundle.js',
     '/models/image-compress/wasm/vision_wasm_internal.wasm'
   ]){
     const resp=await page.request.get(new URL(resource,page.url()).toString());
