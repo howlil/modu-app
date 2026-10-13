@@ -8,7 +8,7 @@ self.onmessage = async function(event) {
     if (!self.visionM3) {
       self.module = {exports:{}};
       self.exports = self.module.exports;
-      importScripts('/models/image-compress/vision_bundle.cjs');
+      importScripts('/models/image-compress/vision_bundle.js');
       self.visionM3 = self.module.exports;
       if (!self.visionM3.FaceDetector || !self.visionM3.FilesetResolver)
         throw new Error('MediaPipe classic bundle did not export detector APIs.');

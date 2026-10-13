@@ -27,7 +27,7 @@ jobs:
           curl -fL --retry 3 --max-time 120 \
             'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite' \
             -o static/models/image-compress/blaze_face_short_range.tflite
-          cp node_modules/@mediapipe/tasks-vision/vision_bundle.cjs static/models/image-compress/
+          cp node_modules/@mediapipe/tasks-vision/vision_bundle.cjs static/models/image-compress/vision_bundle.js
           cp node_modules/@mediapipe/tasks-vision/wasm/vision_wasm_internal.js static/models/image-compress/wasm/
           cp node_modules/@mediapipe/tasks-vision/wasm/vision_wasm_internal.wasm static/models/image-compress/wasm/
           cp node_modules/@mediapipe/tasks-vision/wasm/vision_wasm_nosimd_internal.js static/models/image-compress/wasm/
