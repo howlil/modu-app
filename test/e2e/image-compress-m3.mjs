@@ -75,6 +75,25 @@ try{
   assert.deepEqual(dims,{w:1200,h:800});
   assert.deepEqual(pageErrors,[]);
   console.log('M3 ROI E2E passed',JSON.stringify({browser:type,initialBytes:prev.length,finalBytes:out.length,dims}));
+
+  // Independent real-face smoke: automatic detections must be honest and local.
+  await page.setViewportSize({width:1200,height:900});
+  const portrait=await readFile('test/fixtures/image-compress/portrait.jpg');
+  await page.locator('#modu-image-input').setInputFiles({
+    name:'portrait.jpg',mimeType:'image/jpeg',buffer:portrait
+  });
+  await page.getByText('portrait.jpg').waitFor();
+  await page.getByRole('button',{name:'WebP',exact:true}).click();
+  await page.locator('#modu-target-kb').fill('500');
+  await page.getByRole('button',{name:'Compress image',exact:true}).click();
+  await page.getByText('Target reached').waitFor({timeout:180000});
+  await page.getByRole('button',{name:'Optimize important details'}).click();
+  await page.getByText(/Important details checked:/).waitFor({timeout:180000});
+  const portraitResult=await page.locator('body').innerText();
+  const faceCount=Number(portraitResult.match(/Important details checked:\s*(\d+) face/)?.[1]||0);
+  assert.ok(faceCount>0,'Local MediaPipe did not detect a face in portrait fixture: '+portraitResult.slice(-1000));
+  assert.ok(!portraitResult.includes('Automatic face detection unavailable.'));
+  console.log('M3 self-hosted face detection passed',JSON.stringify({browser:type,faces:faceCount}));
 } catch(e) {
   console.error('M3 ROI E2E failed',e);
   console.error('Body tail',(await page.locator('body').innerText().catch(()=>'')).slice(-2400));

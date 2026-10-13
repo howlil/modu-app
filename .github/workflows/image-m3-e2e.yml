@@ -27,6 +27,13 @@ jobs:
         run: |
           bun add -d playwright
           bunx playwright install --with-deps ${{ matrix.browser }}
+      - name: Download public portrait fixture for real-face detector smoke
+        run: |
+          mkdir -p test/fixtures/image-compress
+          curl --fail --location --retry 3 --max-time 100 \
+            --user-agent 'ModuImageBench/3.0 (Open-source QA)' \
+            'https://commons.wikimedia.org/wiki/Special:Redirect/file/Portrait_of_woman.jpg?width=1280' \
+            -o test/fixtures/image-compress/portrait.jpg
       - run: bun run build
       - name: Start production-like worker
         run: |
