@@ -118,7 +118,9 @@
         </div>
       </div>
 
-      <Button class="mt-6 w-full" disabled={!controller.file || !controller.info || Boolean(controller.targetError) || controller.status === 'processing'}
+      <Button class="mt-6 w-full"
+        variant={controller.status === 'quality-limited' && !controller.allowResize ? 'outline' : 'default'}
+        disabled={!controller.file || !controller.info || Boolean(controller.targetError) || controller.status === 'processing'}
         onclick={() => void controller.compress()}>
         {#if controller.status === 'processing'}
           Encoding attempt {controller.attempts}…
