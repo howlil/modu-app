@@ -136,6 +136,40 @@ describe('image compressor one-click recovery', () => {
     controller.dispose();
   });
 
+  it('cancels an active retry, keeps prior output, and ignores its late result', async () => {
+    const controller = await limitedController();
+    const previous = controller.output;
+    const url = controller.outputUrl;
+    const pending = deferred();
+    adapters.encode.mockImplementationOnce(() => pending.promise);
+    const active = controller.recompressWithResize();
+    expect(controller.status).toBe('processing');
+    controller.cancel();
+    expect(controller.status).toBe('quality-limited');
+    expect(controller.output).toBe(previous);
+    expect(controller.outputUrl).toBe(url);
+    pending.resolve(makeResult('within-target', 19_000, true));
+    await active;
+    expect(controller.output).toBe(previous);
+    expect(controller.outputUrl).toBe(url);
+    controller.dispose();
+  });
+
+  it('cancels a first compression and remains ready with no stale output', async () => {
+    const controller = createImageCompressController();
+    await controller.setFile(new File(['img'], 'x.png', { type: 'image/png' }));
+    const pending = deferred();
+    adapters.encode.mockImplementationOnce(() => pending.promise);
+    const active = controller.compress();
+    controller.cancel();
+    expect(controller.status).toBe('ready');
+    pending.resolve(makeResult('within-target', 18_000, false));
+    await active;
+    expect(controller.output).toBeNull();
+    expect(controller.status).toBe('ready');
+    controller.dispose();
+  });
+
   it('refuses recovery unless a prior quality-limited result exists', async () => {
     const controller = createImageCompressController();
     await controller.recompressWithResize();
