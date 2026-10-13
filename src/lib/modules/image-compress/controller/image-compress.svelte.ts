@@ -15,6 +15,7 @@ export function createImageCompressController() {
   let status = $state<CompressionStatus>('idle');
   let error = $state('');
   let retryNotice = $state('');
+  let optimizationNotice = $state('');
   let attempts = $state(0);
   let revision = 0;
   let activeAbort: AbortController | null = null;
@@ -33,6 +34,7 @@ export function createImageCompressController() {
     output = null;
     attempts = 0;
     retryNotice = '';
+    optimizationNotice = '';
   }
 
   function releaseImage(): void {
@@ -108,7 +110,8 @@ export function createImageCompressController() {
    */
   async function runCompression(
     resize: boolean,
-    retainPrevious = false
+    retainPrevious = false,
+    mode: 'standard' | 'perceptual' = 'standard'
   ): Promise<void> {
     if (!file || !info || status === 'processing') return;
     const inputError = getTargetError();
@@ -128,6 +131,7 @@ export function createImageCompressController() {
     attempts = 0;
     error = '';
     retryNotice = '';
+    optimizationNotice = '';
     allowResize = resize;
     cancelRestores = preserve ? previousStatus : 'ready';
     status = 'processing';
@@ -141,9 +145,17 @@ export function createImageCompressController() {
         targetBytes,
         (count) => { if (run === revision) attempts = count; },
         abort.signal,
-        resize
+        resize,
+        mode
       );
       if (run !== revision) return;
+
+      if (mode === 'perceptual' && preserve &&
+          (encoded.status !== 'within-target' || !encoded.qualityEvidence?.improved)) {
+        status = previousStatus;
+        optimizationNotice = 'No better result found within this target. Your previous image was kept.';
+        return;
+      }
 
       // An unreachable retry must not replace a usable previous result.
       if (preserve && encoded.status !== 'within-target') {
@@ -181,6 +193,11 @@ export function createImageCompressController() {
     attempts = 0;
   }
 
+  function optimizeVisualQuality(): Promise<void> {
+    if (status !== 'complete' || !output || !outputUrl || !file || !info) return Promise.resolve();
+    return runCompression(allowResize, true, 'perceptual');
+  }
+
   function recompressWithResize(): Promise<void> {
     if (status !== 'quality-limited' || allowResize || !file || !info || !output || !outputUrl) {
       return Promise.resolve();
@@ -190,7 +207,7 @@ export function createImageCompressController() {
 
   function download(): void {
     if (!output || !outputUrl || !file) return;
-    const extension = output.format === 'image/jpeg' ? 'jpg' : 'webp';
+    const extension = output.format === 'image/jpeg' ? 'jpg' : output.format === 'image/avif' ? 'avif' : 'webp';
     const base = file.name.replace(/\.[^.]+$/, '') || 'image';
     const anchor = document.createElement('a');
     anchor.href = outputUrl;
@@ -217,8 +234,9 @@ export function createImageCompressController() {
     get status() { return status; },
     get error() { return error; },
     get retryNotice() { return retryNotice; },
+    get optimizationNotice() { return optimizationNotice; },
     get attempts() { return attempts; },
     get targetError() { return getTargetError(); },
-    setFile, setTargetInput, setFormat, setAllowResize, compress, cancel, recompressWithResize, download, dispose
+    setFile, setTargetInput, setFormat, setAllowResize, compress, cancel, recompressWithResize, optimizeVisualQuality, download, dispose
   };
 }
