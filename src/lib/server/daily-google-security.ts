@@ -10,6 +10,8 @@ export type D1Store = {
 };
 export interface GoogleOAuthEnv {
   DAILY_AUTH_DB?: D1Store;
+  DAILY_GOOGLE_AUTH_LIMITER?: {limit(options:{key:string}):Promise<{success:boolean}>};
+  DAILY_GOOGLE_TASKS_LIMITER?: {limit(options:{key:string}):Promise<{success:boolean}>};
   GOOGLE_OAUTH_CLIENT_ID?: string;
   GOOGLE_OAUTH_CLIENT_SECRET?: string;
   GOOGLE_OAUTH_REDIRECT_URI?: string;
