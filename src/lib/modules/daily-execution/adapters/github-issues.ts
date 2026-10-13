@@ -21,8 +21,16 @@ export async function loadPublicGithubIssues(
   const result:SourceCandidate[]=[];
   // Full snapshot: never treat partial pages as a complete sync.
   for(let page=1;page<=10;page++){
-    const url='https://api.github.com/repos/'+repository+'/issues?state=all&sort=updated&direction=desc&per_page=100&page='+page;
-    const response=await fetcher(url,{signal,headers:{'Accept':'application/vnd.github+json'}});
+    const url = new URL('https://api.github.com/repos/'+repository+'/issues');
+    url.searchParams.set('state','all');
+    url.searchParams.set('sort','updated');
+    url.searchParams.set('direction','desc');
+    url.searchParams.set('per_page','100');
+    url.searchParams.set('page',String(page));
+    // Fetch a two-minute overlap to tolerate clock skew and delayed provider updates.
+    if(connection.lastSyncedAt !== undefined)
+      url.searchParams.set('since',new Date(Math.max(0,connection.lastSyncedAt-120_000)).toISOString());
+    const response=await fetcher(url.toString(),{signal,headers:{'Accept':'application/vnd.github+json'}});
     if(!response.ok){
       if(response.status===401||response.status===403||response.status===429)
         throw new Error('GitHub request was limited or denied. Try again later.');
