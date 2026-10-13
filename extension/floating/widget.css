@@ -38,9 +38,20 @@ button:focus-visible, a:focus-visible {
   border-radius: 20px;
   box-shadow: 0 12px 32px rgba(37,37,37,.11), 0 2px 8px rgba(37,37,37,.035);
   font: 400 14px/20px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  touch-action: none;
+  user-select: none;
 }
+.modu-widget.modu-dragging {
+  animation: none !important;
+  cursor: grabbing;
+  box-shadow: 0 16px 36px rgba(37,37,37,.17);
+}
+.modu-header, .modu-content, .modu-mini-main { cursor: grab; }
+.modu-dragging .modu-header, .modu-dragging .modu-content,
+.modu-dragging .modu-mini-main { cursor: grabbing; }
+
 .modu-widget.mini {
-  width: min(204px, calc(100vw - 32px));
+  width: min(260px, calc(100vw - 16px));
   border-radius: 16px;
 }
 .modu-header {
@@ -164,20 +175,67 @@ button:focus-visible, a:focus-visible {
 .modu-mini {
   display: flex;
   align-items: center;
+  gap: 4px;
+  padding: 10px 8px 10px 12px;
+}
+.modu-mini-main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
   gap: 10px;
-  width: 100%;
-  padding: 9px 12px;
-  background: transparent;
-  border: 0;
-  color: var(--modu-foreground);
-  text-align: left;
 }
 .modu-mini-brand { flex-shrink: 0; }
-.modu-mini-details { display: flex; flex: 1; min-width: 0; flex-direction: column; }
-.modu-mini-time { font-size: 14px; line-height: 20px; font-weight: 600; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
-.modu-mini-state { font-size: 12px; line-height: 16px; color: var(--modu-muted-foreground); white-space: nowrap; }
-.modu-mini-action { color: var(--modu-muted-foreground); }
-.modu-mini:hover .modu-mini-action { color: var(--modu-primary); }
+.modu-mini-details {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+.modu-mini-top { display: flex; align-items: baseline; gap: 8px; }
+.modu-mini-time {
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 600;
+  letter-spacing: -.025em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.modu-mini-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--modu-secondary-foreground);
+}
+.modu-mini-task {
+  overflow: hidden;
+  color: var(--modu-muted-foreground);
+  font-size: 12px;
+  line-height: 16px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.modu-mini-expand {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--modu-muted-foreground);
+  cursor: pointer;
+}
+.modu-mini-expand:hover {
+  background: var(--modu-muted);
+  color: var(--modu-primary);
+}
 .modu-mini-progress { height: 3px; border-radius: 0; }
 @media (prefers-reduced-motion: reduce) {
   .modu-progress > span, .modu-mini-progress > span { transition: none; }

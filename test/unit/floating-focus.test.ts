@@ -111,6 +111,131 @@ describe('Modu Floating Focus', () => {
     expect(widgetSource).toContain("eye-off");
     expect(widgetStyles).toContain("--modu-primary: #2468f2");
     expect(widgetStyles).toContain(".modu-icon-button");
+    expect(widgetSource).toContain("module-floating-position-v1");
+    expect(widgetSource).toContain("setPointerCapture");
+    expect(widgetSource).toContain("pointercancel");
+    expect(widgetSource).toContain("normalizePosition");
+    expect(widgetSource).toContain("id=\"mini-task\"");
+    expect(widgetStyles).toContain(".modu-mini-expand");
+    expect(widgetStyles).toContain("touch-action: none");
+
+  });
+
+  it('drags the mini widget with pointer capture, saves position, and clamps on resize', async () => {
+    type Pointer = {
+      pointerId: number; clientX: number; clientY: number; isPrimary: boolean; button: number;
+      target: { closest: (selector: string) => null | object }; preventDefault: () => void;
+    };
+    const listeners = new Map<string, (event: Pointer) => void>();
+    const actions = new Map<string, () => void>();
+    const viewport = { width: 1200, height: 800 };
+    const styles = new Map<string, string>();
+    const writes: Record<string, unknown>[] = [];
+    const panel = {
+      id: '', className: '', innerHTML: '', dataset: {} as Record<string, string>,
+      classList: { add: (_name: string) => {}, remove: (_name: string) => {} },
+      addEventListener: (name: string, cb: (event: Pointer) => void) => listeners.set(name, cb),
+      setPointerCapture: (_pointerId: number) => {},
+      hasPointerCapture: (_pointerId: number) => true,
+      releasePointerCapture: (_pointerId: number) => {},
+      querySelector: (id: string) => ({
+        addEventListener: (_name: string, cb: () => void) => actions.set(id, cb),
+        style: { width: '' }, textContent: '', hidden: false
+      })
+    };
+    const shadow = {
+      append: (_node: unknown) => {},
+      getElementById: (_id: string) => panel
+    };
+    const host = {
+      id: '', isConnected: false, style: {
+        cssText: '',
+        setProperty: (name: string, value: string) => styles.set(name, value)
+      },
+      attachShadow: (_options: unknown) => shadow,
+      getBoundingClientRect: () => {
+        const width = panel.className.includes('mini') ? 260 : 320;
+        const height = panel.className.includes('mini') ? 65 : 320;
+        return {
+          width, height,
+          left: styles.has('left') ? Number.parseFloat(styles.get('left')!) : viewport.width - width - 24,
+          top: styles.has('top') ? Number.parseFloat(styles.get('top')!) : viewport.height - height - 24
+        };
+      },
+      remove: () => { host.isConnected = false; }
+    };
+    let divCount = 0;
+    const document = {
+      createElement: (tag: string) =>
+        tag === 'div' ? (divCount++ === 0 ? host : panel) : {
+          rel: '', href: '', addEventListener: (_name: string, _callback: () => void) => {}
+        },
+      documentElement: { append: (_node: unknown) => { host.isConnected = true; } }
+    };
+    const resizeHandlers = new Map<string, () => void>();
+    const window = {
+      get innerWidth() { return viewport.width; },
+      get innerHeight() { return viewport.height; },
+      addEventListener: (type: string, callback: () => void) => resizeHandlers.set(type, callback)
+    };
+    const chrome = {
+      runtime: {
+        getURL: (name: string) => 'chrome-extension://test/' + name,
+        onMessage: { addListener: (_handler: unknown) => {} }
+      },
+      storage: {
+        onChanged: { addListener: (_handler: unknown) => {} },
+        local: {
+          get: async (_keys: string[]) => ({
+            'module-floating-settings-v1': { enabled: true, showTask: true, excludedDomains: [] },
+            'module-floating-focus-v1': snapshot(Date.now())
+          }),
+          set: async (value: Record<string, unknown>) => { writes.push(value); }
+        }
+      }
+    };
+    new Function(
+      'chrome', 'document', 'window', 'location', 'globalThis', 'setInterval', 'clearInterval',
+      widgetSource
+    )(chrome, document, window, { hostname: 'example.org' }, {},
+      (_fn: unknown, _ms: number) => 1, (_id: number) => {}
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(panel.innerHTML).toContain('mini-task');
+    const fire = (type: string, x: number, y: number, interactive = false) => {
+      const event: Pointer = {
+        pointerId: 5, clientX: x, clientY: y, isPrimary: true, button: 0,
+        target: { closest: () => interactive ? {} : null }, preventDefault: () => {}
+      };
+      const callback = listeners.get(type);
+      if (!callback) throw new Error('Missing event listener: ' + type);
+      callback(event);
+    };
+
+    // The dedicated expand button must never initiate a drag.
+    fire('pointerdown', 900, 710, true);
+    fire('pointermove', 0, 0);
+    fire('pointerup', 0, 0);
+    expect(writes).toHaveLength(0);
+
+    fire('pointerdown', 900, 710);
+    fire('pointermove', -200, -200);
+    fire('pointerup', -200, -200);
+    expect(writes).toHaveLength(1);
+    expect(writes[0]['module-floating-position-v1']).toEqual({ x: 0, y: 0 });
+    expect(styles.get('left')).toBe('8px');
+    expect(styles.get('top')).toBe('8px');
+
+    // Normalized placement stays accessible after expanding and shrinking the viewport.
+    actions.get('#expand')?.();
+    expect(panel.className).toBe('modu-widget');
+    viewport.width = 400;
+    viewport.height = 360;
+    resizeHandlers.get('resize')?.();
+    expect(styles.get('left')).toBe('8px');
+    expect(styles.get('top')).toBe('8px');
   });
 
   it('preserves Daily next action through the one-shot handoff and Pomodoro restore', () => {

@@ -15,14 +15,15 @@ The web app owns timer transitions and recorded session history; the extension n
 4. Open Settings → Floating focus. Check that the extension is connected and enable the widget. Start a Focus session or launch one from Daily.
 5. Switch to another HTTP(S) website and refresh that tab if needed. The widget is hidden on Modu itself, localhost, restricted Chrome pages, excluded domains, and while the timer is idle. Expand the timer to see the task and next action.
 6. Pause and resume in the Pomodoro web app. The countdown must freeze and resume.
-7. **Minimize** (chevron) keeps the small timer visible. **Hide** (eye-off) removes it on the current tab for this session. To restore it during the same session, **pin Modu Focus Companion** in the Brave/Chrome toolbar and click its icon while viewing that website. It expands again. A new session automatically brings the floating timer back.
-8. The toolbar restore does nothing when the timer is idle, floating is disabled, the tab is excluded, or the tab is an internal browser page.
-9. Disable Floating focus; the overlay must disappear without changing Focus Protection.
-10. Exclude a hostname and verify the widget stays hidden there. Test existing blocked-site navigation separately.
+7. **Drag and drop:** grab the mini timer's logo/text area, or any non-button surface of the expanded panel, then move it anywhere inside the browser viewport with mouse, pen or touch. The position is saved across supported websites and browser restarts and clamped back into view on resize. The chevron, Hide and Open timer remain click-only controls.
+8. **Minimize** (chevron) keeps the small timer visible. **Hide** (eye-off) removes it on the current tab for this session. To restore it during the same session, **pin Modu Focus Companion** in the Brave/Chrome toolbar and click its icon while viewing that website. It expands again. A new session automatically brings the floating timer back.
+9. The toolbar restore does nothing when the timer is idle, floating is disabled, the tab is excluded, or the tab is an internal browser page.
+10. Disable Floating focus; the overlay must disappear without changing Focus Protection.
+11. Exclude a hostname and verify the widget stays hidden there. Test existing blocked-site navigation separately.
 
 ## Privacy and permissions
 
-- storage: persists the user’s floating preferences, latest task/timer snapshot, blocklist, and focus protection state in the browser.
+- storage: persists the user’s floating preferences, latest task/timer snapshot, widget position (two relative numbers), blocklist, and focus protection state in the browser.
 - scripting + host_permissions: enables injection on ordinary websites only after the user opts into Floating focus. The existing host permissions also support user-defined blocklists.
 - webNavigation + declarativeNetRequestWithHostAccess: supports website blocking.
 - No visited URLs, page contents, page titles or browsing history are collected. Current hostname is examined locally for exclusions; no browsing data is recorded.

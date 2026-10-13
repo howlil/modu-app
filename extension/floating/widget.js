@@ -5,6 +5,7 @@
 
   const SETTINGS_KEY = 'module-floating-settings-v1';
   const SNAPSHOT_KEY = 'module-floating-focus-v1';
+  const POSITION_KEY = 'module-floating-position-v1';
   const HOST_ID = 'modu-floating-focus-root';
   if (/^(modu\.howlil\.site|localhost|127\.0\.0\.1)$/i.test(location.hostname)) return;
 
@@ -28,6 +29,8 @@
   let shadow = null;
   let lastMarkupKind = '';
   let tickId = null;
+  let position = null;
+  let drag = null;
 
   const isExcluded = () => (settings.excludedDomains || []).some(
     (domain) => location.hostname === domain || location.hostname.endsWith('.' + domain)
@@ -60,8 +63,78 @@
     return { label, text, progress, status: t.status };
   };
 
+  // Fractions of available space keep placement visible across viewport sizes.
+  const GAP = 8;
+  const limit = (v, maximum) => Math.max(GAP, Math.min(
+    Number.isFinite(v) ? v : GAP, Math.max(GAP, maximum)
+  ));
+  function normalizePosition(value) {
+    return value && Number.isFinite(value.x) && Number.isFinite(value.y)
+      ? { x: Math.max(0, Math.min(1, value.x)), y: Math.max(0, Math.min(1, value.y)) }
+      : null;
+  }
+  function bounds() {
+    const rect = host.getBoundingClientRect();
+    return {
+      maxX: Math.max(GAP, window.innerWidth - rect.width - GAP),
+      maxY: Math.max(GAP, window.innerHeight - rect.height - GAP)
+    };
+  }
+  function moveTo(x, y) {
+    if (!host) return;
+    const { maxX, maxY } = bounds();
+    host.style.setProperty('right', 'auto', 'important');
+    host.style.setProperty('bottom', 'auto', 'important');
+    host.style.setProperty('left', limit(x, maxX) + 'px', 'important');
+    host.style.setProperty('top', limit(y, maxY) + 'px', 'important');
+  }
+  function applyPosition() {
+    if (!host?.isConnected || drag) return;
+    const { maxX, maxY } = bounds();
+    if (position) moveTo(GAP + position.x * (maxX - GAP), GAP + position.y * (maxY - GAP));
+    else moveTo(maxX - 16, maxY - 16);
+  }
+  function onDragStart(event) {
+    if (!event.isPrimary || event.button !== 0 || !host) return;
+    if (event.target.closest('button, a, input, textarea, select')) return;
+    const panel = shadow?.getElementById('modu-panel');
+    if (!panel) return;
+    const rect = host.getBoundingClientRect();
+    drag = { id: event.pointerId, startX: event.clientX, startY: event.clientY,
+      left: rect.left, top: rect.top, moved: false };
+    panel.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  }
+  function onDragMove(event) {
+    if (!drag || drag.id !== event.pointerId) return;
+    const dx = event.clientX - drag.startX;
+    const dy = event.clientY - drag.startY;
+    if (!drag.moved && Math.hypot(dx, dy) < 4) return;
+    drag.moved = true;
+    shadow?.getElementById('modu-panel')?.classList.add('modu-dragging');
+    moveTo(drag.left + dx, drag.top + dy);
+    event.preventDefault();
+  }
+  function onDragEnd(event) {
+    if (!drag || drag.id !== event.pointerId) return;
+    const moved = drag.moved;
+    drag = null;
+    const panel = shadow?.getElementById('modu-panel');
+    panel?.classList.remove('modu-dragging');
+    if (panel?.hasPointerCapture(event.pointerId)) panel.releasePointerCapture(event.pointerId);
+    if (!moved || !host?.isConnected) return;
+    const rect = host.getBoundingClientRect();
+    const { maxX, maxY } = bounds();
+    position = normalizePosition({
+      x: (rect.left - GAP) / Math.max(1, maxX - GAP),
+      y: (rect.top - GAP) / Math.max(1, maxY - GAP)
+    });
+    void chrome.storage.local.set({ [POSITION_KEY]: position }).catch(() => {});
+  }
+
   function unmount() {
     if (tickId !== null) { clearInterval(tickId); tickId = null; }
+    drag = null;
     host?.remove();
     host = null;
     shadow = null;
@@ -80,9 +153,14 @@
     link.rel = 'stylesheet';
     link.href = chrome.runtime.getURL('floating/widget.css');
     shadow.append(link);
+    link.addEventListener('load', applyPosition);
     const panel = document.createElement('div');
     panel.id = 'modu-panel';
     shadow.append(panel);
+    panel.addEventListener('pointerdown', onDragStart);
+    panel.addEventListener('pointermove', onDragMove);
+    panel.addEventListener('pointerup', onDragEnd);
+    panel.addEventListener('pointercancel', onDragEnd);
     document.documentElement.append(host);
   }
 
@@ -93,18 +171,27 @@
 
     if (kind === 'mini') {
       panel.innerHTML =
-        '<button class="modu-mini" id="expand" type="button" aria-label="Expand Modu floating timer">' +
-          '<span class="modu-mini-brand">' + BRAND_IMAGE + '</span>' +
-          '<span class="modu-mini-details"><strong id="time" class="modu-mini-time" role="timer"></strong><span id="state" class="modu-mini-state"></span></span>' +
-          '<span class="modu-mini-action">' + icon('chevron-up') + '</span>' +
-        '</button>' +
+        '<div class="modu-mini">' +
+          '<div class="modu-mini-main" title="Drag to move">' +
+            '<span class="modu-mini-brand">' + BRAND_IMAGE + '</span>' +
+            '<span class="modu-mini-details">' +
+              '<span class="modu-mini-top"><strong id="time" class="modu-mini-time" role="timer"></strong>' +
+                '<span class="modu-mini-status"><span class="modu-status-dot" aria-hidden="true"></span><span id="state"></span></span>' +
+              '</span>' +
+              '<span class="modu-mini-task" id="mini-task"></span>' +
+            '</span>' +
+          '</div>' +
+          '<button id="expand" class="modu-mini-expand" type="button" title="Expand focus timer" aria-label="Expand Modu floating timer">' +
+            icon('chevron-up') +
+          '</button>' +
+        '</div>' +
         '<div class="modu-mini-progress" aria-hidden="true"><span id="progress"></span></div>';
       panel.querySelector('#expand').addEventListener('click', () => { mini = false; render(); });
     } else {
       panel.innerHTML =
         '<header class="modu-header">' +
-          '<a class="modu-brand" href="' + MODU_URL + '" target="_blank" rel="noopener noreferrer" aria-label="Open Modu Pomodoro">' +
-            BRAND_IMAGE + '<span class="modu-brand-copy"><strong>Modu</strong><span>Focus companion</span></span></a>' +
+          '<div class="modu-brand" title="Drag to move">' +
+            BRAND_IMAGE + '<span class="modu-brand-copy"><strong>Modu</strong><span>Focus companion</span></span></div>' +
           '<div class="modu-controls">' +
             '<button id="collapse" class="modu-icon-button" type="button" title="Minimize" aria-label="Minimize floating timer">' + icon('chevron-down') + '</button>' +
             '<button id="hide" class="modu-icon-button" type="button" title="Hide until next session · click the extension toolbar icon to restore" aria-label="Hide floating timer until next session. Use the extension toolbar icon to restore.">' + icon('eye-off') + '</button>' +
@@ -129,6 +216,7 @@
       });
     }
     lastMarkupKind = kind;
+    applyPosition();
   }
 
   function render() {
@@ -145,7 +233,11 @@
     panel.querySelector('#time').textContent = values.text;
     panel.querySelector('#state').textContent = values.label;
     panel.querySelector('#progress').style.width = values.progress + '%';
-    if (!mini) {
+    if (mini) {
+      const hasTask = settings.showTask && snapshot.timer.mode === 'focus' && snapshot.task?.title;
+      panel.querySelector('#mini-task').textContent = hasTask ? snapshot.task.title :
+        snapshot.timer.mode === 'focus' ? 'Focus session' : 'Take a break';
+    } else {
       const hasTask = settings.showTask && snapshot.timer.mode === 'focus' && snapshot.task?.title;
       const nextAction = hasTask ? snapshot.task.nextAction || '' : '';
       const next = panel.querySelector('#next');
@@ -156,6 +248,8 @@
       next.hidden = !nextAction;
     }
   }
+
+  window.addEventListener('resize', applyPosition);
 
   // Toolbar action restores the widget in this tab even during the same session.
   chrome.runtime.onMessage.addListener((message, _sender, respond) => {
@@ -173,6 +267,10 @@
       settings = changes[SETTINGS_KEY].newValue || settings;
       if (!wasEnabled && settings.enabled) { dismissedId = null; mini = true; }
     }
+    if (changes[POSITION_KEY]) {
+      position = normalizePosition(changes[POSITION_KEY].newValue);
+      applyPosition();
+    }
     if (changes[SNAPSHOT_KEY]) {
       const oldId = snapshot?.sessionId;
       snapshot = changes[SNAPSHOT_KEY].newValue || null;
@@ -180,9 +278,10 @@
     }
     render();
   });
-  chrome.storage.local.get([SETTINGS_KEY, SNAPSHOT_KEY]).then((state) => {
+  chrome.storage.local.get([SETTINGS_KEY, SNAPSHOT_KEY, POSITION_KEY]).then((state) => {
     settings = state[SETTINGS_KEY] || settings;
     snapshot = state[SNAPSHOT_KEY] || null;
+    position = normalizePosition(state[POSITION_KEY]);
     render();
   }).catch(() => {});
 })();
