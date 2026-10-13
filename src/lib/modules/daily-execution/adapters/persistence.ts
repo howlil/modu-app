@@ -1,5 +1,44 @@
 import { emptyExecutionState, type ExecutionState, type ExecutionTask, type ManualWorkEntry } from '../core/planning.ts';
 const KEY = 'modu-daily-execution-v1';
+export const DAILY_STORAGE_KEY = KEY;
+
+export class DailyStorageConflictError extends Error {
+  constructor() { super('Daily was modified in another tab.'); this.name = 'DailyStorageConflictError'; }
+}
+
+/** Strict read for the interactive controller: never turn unreadable user data into an empty writable state. */
+export function readExecutionSnapshot(): { state: ExecutionState; raw: string | null } {
+  if (typeof localStorage === 'undefined') throw new Error('Local storage unavailable.');
+  const raw = localStorage.getItem(KEY);
+  if (raw !== null) {
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('Invalid Daily record.');
+    }
+    const candidate = parsed as Partial<ExecutionState>;
+    if (candidate.tasks !== undefined && (
+      !Array.isArray(candidate.tasks) || candidate.tasks.some(task =>
+        !task || typeof task.id !== 'string' || typeof task.title !== 'string' ||
+        typeof task.nextAction !== 'string' || typeof task.workstream !== 'string' ||
+        !['ready', 'blocked', 'done', 'archived'].includes(task.status)
+      )
+    )) throw new Error('Invalid Daily tasks. Original data has been preserved.');
+    if (candidate.days !== undefined && (
+      !candidate.days || typeof candidate.days !== 'object' || Array.isArray(candidate.days)
+    )) throw new Error('Invalid dated selections.');
+  }
+  return { state: readExecutionState(), raw };
+}
+
+/** Best-effort optimistic cross-tab guard. localStorage has no atomic compare-and-swap. */
+export function saveExecutionStateIfCurrent(value: ExecutionState, expectedRaw: string | null): string {
+  if (typeof localStorage === 'undefined') throw new Error('Local storage unavailable.');
+  if (localStorage.getItem(KEY) !== expectedRaw) throw new DailyStorageConflictError();
+  const raw = JSON.stringify(value);
+  localStorage.setItem(KEY, raw);
+  return raw;
+}
+
 
 export function readExecutionState(): ExecutionState {
   if (typeof localStorage === 'undefined') return emptyExecutionState();
