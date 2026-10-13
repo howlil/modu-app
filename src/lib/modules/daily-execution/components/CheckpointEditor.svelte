@@ -6,9 +6,19 @@
     onSave: (lastCompleted: string, blocker: string, nextAction: string) => void;
     onCancel: () => void;
   } = $props();
-  let lastCompleted = $state(task.checkpoint?.lastCompleted ?? '');
-  let blocker = $state(task.checkpoint?.blocker ?? '');
-  let nextAction = $state(task.checkpoint?.nextAction ?? task.nextAction);
+  // The editable draft follows the selected task, not subsequent prop object refreshes.
+  let lastCompleted = $state('');
+  let blocker = $state('');
+  let nextAction = $state('');
+  let editingTaskId: string | null = null;
+
+  $effect(() => {
+    if (task.id === editingTaskId) return;
+    editingTaskId = task.id;
+    lastCompleted = task.checkpoint?.lastCompleted ?? '';
+    blocker = task.checkpoint?.blocker ?? '';
+    nextAction = task.checkpoint?.nextAction ?? task.nextAction;
+  });
 </script>
 
 <form class="mt-4 grid gap-3 rounded-xl border border-border bg-card p-4"
