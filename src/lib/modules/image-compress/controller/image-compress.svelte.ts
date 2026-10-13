@@ -16,6 +16,7 @@ export function createImageCompressController() {
   let error = $state('');
   let retryNotice = $state('');
   let optimizationNotice = $state('');
+  let runningMode = $state<'standard' | 'perceptual'>('standard');
   let attempts = $state(0);
   let revision = 0;
   let activeAbort: AbortController | null = null;
@@ -133,6 +134,7 @@ export function createImageCompressController() {
     retryNotice = '';
     optimizationNotice = '';
     allowResize = resize;
+    runningMode = mode;
     cancelRestores = preserve ? previousStatus : 'ready';
     status = 'processing';
     const abort = new AbortController();
@@ -177,7 +179,7 @@ export function createImageCompressController() {
       error = cause instanceof Error ? cause.message : 'Compression failed.';
       status = preserve ? previousStatus : 'error';
     } finally {
-      if (run === revision) activeAbort = null;
+      if (run === revision) { activeAbort = null; runningMode = 'standard'; }
     }
   }
 
@@ -189,6 +191,7 @@ export function createImageCompressController() {
     if (status !== 'processing') return;
     invalidateRunning(); // Terminates the in-flight Web Worker via AbortSignal.
     status = output ? cancelRestores : (file && info ? 'ready' : 'idle');
+    runningMode = 'standard';
     error = '';
     attempts = 0;
   }
@@ -235,6 +238,7 @@ export function createImageCompressController() {
     get error() { return error; },
     get retryNotice() { return retryNotice; },
     get optimizationNotice() { return optimizationNotice; },
+    get runningMode() { return runningMode; },
     get attempts() { return attempts; },
     get targetError() { return getTargetError(); },
     setFile, setTargetInput, setFormat, setAllowResize, compress, cancel, recompressWithResize, optimizeVisualQuality, download, dispose
