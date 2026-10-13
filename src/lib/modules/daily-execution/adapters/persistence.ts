@@ -27,7 +27,7 @@ export function readExecutionSnapshot(): { state: ExecutionState; raw: string | 
       !candidate.days || typeof candidate.days !== 'object' || Array.isArray(candidate.days)
     )) throw new Error('Invalid dated selections.');
   }
-  return { state: readExecutionState(), raw };
+  return { state: readExecutionState(raw), raw };
 }
 
 /** Best-effort optimistic cross-tab guard. localStorage has no atomic compare-and-swap. */
@@ -40,10 +40,10 @@ export function saveExecutionStateIfCurrent(value: ExecutionState, expectedRaw: 
 }
 
 
-export function readExecutionState(): ExecutionState {
+export function readExecutionState(rawSnapshot?: string | null): ExecutionState {
   if (typeof localStorage === 'undefined') return emptyExecutionState();
   try {
-    const parsed: unknown = JSON.parse(localStorage.getItem(KEY) ?? 'null');
+    const parsed: unknown = JSON.parse(rawSnapshot === undefined ? (localStorage.getItem(KEY) ?? 'null') : (rawSnapshot ?? 'null'));
     if (!parsed || typeof parsed !== 'object') return emptyExecutionState();
     const raw = parsed as Partial<ExecutionState>;
     const validTasks = Array.isArray(raw.tasks) ? raw.tasks.filter((task): task is ExecutionTask =>
