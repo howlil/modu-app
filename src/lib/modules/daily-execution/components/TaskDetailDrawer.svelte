@@ -3,11 +3,12 @@
  import { onMount } from 'svelte';
  import { Button } from '#lib/components/ui/button/index.js';
  import type { ExecutionTask } from '../core/planning.ts';
- let { task, onClose, onSave, onArchive }: {
+ let { task, onClose, onSave, onArchive, onRemoveFromToday }: {
    task: ExecutionTask;
    onClose: () => void;
    onSave: (fields: { title: string; context: string; nextAction: string; estimateMinutes: number; dueDate: string }) => boolean;
    onArchive: () => void;
+   onRemoveFromToday?: () => void;
  } = $props();
  let title = $state('');
  let context = $state('');
@@ -89,6 +90,9 @@
        </div>
      {/if}
      <div class="mt-2 flex flex-wrap justify-end gap-2">
+       {#if onRemoveFromToday}
+         <Button type="button" variant="ghost" class="rounded-lg text-muted-foreground" onclick={onRemoveFromToday}>Remove from Today</Button>
+       {/if}
        {#if task.status !== 'done'}
          <Button type="button" variant="ghost" class="rounded-lg text-muted-foreground" onclick={onArchive}>
            {task.status === 'blocked' ? 'Unblock' : task.status === 'archived' ? 'Restore' : 'Archive'}
