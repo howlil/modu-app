@@ -86,7 +86,7 @@
       <div class="mt-6 border-t border-border pt-5">
         <p class="mb-3 text-ui font-medium">Output format</p>
         <div class="flex flex-wrap gap-2" role="group" aria-label="Output format">
-          {#each [{ label: 'WebP', value: 'image/webp' }, { label: 'JPEG', value: 'image/jpeg' }] as option}
+          {#each [{ label: 'WebP', value: 'image/webp' }, { label: 'JPEG', value: 'image/jpeg' }, { label: 'AVIF', value: 'image/avif' }] as option}
             <Button variant={controller.format === option.value ? 'secondary' : 'outline'} size="sm"
               aria-pressed={controller.format === option.value} disabled={controller.status === 'processing'}
               onclick={() => controller.setFormat(option.value as ImageOutputFormat)}>
@@ -97,7 +97,9 @@
         <p class="mt-2 text-meta text-muted-foreground">
           {controller.format === 'image/jpeg'
             ? 'JPEG works with most upload forms. Transparent pixels turn white.'
-            : 'WebP generally gives smaller files, but some forms require JPEG.'}
+            : controller.format === 'image/avif'
+              ? 'AVIF can compress efficiently but encodes more slowly. Some upload forms reject it.'
+              : 'WebP generally gives smaller files, but some forms require JPEG.'}
         </p>
       </div>
 
@@ -210,7 +212,7 @@
 
       <div role="status" aria-live="polite" class="mt-5">
         {#if controller.status === 'processing'}
-          <p class="text-ui">{controller.output ? 'Resizing and recompressing…' : 'Optimizing image…'}</p>
+          <p class="text-ui">{controller.runningMode === 'perceptual' ? 'Comparing visual quality…' : controller.output ? 'Resizing and recompressing…' : 'Optimizing image…'}</p>
           <p class="mt-1 text-meta text-muted-foreground">
             {controller.output
               ? 'Your previous result remains available during this attempt.'
@@ -240,6 +242,16 @@
         {:else if controller.status === 'ready'}
           <p class="text-ui text-muted-foreground">Choose a target and compress to see the result.</p>
         {/if}
+        {#if controller.optimizationNotice}
+          <p class="mt-2 text-meta text-muted-foreground">{controller.optimizationNotice}</p>
+        {/if}
+        {#if controller.output?.qualityEvidence}
+          <p class="mt-2 text-meta text-muted-foreground">
+            Evaluated {controller.output.qualityEvidence.scoredCandidates} candidates using MILO at
+            {controller.output.qualityEvidence.comparisonLongSide}px display size.
+            Raw error {controller.output.qualityEvidence.rawError.toFixed(5)} (lower is better; not a quality percentage).
+          </p>
+        {/if}
         {#if controller.error}
           <p role="alert" class="mt-2 text-ui text-destructive">{controller.error}</p>
         {/if}
@@ -254,6 +266,12 @@
             <Button class="w-full" onclick={() => void controller.recompressWithResize()}>
               <WandSparkles class="size-4" strokeWidth={1.8} />
               Smart resize &amp; retry {controller.targetInput} KB
+            </Button>
+          {/if}
+          {#if controller.status === 'complete' && !controller.output.qualityEvidence && !controller.optimizationNotice}
+            <Button class="w-full" variant="outline" onclick={() => void controller.optimizeVisualQuality()}>
+              <WandSparkles class="size-4" strokeWidth={1.8} />
+              Optimize visual quality
             </Button>
           {/if}
           <Button variant={controller.status === 'complete' ? 'default' : 'outline'} class="w-full"
