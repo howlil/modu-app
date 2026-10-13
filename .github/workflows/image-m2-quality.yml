@@ -88,7 +88,7 @@ jobs:
           pattern: image-m2-*
           path: m2-artifacts/
       - name: Install reference quality CLI
-        run: cargo install ssimulacra2_rs --version 0.5.2 --locked
+        run: cargo install ssimulacra2_rs --version 0.5.2 --locked --no-default-features
       - name: Compare before and after at identical display dimensions
         run: python3 test/benchmarks/image-m2-reference.py m2-artifacts
       - uses: actions/upload-artifact@v4

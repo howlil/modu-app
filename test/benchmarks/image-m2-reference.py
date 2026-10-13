@@ -14,7 +14,7 @@ from pathlib import Path
 
 def score(reference: Path, candidate: Path) -> float:
     process = subprocess.run(
-        ["ssimulacra2_rs", str(reference), str(candidate)],
+        ["ssimulacra2_rs", "image", str(reference), str(candidate)],
         text=True, capture_output=True, check=True, timeout=45
     )
     output = (process.stdout + "\n" + process.stderr).strip()
