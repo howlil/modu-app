@@ -23,6 +23,7 @@ scope.onmessage = async (event: MessageEvent<Request>) => {
     if (!originalContext) throw new Error('Canvas initialization failed.');
     originalContext.drawImage(bitmap, 0, 0);
 
+    let usedBrowserFallback = false;
     let currentPixels: ImageData | undefined;
     let currentKey = '';
     const pixelsAt = async (dimensions: Dimensions): Promise<ImageData> => {
@@ -56,6 +57,7 @@ scope.onmessage = async (event: MessageEvent<Request>) => {
           if (!raw) throw new Error('WebP WASM encoder returned no data.');
           bytes = new Uint8Array(raw);
         } catch {
+          usedBrowserFallback = true;
           const canvas = new OffscreenCanvas(dimensions.width, dimensions.height);
           const ctx = canvas.getContext('2d');
           if (!ctx) throw new Error('No fallback WebP encoder available.');
@@ -83,6 +85,7 @@ scope.onmessage = async (event: MessageEvent<Request>) => {
             { quality: Math.round(quality * 100), progressive: true, optimize_coding: true }
           );
         } catch {
+          usedBrowserFallback = true;
           const canvas = new OffscreenCanvas(dimensions.width, dimensions.height);
           const ctx = canvas.getContext('2d');
           if (!ctx) throw new Error('No fallback JPEG encoder available.');
@@ -113,7 +116,8 @@ scope.onmessage = async (event: MessageEvent<Request>) => {
         resized: result.resized,
         width: result.width,
         height: result.height,
-        format
+        format,
+        engine: usedBrowserFallback ? 'browser-fallback' : 'wasm'
       }
     });
     originalCanvas.width = 0;

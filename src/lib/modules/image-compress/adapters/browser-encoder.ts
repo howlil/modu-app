@@ -11,6 +11,7 @@ export interface ImageInfo { width: number; height: number }
 export interface EncodedImage extends TargetSizeResult, ImageInfo {
   format: ImageOutputFormat;
   resized: boolean;
+  engine: 'wasm' | 'browser-fallback' | 'original';
 }
 
 function validateFile(file: File): void {
@@ -51,7 +52,7 @@ export async function encodeImageToTarget(
     const info = await inspectImage(file);
     return {
       blob: file, quality: 1, attempts: 0, status: 'within-target',
-      ...info, format, resized: false
+      ...info, format, resized: false, engine: 'original'
     };
   }
   if (typeof Worker === 'undefined') {

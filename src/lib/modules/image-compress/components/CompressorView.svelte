@@ -176,6 +176,7 @@
           <p class="mt-1 text-meta text-muted-foreground">
             {formatBytes(controller.output.blob.size)} · Quality setting {Math.round(controller.output.quality * 100)}%
             · {controller.output.width} × {controller.output.height} px {controller.output.resized ? '(resized with permission)' : '(original resolution)'}
+            · {controller.output.engine === 'wasm' ? 'WASM encoder' : controller.output.engine === 'browser-fallback' ? 'Browser encoder fallback' : 'Original file'}
           </p>
         {:else if controller.status === 'quality-limited' && controller.output}
           <p class="text-ui font-medium text-destructive">Target cannot be reached within the quality and resolution limits</p>
