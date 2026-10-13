@@ -30,6 +30,7 @@ export function createDailyExecutionController() {
   let intelligenceNotice = $state('');
   let evidenceRefreshVersion = 0;
   let view = $state<'today' | 'priorities' | 'review'>('today');
+  let sourcePanelOpen = $state(false);
   let dayKey = $state(localDayKey(Date.now()));
   let weekStart = $state(weekKey(Date.now()));
   let error = $state('');
@@ -586,6 +587,9 @@ export function createDailyExecutionController() {
     get intelligenceNotice() { return intelligenceNotice; },
     get reviewSubview() { return reviewSubview; },
     set reviewSubview(value: 'summary'|'intelligence'|'evidence'|'sources') { reviewSubview = value; },
+    get sourcePanelOpen(){return sourcePanelOpen;},
+    set sourcePanelOpen(value:boolean){sourcePanelOpen=value;},
+    openSourcePanel(){sourcePanelOpen=true;view='priorities';},
     get view() { return view; },
     set view(value: 'today' | 'priorities' | 'review') { view = value; },
     get dayKey() { return dayKey; },
