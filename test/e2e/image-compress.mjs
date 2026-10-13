@@ -107,6 +107,13 @@ try {
   assert.equal(await page.getByRole('button', { name: '100%', exact: true }).getAttribute('aria-pressed'), 'true');
   await page.getByRole('button', { name: 'Compare', exact: true }).click();
   await page.getByRole('button', { name: 'Fit', exact: true }).click();
+  // Repeated switch changes must stay synchronized with controller state.
+  await originalToggle.click();
+  await page.getByText('Preserved', { exact: true }).waitFor();
+  assert.equal(await originalToggle.getAttribute('data-state'), 'unchecked');
+  await originalToggle.click();
+  await page.getByText('Adaptive', { exact: true }).waitFor();
+  assert.equal(await originalToggle.getAttribute('data-state'), 'checked');
 
   // M1.5: alpha is flattened against white when a transparent PNG is saved as JPEG.
   const alpha = await page.evaluate(async () => {
