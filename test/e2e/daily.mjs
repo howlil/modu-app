@@ -1,7 +1,7 @@
 // @ts-nocheck — independent Playwright browser suite, excluded from application typecheck.
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 
 const url = process.env.MODU_DAILY_E2E_URL || 'http://127.0.0.1:8787/daily';
 const output = process.env.MODU_E2E_ARTIFACTS || 'test-results/daily';
@@ -10,6 +10,7 @@ const browser = await chromium.launch({ headless: true });
 let activePage;
 const browserErrors = [];
 const results = [];
+let failureReason = null;
 function capture(page) { page.on('pageerror', error => browserErrors.push(error.message)); }
 function record(name) { results.push(name); console.log('PASS', name); }
 async function ready(page) {
@@ -103,6 +104,26 @@ try {
   }
   record('DLY-09 responsive widths and mobile activity shelf');
 
+  // Touch input is not equivalent to resizing a mouse context: exercise a real mobile context.
+  const touchContext = await browser.newContext({
+    viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2,
+    reducedMotion: 'reduce'
+  });
+  const touch = await touchContext.newPage(); activePage = touch;
+  capture(touch);
+  await ready(touch);
+  await touch.getByRole('textbox', { name: 'New activity' }).fill('Touch activity');
+  await touch.getByRole('button', { name: 'Add', exact: true }).tap();
+  await touch.getByRole('button', { name: 'Complete Touch activity' }).tap();
+  await touch.getByRole('button', { name: 'Completed (1)' }).tap();
+  await touch.getByRole('button', { name: 'Reopen Touch activity' }).tap();
+  await touch.getByRole('button', { name: 'Browse list' }).tap();
+  await touch.getByRole('heading', { name: 'From your list' }).waitFor();
+  await noOverflow(touch, 'touch mobile 390px');
+  await touch.screenshot({ path: output + '/touch.png', fullPage: true });
+  record('DLY-12 mobile touch interactions and accessible Browse trigger');
+  await touchContext.close();
+
   const perfContext = await browser.newContext({ viewport: { width: 1024, height: 768 } });
   const perf = await perfContext.newPage(); activePage = perf;
   capture(perf);
@@ -140,6 +161,7 @@ try {
   assert.deepEqual(browserErrors, [], 'No uncaught JavaScript page errors');
   console.log('Daily browser acceptance passed:', results.length, 'scenarios');
 } catch (error) {
+  failureReason = String(error);
   console.error('Daily browser acceptance FAILED:', error);
   if (activePage && !activePage.isClosed()) {
     await activePage.screenshot({ path: output + '/failure.png', fullPage: true }).catch(() => {});
@@ -147,6 +169,16 @@ try {
   console.error('Completed scenarios:', results);
   console.error('Uncaught browser errors:', browserErrors);
   process.exitCode = 1;
-} finally {
+ } finally {
+  await writeFile(output + '/report.json', JSON.stringify({
+    suite: 'Modu Daily browser acceptance',
+    revision: process.env.GITHUB_SHA || null,
+    completed: results,
+    completedCount: results.length,
+    status: failureReason === null ? 'passed' : 'failed',
+    failure: failureReason,
+    pageErrors: browserErrors,
+    testedAt: new Date().toISOString()
+  }, null, 2)).catch(() => {});
   await browser.close();
 }
