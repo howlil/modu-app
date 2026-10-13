@@ -68,17 +68,26 @@ export async function findTargetSize(
     return { ...best, attempts, status: 'quality-limited' };
   }
 
-  let low = minimumQuality;
-  let high = 1;
-
-  for (let pass = 0; pass < 10 && high - low > 0.001; pass++) {
-    const quality = (low + high) / 2;
-    const candidate = await measure(quality);
+  // Encoder bindings quantize quality to integer values; search that domain
+  // so we do not encode the same rounded setting repeatedly.
+  let low = Math.ceil(minimumQuality * 100);
+  let high = 100;
+  let bestLevel = low;
+  while (high - low > 1) {
+    const mid = Math.floor((low + high) / 2);
+    const candidate = await measure(mid / 100);
     if (candidate.blob.size <= targetBytes) {
-      if (candidate.quality > best.quality) best = candidate;
-      low = quality;
-    } else {
-      high = quality;
+      low = mid;
+      if (mid > bestLevel) { best = candidate; bestLevel = mid; }
+    } else high = mid;
+  }
+  // Verify the adjacent upper neighborhood. Actual byte sizes need not be
+  // strictly monotonic across adjacent quality levels.
+  for (let q = bestLevel + 1; q <= Math.min(100, bestLevel + 2); q++) {
+    const candidate = await measure(q / 100);
+    if (candidate.blob.size <= targetBytes) {
+      best = candidate;
+      bestLevel = q;
     }
   }
 
