@@ -19,6 +19,8 @@
     "preview": "bun run build && wrangler dev"
   },
   "dependencies": {
+    "@blazediff/milo-wasm": "^0.1.0",
+    "@jsquash/avif": "^2.1.1",
     "@jsquash/jpeg": "^1.6.0",
     "bits-ui": "^2.19.5",
     "cn": "^0.3.1",

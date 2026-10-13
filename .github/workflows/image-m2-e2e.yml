@@ -1,0 +1,29 @@
+name: M2 dependency lock and browser validation
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'package.json'
+      - '.github/workflows/image-m2-e2e.yml'
+      - 'src/lib/modules/image-compress/**'
+  workflow_dispatch:
+jobs:
+  m2-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.2.15'
+      - name: Resolve M2 dependency lock
+        run: |
+          bun install
+          echo 'MODU_M2_LOCK_BEGIN'
+          cat bun.lock
+          echo 'MODU_M2_LOCK_END'
+      - name: Run checks
+        run: |
+          bun run check
+          bun run test
+          bun run build
