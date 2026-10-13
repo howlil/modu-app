@@ -94,8 +94,14 @@ export async function encodeImageToTarget(
   return new Promise<EncodedImage>((resolve, reject) => {
     const worker = new Worker(new URL('./compress.worker.ts', import.meta.url), { type: 'module' });
     let settled = false;
+    const watchdog = setTimeout(() => {
+      if (settled) return;
+      finish();
+      reject(new Error('Compression timed out. Try a smaller image or a different output format.'));
+    }, 180_000);
     function finish(): void {
       settled = true;
+      clearTimeout(watchdog);
       worker.terminate();
       signal?.removeEventListener('abort', cancel);
     }
@@ -157,6 +163,12 @@ export async function encodeImageToTarget(
       }
     };
     signal?.addEventListener('abort', cancel, { once: true });
-    worker.postMessage({ file, format, targetBytes, allowResize });
+    if (signal?.aborted) { cancel(); return; }
+    try {
+      worker.postMessage({ file, format, targetBytes, allowResize });
+    } catch (error) {
+      finish();
+      reject(error);
+    }
   });
 }
