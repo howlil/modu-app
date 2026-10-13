@@ -152,6 +152,10 @@ try {
   assert.equal(remaining.length,1,'Disconnect must preserve linked local history');
   record('DLY-M3-03 public GitHub connect, incremental refresh, no write-back and disconnect');
   await activePage.getByRole('navigation', { name: 'Daily views' }).getByRole('button', { name: 'Today' }).click();
+  await activePage.getByRole('button', { name: 'Manage', exact: true }).click();
+  await activePage.getByRole('heading', { name: 'Activity sources' }).waitFor();
+  await activePage.getByRole('navigation', { name: 'Daily views' }).getByRole('button', { name: 'Today' }).click();
+  record('DLY-M3-04 direct source management navigation from Today');
 
   await activePage.screenshot({ path: output + '/desktop.png', fullPage: true });
   await activePage.getByRole('button', { name: 'Start focus' }).click();
