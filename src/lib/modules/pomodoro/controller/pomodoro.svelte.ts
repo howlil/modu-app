@@ -1,6 +1,6 @@
 import { onMount, tick } from 'svelte';
 import { elapsedFocus, emptyFocusAccounting, pauseFocus, resumeFocus, type FocusAccounting } from '../core/focus-accounting.ts';
-import { consumePendingFocusTask } from '#lib/shared/focus-sessions/context.ts';
+import { consumePendingFocusTask, canAcceptPendingFocusTask } from '#lib/shared/focus-sessions/context.ts';
 import type { FocusTaskContext } from '#lib/shared/focus-sessions/types.ts';
   import { createWakeLockController } from '#lib/modules/pomodoro/adapters/wake-lock.ts';
   import { clearFocusSessions, loadFocusSessions, saveFocusSession, saveFocusSessions } from '#lib/modules/pomodoro/adapters/activity-storage.ts';
@@ -948,7 +948,7 @@ export function createPomodoroController() {
     const requestedTaskId = new URLSearchParams(window.location.search).get('taskId');
     if (requestedTaskId) {
       const pendingTask = consumePendingFocusTask(requestedTaskId);
-      if (pendingTask && timer.mode === 'focus' && timer.status === 'idle') {
+      if (canAcceptPendingFocusTask(pendingTask, timer.mode, timer.status)) {
         linkedTask = pendingTask;
         focusText = pendingTask.title;
         focusDraft = pendingTask.title;
