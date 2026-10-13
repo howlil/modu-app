@@ -28,11 +28,13 @@ export function readExecutionSnapshot(): { state: ExecutionState; raw: string | 
       throw new Error('Invalid linked activity. Original data has been preserved.');
     }
     if (candidate.sourceConnections !== undefined &&
-      (!Array.isArray(candidate.sourceConnections) || candidate.sourceConnections.some(v=>!isSourceConnection(v)))) {
+      (!Array.isArray(candidate.sourceConnections) || candidate.sourceConnections.length>30 ||
+      candidate.sourceConnections.some(v=>!isSourceConnection(v)))) {
       throw new Error('Invalid source connection. Original data has been preserved.');
     }
     if (candidate.sourceItems !== undefined &&
-      (!Array.isArray(candidate.sourceItems) || candidate.sourceItems.some(v=>!isSourceCandidate(v)))) {
+      (!Array.isArray(candidate.sourceItems) || candidate.sourceItems.length>1500 ||
+      candidate.sourceItems.some(v=>!isSourceCandidate(v)))) {
       throw new Error('Invalid source candidates. Original data has been preserved.');
     }
     if (candidate.days !== undefined && (
@@ -45,6 +47,8 @@ export function readExecutionSnapshot(): { state: ExecutionState; raw: string | 
 /** Best-effort optimistic cross-tab guard. localStorage has no atomic compare-and-swap. */
 export function saveExecutionStateIfCurrent(value: ExecutionState, expectedRaw: string | null): string {
   if (typeof localStorage === 'undefined') throw new Error('Local storage unavailable.');
+  if (value.sourceConnections.length>30 || value.sourceItems.length>1500)
+    throw new Error('Connected source storage limit exceeded.');
   if (localStorage.getItem(KEY) !== expectedRaw) throw new DailyStorageConflictError();
   const raw = JSON.stringify(value);
   localStorage.setItem(KEY, raw);
