@@ -13,12 +13,8 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: '1.2.15'
-      - name: Install dependencies and generate lock
-        run: |
-          bun install
-          echo 'MODU_LOCK_BEGIN'
-          cat bun.lock
-          echo 'MODU_LOCK_END'
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
       - name: Typecheck
         run: bun run check
       - name: Unit tests
