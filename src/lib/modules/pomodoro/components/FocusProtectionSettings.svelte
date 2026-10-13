@@ -1,8 +1,8 @@
 <script lang="ts">
   import { ChevronRight, Plus, X } from 'lucide-svelte';
-  import { Button } from "$lib/components/ui/button/index.js";
-  import { Input } from "$lib/components/ui/input/index.js";
-  import { Switch } from "$lib/components/ui/switch/index.js";
+  import { Button } from "#lib/components/ui/button/index.js";
+  import { Input } from "#lib/components/ui/input/index.js";
+  import { Switch } from "#lib/components/ui/switch/index.js";
   import {
     normalizeBlockedDomain,
     type FocusProtectionConnection

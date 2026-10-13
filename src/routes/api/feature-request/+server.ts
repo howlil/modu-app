@@ -1,11 +1,11 @@
 import { env } from 'cloudflare:workers';
 import { json } from '@sveltejs/kit';
-import { checkFeatureRequestRateLimit, isAllowedOrigin } from '$lib/server/feature-request-security';
+import { checkFeatureRequestRateLimit, isAllowedOrigin } from '#lib/server/feature-request-security';
 import type { RequestHandler } from './$types';
 
 const repository = 'howlil/modu-app';
 
-import type { RateLimiter } from '$lib/server/feature-request-security';
+import type { RateLimiter } from '#lib/server/feature-request-security';
 
 type FeatureRequestEnv = {
   GITHUB_TOKEN?: string;

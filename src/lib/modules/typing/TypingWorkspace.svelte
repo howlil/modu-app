@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Settings2 } from 'lucide-svelte';
-  import { Button } from '$lib/components/ui/button/index.js';
-  import * as Tabs from '$lib/components/ui/tabs/index.js';
+  import { Button } from '#lib/components/ui/button/index.js';
+  import * as Tabs from '#lib/components/ui/tabs/index.js';
   import ToolHeader from '#lib/components/ToolHeader.svelte';
   import TypingCanvas from './components/TypingCanvas.svelte';
   import ProgressView from './components/ProgressView.svelte';

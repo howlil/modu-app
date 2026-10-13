@@ -1,7 +1,7 @@
 <script lang="ts">
-  import * as Card from '$lib/components/ui/card/index.js';
-  import { Button } from '$lib/components/ui/button/index.js';
-  import { Switch } from '$lib/components/ui/switch/index.js';
+  import * as Card from '#lib/components/ui/card/index.js';
+  import { Button } from '#lib/components/ui/button/index.js';
+  import { Switch } from '#lib/components/ui/switch/index.js';
   import type { TypingPreferences } from '../core/trainer.ts';
 
   let { preferences, audioUnavailable, onTogglePreference, onPreviewSound }: {

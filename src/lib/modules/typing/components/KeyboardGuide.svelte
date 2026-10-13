@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import { Button } from '$lib/components/ui/button/index.js';
+  import { Button } from '#lib/components/ui/button/index.js';
   import { resolveFingerCue } from '../core/finger-guide.ts';
   import FingerShadow from './FingerShadow.svelte';
 

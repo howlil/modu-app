@@ -1,6 +1,6 @@
 <script lang="ts">
   import { ArrowDown, Download, FileImage, ImageUp, RefreshCcw } from 'lucide-svelte';
-  import { Button } from '$lib/components/ui/button/index.js';
+  import { Button } from '#lib/components/ui/button/index.js';
   import { formatBytes, type ImageOutputFormat } from '../core/target-size.ts';
   import type { createImageCompressController } from '../controller/image-compress.svelte.ts';
 
@@ -132,7 +132,7 @@
         <div class="mt-4 grid grid-cols-2 gap-3">
           <figure class="min-w-0">
             <div class="flex h-48 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted max-[640px]:h-36">
-              <img src={controller.originalUrl} class="max-h-full max-w-full object-contain" alt="Original image preview" />
+              <img src={controller.originalUrl} class="max-h-full max-w-full object-contain" alt="Original preview" />
             </div>
             <figcaption class="mt-2 text-meta text-muted-foreground">
               Original · {formatBytes(controller.file?.size ?? 0)}
@@ -141,7 +141,7 @@
           <figure class="min-w-0">
             <div class="flex h-48 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted max-[640px]:h-36">
               {#if controller.outputUrl}
-                <img src={controller.outputUrl} class="max-h-full max-w-full object-contain" alt="Compressed image preview" />
+                <img src={controller.outputUrl} class="max-h-full max-w-full object-contain" alt="Compressed preview" />
               {:else}
                 <span class="text-meta text-muted-foreground">Result</span>
               {/if}

@@ -7,10 +7,7 @@ export default defineConfig({
   plugins: [
     tailwindcss(),
     sveltekit({
-      adapter: adapter(),
-      alias: {
-        '$lib': 'src/lib'
-      }
+      adapter: adapter()
     })
   ]
 });

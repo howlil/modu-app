@@ -15,6 +15,7 @@ type MessageHandler = (message: Record<string, unknown>, sender: { url: string }
 function makeExtension() {
   const data = new Map<string, unknown>();
   const registered = new Set<string>();
+  const injectedTabIds: number[] = [];
   let handler: MessageHandler | null = null;
   const event = { addListener: () => undefined };
   const local = {
@@ -39,13 +40,17 @@ function makeExtension() {
       getSessionRules: async () => [],
       updateSessionRules: async () => undefined
     },
-    tabs: { query: async () => [], update: async () => undefined },
+    tabs: { query: async () => [
+      { id: 10, url: 'https://example.com/' },
+      { id: 11, url: 'https://modu.howlil.site/pomodoro' },
+      { id: 12, url: 'chrome://extensions/' }
+    ], update: async () => undefined },
     webNavigation: { onCommitted: event, onHistoryStateUpdated: event },
     scripting: {
       getRegisteredContentScripts: async () => [...registered].map((id) => ({ id })),
       registerContentScripts: async (items: {id: string}[]) => { items.forEach((item) => registered.add(item.id)); },
       unregisterContentScripts: async (arg: {ids: string[]}) => { arg.ids.forEach((id) => registered.delete(id)); },
-      executeScript: async () => undefined
+      executeScript: async ({ target }: {target: {tabId: number}}) => { injectedTabIds.push(target.tabId); }
     }
   };
   new Function('chrome', workerSource)(chrome);
@@ -53,7 +58,7 @@ function makeExtension() {
     if (!handler) throw new Error('Missing extension message handler');
     return new Promise((resolve) => handler!(message, { url: 'https://modu.howlil.site/pomodoro' }, resolve));
   }
-  return { send, data, registered };
+  return { send, data, registered, injectedTabIds };
 }
 
 function snapshot(updatedAt: number) {
@@ -122,6 +127,11 @@ describe('Modu Floating Focus', () => {
     });
     expect(enabled.ok).toBe(true);
     expect(extension.registered.has('modu-floating-focus')).toBe(true);
+    // Only ordinary websites are injected; injection is asynchronous after opt-in.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(extension.injectedTabIds).toContain(10);
+    expect(extension.injectedTabIds).not.toContain(11);
+    expect(extension.injectedTabIds).not.toContain(12);
     expect((await extension.send({type:'GET_STATUS'})).data?.active).toBe(false);
 
     const now = Date.now();

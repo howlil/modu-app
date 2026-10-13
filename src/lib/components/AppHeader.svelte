@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { Github, Heart } from 'lucide-svelte';
-  import { Button } from "$lib/components/ui/button/index.js";
+  import { Button } from "#lib/components/ui/button/index.js";
 
   const FLOATING_THRESHOLD = 72;
   let scrolled = $state(false);

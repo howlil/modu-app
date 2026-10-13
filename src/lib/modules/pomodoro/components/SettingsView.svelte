@@ -1,10 +1,10 @@
 <script lang="ts">
   import { ArrowLeft, Check, ChevronRight, Download, Trash2, X } from 'lucide-svelte';
-  import { Button } from '$lib/components/ui/button/index.js';
-  import { Input } from '$lib/components/ui/input/index.js';
-  import { Switch } from '$lib/components/ui/switch/index.js';
-  import { Dialog } from '$lib/components/ui/dialog/index.js';
-  import * as Card from '$lib/components/ui/card/index.js';
+  import { Button } from '#lib/components/ui/button/index.js';
+  import { Input } from '#lib/components/ui/input/index.js';
+  import { Switch } from '#lib/components/ui/switch/index.js';
+  import { Dialog } from '#lib/components/ui/dialog/index.js';
+  import * as Card from '#lib/components/ui/card/index.js';
   import { RINGTONE_OPTIONS } from '../adapters/sounds.ts';
   import type { PomodoroMode } from '../core/timer.ts';
   import type { PomodoroPreferences } from '../adapters/persistence.ts';
@@ -27,7 +27,6 @@
   const wakeLockSupported = $derived(controller.wakeLockSupported);
   const dataMessage = $derived(controller.dataMessage);
   const deleteConfirm = $derived(controller.deleteConfirm);
-  const { openSettingsPanel, updateDuration, togglePreference, toggleFocusProtection, updateBlockedDomains, toggleSound, toggleNotifications, selectRingtone, exportAllPomodoroData, deleteAllPomodoroData } = controller;
 </script>
 
 <div class={settingsPanel === 'main'
@@ -40,7 +39,7 @@
             size="icon-sm"
             class="shrink-0 rounded-full text-muted-foreground"
             aria-label="Back to Pomodoro settings"
-            onclick={() => openSettingsPanel('main')}
+            onclick={() => controller.openSettingsPanel('main')}
           >
             <ArrowLeft class="size-4" strokeWidth={1.7} />
           </Button>
@@ -70,7 +69,7 @@
                       aria-label={row[1] + ' duration in minutes'}
                       class="h-8 w-full max-w-[76px] border-0 bg-transparent px-1 text-center text-title-lg font-medium text-foreground shadow-none focus-visible:ring-1"
                       value={durations[timerMode]}
-                      onchange={(event) => updateDuration(timerMode, event.currentTarget.value)}
+                      onchange={(event) => controller.updateDuration(timerMode, event.currentTarget.value)}
                     />
                     <span>minutes</span>
                   </label>
@@ -91,7 +90,7 @@
                 {@const key = option[0] as keyof PomodoroPreferences}
                 <div class="flex min-h-9 items-center justify-between gap-3 border-t border-border pt-2 text-ui">
                   <span>{option[1]}</span>
-                  <Switch checked={preferences[key]} aria-label={option[1]} onclick={() => togglePreference(key)} />
+                  <Switch checked={preferences[key]} aria-label={option[1]} onclick={() => controller.togglePreference(key)} />
                 </div>
               {/each}
             </Card.Root>
@@ -102,8 +101,8 @@
                 {blockedDomains}
                 connection={focusProtectionConnection}
                 errorMessage={focusProtectionError}
-                onToggle={toggleFocusProtection}
-                onBlocklistChange={updateBlockedDomains}
+                onToggle={controller.toggleFocusProtection}
+                onBlocklistChange={controller.updateBlockedDomains}
                 onManage={() => (controller.blockedSitesDialogOpen = true)}
               />
             </Card.Root>
@@ -115,7 +114,7 @@
               </div>
               <div class="flex min-h-9 items-center justify-between gap-2 border-t border-border pt-2 text-ui">
                 <span>Sound</span>
-                <Switch checked={soundEnabled} aria-label="Sound" onclick={toggleSound} />
+                <Switch checked={soundEnabled} aria-label="Sound" onclick={controller.toggleSound} />
               </div>
               <Button variant="ghost" class="flex h-10 w-full items-center justify-between rounded-lg px-3 text-ui font-normal text-foreground shadow-none hover:bg-muted/70 hover:text-foreground" onclick={() => (controller.ringtoneDialogOpen = true)}>
                 <span>Ringtone</span>
@@ -126,11 +125,11 @@
               </Button>
               <div class="flex min-h-9 items-center justify-between gap-2 border-t border-border pt-2 text-ui">
                 <span>Notifications {#if !notificationsSupported}<span class="text-meta text-muted-foreground">Unavailable</span>{/if}</span>
-                <Switch checked={notificationsEnabled} aria-label="Notifications" disabled={!notificationsSupported} onclick={toggleNotifications} />
+                <Switch checked={notificationsEnabled} aria-label="Notifications" disabled={!notificationsSupported} onclick={controller.toggleNotifications} />
               </div>
               <div class="flex min-h-9 items-center justify-between gap-2 border-t border-border pt-2 text-ui">
                 <span>Keep screen awake {#if !wakeLockSupported}<span class="text-meta text-muted-foreground">Unavailable</span>{/if}</span>
-                <Switch checked={preferences.keepAwake} aria-label="Keep screen awake" disabled={!wakeLockSupported} onclick={() => togglePreference('keepAwake')} />
+                <Switch checked={preferences.keepAwake} aria-label="Keep screen awake" disabled={!wakeLockSupported} onclick={() => controller.togglePreference('keepAwake')} />
               </div>
             </Card.Root>
 
@@ -154,7 +153,9 @@
                   onclick={() => controller.updateFloatingFocus({ showTask: !controller.floatingSettings.showTask })} />
               </div>
               {#if !controller.companionConnected}
-                <p class="text-meta text-muted-foreground">Install or reload the Modu extension to enable floating focus.</p>
+                <p class="text-meta text-muted-foreground">Extension not connected. Install or reload it at chrome://extensions, then return to this tab.</p>
+              {:else if controller.floatingSettings.enabled}
+                <p class="text-meta text-muted-foreground">Enabled. Start a Focus session, then switch to another website tab. The widget is hidden on Modu itself.</p>
               {/if}
               {#if controller.floatingError}
                 <p class="text-meta text-destructive">{controller.floatingError}</p>
@@ -186,7 +187,7 @@
             <Card.Root class="col-span-12 gap-2 rounded-[20px] p-5 shadow-none">
               <h3 class="m-0 text-ui font-medium">Your data</h3>
               <p class="text-meta text-muted-foreground">Timer settings and focus history stay in your browser.</p>
-              <Button variant="outline" size="sm" class="mt-1 w-fit rounded-full shadow-none" onclick={() => openSettingsPanel('data')}>
+              <Button variant="outline" size="sm" class="mt-1 w-fit rounded-full shadow-none" onclick={() => controller.openSettingsPanel('data')}>
                 Export & delete data <ChevronRight class="size-3.5" strokeWidth={1.7} />
               </Button>
             </Card.Root>
@@ -200,7 +201,7 @@
             <Button
               variant="outline"
               class="h-10 w-full justify-start rounded-lg px-3 text-ui font-normal text-foreground shadow-none hover:bg-muted/70 hover:text-foreground"
-              onclick={exportAllPomodoroData}
+              onclick={controller.exportAllPomodoroData}
             >
               <Download class="size-3.5" strokeWidth={1.7} />
               Export all data
@@ -243,7 +244,7 @@
                       variant="destructive"
                       size="sm"
                       class="h-8 rounded-full text-meta font-medium shadow-none"
-                      onclick={deleteAllPomodoroData}
+                      onclick={controller.deleteAllPomodoroData}
                     >
                       Delete all
                     </Button>
@@ -282,8 +283,8 @@
             {blockedDomains}
             connection={focusProtectionConnection}
             errorMessage={focusProtectionError}
-            onToggle={toggleFocusProtection}
-            onBlocklistChange={updateBlockedDomains}
+            onToggle={controller.toggleFocusProtection}
+            onBlocklistChange={controller.updateBlockedDomains}
           />
         </div>
       </Dialog.Content>
@@ -316,7 +317,7 @@
               class="flex h-auto min-h-14 w-full items-center justify-between gap-4 rounded-lg px-3 py-3 text-left text-ui font-normal whitespace-normal text-foreground shadow-none hover:bg-muted/70 hover:text-foreground"
               aria-pressed={ringtone === option.id}
               onclick={() => {
-                selectRingtone(option.id);
+                controller.selectRingtone(option.id);
                 controller.ringtoneDialogOpen = false;
               }}
             >

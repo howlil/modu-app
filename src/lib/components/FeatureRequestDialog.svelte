@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { Dialog } from '$lib/components/ui/dialog/index.js';
+  import { Dialog } from '#lib/components/ui/dialog/index.js';
   import { Check, ExternalLink, Send, X } from 'lucide-svelte';
-  import { Button } from '$lib/components/ui/button/index.js';
-  import { Input } from '$lib/components/ui/input/index.js';
-  import { Textarea } from '$lib/components/ui/textarea/index.js';
+  import { Button } from '#lib/components/ui/button/index.js';
+  import { Input } from '#lib/components/ui/input/index.js';
+  import { Textarea } from '#lib/components/ui/textarea/index.js';
 
   function githubFallbackUrl() {
     const params = new URLSearchParams({

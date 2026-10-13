@@ -1,9 +1,9 @@
 <script lang="ts">
   import { Target, X } from 'lucide-svelte';
-  import { Button } from "$lib/components/ui/button/index.js";
-  import { Input } from "$lib/components/ui/input/index.js";
-  import { Dialog } from "$lib/components/ui/dialog/index.js";
-  import * as Card from '$lib/components/ui/card/index.js';
+  import { Button } from "#lib/components/ui/button/index.js";
+  import { Input } from "#lib/components/ui/input/index.js";
+  import { Dialog } from "#lib/components/ui/dialog/index.js";
+  import * as Card from '#lib/components/ui/card/index.js';
   import {
     aggregateDailyActivity,
     buildHeatmapDays,
@@ -33,8 +33,8 @@
   }: Props = $props();
 
   let goalOpen = $state(false);
-  let goalDraftHours = $state(goalHours);
-  let goalDraftSchedule = $state<GoalSchedule>(goalSchedule);
+  let goalDraftHours = $state(8);
+  let goalDraftSchedule = $state<GoalSchedule>('weekdays');
   let selectedDayKey = $state<string | null>(null);
   let dayOpen = $state(false);
 
@@ -246,7 +246,7 @@
         <h3 class="m-0 text-ui font-medium">Focus heatmap</h3>
         <span class="text-meta text-muted-foreground">Last 52 weeks · goal-relative intensity</span>
       </div>
-      <div class="w-full overflow-x-auto pb-2 focus-visible:outline-2 focus-visible:outline-ring" role="region" aria-label="Focus activity by date" tabindex="0">
+      <div class="w-full overflow-x-auto pb-2 focus-visible:outline-2 focus-visible:outline-ring" role="region" aria-label="Focus activity by date" tabindex="-1">
         <div class="grid w-max grid-flow-col grid-rows-7 gap-0">
           {#each heatmapDays as day}
             <Button

@@ -10,10 +10,10 @@ The web app owns timer transitions and recorded session history; the extension n
 ## Install and validate
 
 1. Visit chrome://extensions, enable Developer mode, and Load unpacked using this extension/ folder.
-2. Reload the extension after pulling a manifest update.
+2. After pulling extension changes, click Reload on chrome://extensions and refresh already-open website tabs. A Cloudflare web deployment does **not** update the unpacked Chrome extension.
 3. Visit https://modu.howlil.site/pomodoro or the local development server.
-4. Open Settings → Floating focus. Enable it, then start a Focus session or launch one from Daily.
-5. Switch to another HTTP(S) website. Expand the floating timer to see the task and optional next action.
+4. Open Settings → Floating focus. Check that the extension is connected and enable the widget. Start a Focus session or launch one from Daily.
+5. Switch to another HTTP(S) website and refresh that tab if needed. The widget is hidden on Modu itself, localhost, restricted Chrome pages, excluded domains, and while the timer is idle. Expand the timer to see the task and next action.
 6. Pause and resume in the Pomodoro web app. The countdown must freeze and resume.
 7. Disable Floating focus; the overlay must disappear without changing Focus Protection.
 8. Exclude a hostname and verify the widget stays hidden there. Test existing blocked-site navigation separately.

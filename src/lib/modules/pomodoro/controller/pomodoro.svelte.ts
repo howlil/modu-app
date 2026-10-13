@@ -982,6 +982,11 @@ export function createPomodoroController() {
       updateDocumentTitle();
     }, 250);
 
+    const onWindowFocus = () => {
+      // A user can reload/install the extension after this page was opened.
+      if (!companionConnected) void connectFocusProtection();
+    };
+
     const onVisibilityChange = () => {
       if (document.hidden) {
         void releaseWakeLock();
@@ -1037,11 +1042,13 @@ export function createPomodoroController() {
     };
 
     document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('focus', onWindowFocus);
     window.addEventListener('keydown', onKeyDown);
 
     return () => {
       window.clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('focus', onWindowFocus);
       window.removeEventListener('keydown', onKeyDown);
       void releaseWakeLock();
       document.title = 'Module — Useful tools. Nothing extra.';

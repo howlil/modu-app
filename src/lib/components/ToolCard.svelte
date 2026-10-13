@@ -2,23 +2,23 @@
   import type { ModuleDefinition } from '#lib/platform/registry/types.ts';
 
   let { module }: { module: ModuleDefinition } = $props();
-  const preview = module.status === 'coming-soon';
+  let preview = $derived(module.status === 'coming-soon');
 
-  const tileStyle = {
+  let tileStyle = $derived({
     'pdf-merge': 'background: linear-gradient(145deg, #F8C7D3 0%, #F1AEC0 56%, #E99CB2 100%);',
     'daily-execution': 'background: linear-gradient(145deg, #BDD4FF 0%, #9ABAF7 54%, #81A6EE 100%);',
     pomodoro: 'background: linear-gradient(145deg, #9BC2F7 0%, #80AEEF 54%, #709DE5 100%);',
     typing: 'background: linear-gradient(145deg, #B9A5F5 0%, #A088EC 54%, #9075DF 100%);',
     'image-compress': 'background: linear-gradient(145deg, #C8E8CD 0%, #AEDCB8 54%, #98CFA7 100%);'
-  }[module.id];
+  }[module.id]);
 
-  const tileClass = {
+  let tileClass = $derived({
     'pdf-merge': 'text-[#552433] border-[#DF94AA]',
     'daily-execution': 'text-[#17437A] border-[#86A9EA]',
     pomodoro: 'text-[#163A6B] border-[#6F9FE8]',
     typing: 'text-[#352568] border-[#8E74DC]',
     'image-compress': 'text-[#234B30] border-[#8DC49A]'
-  }[module.id] ?? 'text-foreground border-border';
+  }[module.id] ?? 'text-foreground border-border');
 </script>
 
 <a

@@ -1,6 +1,6 @@
 <script lang="ts">
  import { Plus, ArrowRight } from 'lucide-svelte';
- import { Button } from '$lib/components/ui/button/index.js';
+ import { Button } from '#lib/components/ui/button/index.js';
  let { onAdd }: { onAdd: (title: string) => boolean } = $props();
  let title = $state('');
  let input: HTMLInputElement;

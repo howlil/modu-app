@@ -454,8 +454,10 @@ async function syncFloatingScripts(enabled, injectExisting = false) {
       persistAcrossSessions: true
     }]);
   }
-  // Only inject existing tabs after first registration or explicit enabling.
-  if (!injectExisting) return;
+  // Registration is awaited, but injecting every open tab must not stall the settings response.
+  if (injectExisting) void injectFloatingIntoExistingTabs().catch(() => {});
+}
+async function injectFloatingIntoExistingTabs() {
   const tabs = await chrome.tabs.query({});
   await Promise.allSettled(tabs.filter((tab) =>
     typeof tab.id === 'number' && /^https?:\/\//.test(tab.url || '') &&
@@ -490,9 +492,9 @@ async function saveFloatingSnapshot(input) {
   }
   return { stored: true };
 }
-async function reconcileFloatingScripts() {
+async function reconcileFloatingScripts(injectExisting = false) {
   const settings = await readFloatingSettings();
-  await syncFloatingScripts(settings.enabled);
+  await syncFloatingScripts(settings.enabled, injectExisting && settings.enabled);
 }
 
 let commandQueue = Promise.resolve();
@@ -541,12 +543,12 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 });
 
 chrome.runtime.onInstalled.addListener(() => {
-  void reconcileFloatingScripts().catch(() => {});
+  void reconcileFloatingScripts(true).catch(() => {});
   void reconcileState();
 });
 
 chrome.runtime.onStartup.addListener(() => {
-  void reconcileFloatingScripts().catch(() => {});
+  void reconcileFloatingScripts(true).catch(() => {});
   void reconcileState();
 });
 

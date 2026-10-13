@@ -63,7 +63,7 @@ const REQUEST_TYPE = 'MODULE_FOCUS_REQUEST';
 const RESPONSE_TYPE = 'MODULE_FOCUS_RESPONSE';
 const WEB_SOURCE = 'module-web';
 const EXTENSION_SOURCE = 'module-extension';
-const DEFAULT_TIMEOUT_MS = 900;
+const DEFAULT_TIMEOUT_MS = 2500;
 
 export const PROTECTED_DOMAINS = ['modu.howlil.site', 'localhost', '127.0.0.1'] as const;
 
@@ -193,7 +193,7 @@ export async function getFocusProtectionStatus() {
 export async function pingFocusProtection() {
   const response = await requestExtension<FocusProtectionExtensionStatus>(
     { type: 'PING' },
-    500
+    2000
   );
 
   if (!response.ok || !response.data) return null;
@@ -232,7 +232,7 @@ export async function stopFocusProtection(sessionId?: string) {
 export async function setFloatingFocusSettings(settings: Partial<FloatingFocusSettings>) {
   return requestExtension<{ floating: FloatingFocusSettings }>({
     type: 'SET_FLOATING_SETTINGS', settings
-  }, 3500);
+  }, 6000);
 }
 
 export async function publishFloatingFocusSnapshot(snapshot: FloatingFocusSnapshot) {

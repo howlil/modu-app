@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Settings2 } from 'lucide-svelte';
-  import * as Tabs from '$lib/components/ui/tabs/index.js';
+  import * as Tabs from '#lib/components/ui/tabs/index.js';
   import ToolHeader from '#lib/components/ToolHeader.svelte';
   import { createPomodoroController } from './controller/pomodoro.svelte.ts';
   import TimerView from './components/TimerView.svelte';

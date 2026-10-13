@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Activity, ArrowRight, Lightbulb } from 'lucide-svelte';
-  import { Button } from '$lib/components/ui/button/index.js';
+  import { Button } from '#lib/components/ui/button/index.js';
   import type { DailyExecutionController } from '../controller/daily-execution.svelte.ts';
   import { WORKSTREAM_NAMES, type Workstream } from '../core/planning.ts';
   import type { MetricWindow } from '../core/analytics.ts';

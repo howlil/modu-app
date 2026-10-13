@@ -1,6 +1,6 @@
 <script lang="ts">
  import { X } from 'lucide-svelte';
- import { Button } from '$lib/components/ui/button/index.js';
+ import { Button } from '#lib/components/ui/button/index.js';
  import type { ExecutionTask } from '../core/planning.ts';
  let { task, onClose, onSave, onArchive }: {
    task: ExecutionTask;

@@ -1,6 +1,6 @@
 <script lang="ts">
  import { Play, Check, ChevronRight, ChevronDown, PanelRightClose, PanelRightOpen, Plus, Search } from 'lucide-svelte';
- import { Button } from '$lib/components/ui/button/index.js';
+ import { Button } from '#lib/components/ui/button/index.js';
  import QuickCapture from './QuickCapture.svelte';
  import TaskDetailDrawer from './TaskDetailDrawer.svelte';
  import type { ExecutionTask } from '../core/planning.ts';

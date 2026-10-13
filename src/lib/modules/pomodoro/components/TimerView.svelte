@@ -1,8 +1,8 @@
 <script lang="ts">
   import { ChevronRight, Pencil, RotateCcw, SkipForward } from 'lucide-svelte';
-  import { Button } from '$lib/components/ui/button/index.js';
-  import { Input } from '$lib/components/ui/input/index.js';
-  import * as Card from '$lib/components/ui/card/index.js';
+  import { Button } from '#lib/components/ui/button/index.js';
+  import { Input } from '#lib/components/ui/input/index.js';
+  import * as Card from '#lib/components/ui/card/index.js';
   import { getNextMode, type PomodoroMode } from '../core/timer.ts';
   import { MODE_META, type PomodoroController } from '../controller/pomodoro.svelte.ts';
 
@@ -93,7 +93,7 @@
   </div>
 </div>
 {#if controller.partialDialogOpen}
-  <section role="dialog" aria-modal="false" aria-label="Partial focus session" class="mt-3 rounded-[20px] border border-border bg-card p-5">
+  <div role="dialog" aria-modal="false" aria-label="Partial focus session" class="mt-3 rounded-[20px] border border-border bg-card p-5">
     <h2 class="text-ui font-medium">Save this partial focus?</h2>
     <p class="mt-1 text-meta text-muted-foreground">Your current session has recorded active time. Save it before switching, or discard it. Breaks and pauses are excluded.</p>
     <div class="mt-4 flex flex-wrap gap-2">
@@ -101,7 +101,7 @@
       <Button variant="outline" class="rounded-full" onclick={() => controller.resolvePartial(false)}>Discard</Button>
       <Button variant="ghost" class="rounded-full" onclick={controller.cancelPartial}>Keep session</Button>
     </div>
-  </section>
+  </div>
 {/if}
 {#if controller.linkedTask && controller.contextNotice.includes('Partial focus saved')}
   <a href={'/daily?checkpointTaskId=' + encodeURIComponent(controller.linkedTask.id)} class="mt-3 inline-flex rounded-full border border-border bg-card px-4 py-2 text-meta font-medium text-primary hover:bg-muted">

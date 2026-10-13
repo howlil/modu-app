@@ -1,6 +1,6 @@
 <script lang="ts">
   import { RotateCcw } from 'lucide-svelte';
-  import { Button } from '$lib/components/ui/button/index.js';
+  import { Button } from '#lib/components/ui/button/index.js';
   import { LESSONS, TRAINING_BLOCKS } from '../core/trainer.ts';
   import type { TypingController } from '../controller/typing.svelte.ts';
   import KeyboardGuide from './KeyboardGuide.svelte';
