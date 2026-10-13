@@ -170,6 +170,54 @@ describe('image compressor one-click recovery', () => {
     controller.dispose();
   });
 
+  it('M2 keeps the previous file when perceptual search finds no better candidate', async () => {
+    const controller = createImageCompressController();
+    await controller.setFile(new File(['img'], 'photo.png', { type: 'image/png' }));
+    adapters.encode.mockResolvedValueOnce(makeResult('within-target', 49_000));
+    await controller.compress();
+    const existing = controller.output;
+    adapters.encode.mockResolvedValueOnce({
+      ...makeResult('within-target', 48_000),
+      qualityEvidence: { metric: 'milo', rawError: 0.012, improved: false, scoredCandidates: 4, comparisonLongSide: 256 }
+    });
+    await controller.optimizeVisualQuality();
+    expect(adapters.encode.mock.calls.at(-1)?.[6]).toBe('perceptual');
+    expect(controller.output).toBe(existing);
+    expect(controller.optimizationNotice).toContain('No better result');
+    expect(controller.status).toBe('complete');
+    controller.dispose();
+  });
+
+  it('M2 commits measured improvement only after valid output', async () => {
+    const controller = createImageCompressController();
+    await controller.setFile(new File(['img'], 'photo.png', { type: 'image/png' }));
+    adapters.encode.mockResolvedValueOnce(makeResult('within-target', 49_000));
+    await controller.compress();
+    adapters.encode.mockResolvedValueOnce({
+      ...makeResult('within-target', 48_000),
+      qualityEvidence: { metric: 'milo', rawError: 0.006, improved: true, scoredCandidates: 3, comparisonLongSide: 256 }
+    });
+    await controller.optimizeVisualQuality();
+    expect(controller.output?.blob.size).toBe(48_000);
+    expect(controller.output?.qualityEvidence?.metric).toBe('milo');
+    expect(controller.status).toBe('complete');
+    controller.dispose();
+  });
+
+  it('M2 reports scorer failures without discarding downloadable prior result', async () => {
+    const controller = createImageCompressController();
+    await controller.setFile(new File(['img'], 'photo.png', { type: 'image/png' }));
+    adapters.encode.mockResolvedValueOnce(makeResult('within-target', 49_000));
+    await controller.compress();
+    const previous = controller.output;
+    adapters.encode.mockRejectedValueOnce(new Error('Perceptual scoring unavailable'));
+    await controller.optimizeVisualQuality();
+    expect(controller.error).toContain('Perceptual scoring unavailable');
+    expect(controller.output).toBe(previous);
+    expect(controller.status).toBe('complete');
+    controller.dispose();
+  });
+
   it('refuses recovery unless a prior quality-limited result exists', async () => {
     const controller = createImageCompressController();
     await controller.recompressWithResize();
