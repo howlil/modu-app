@@ -58,12 +58,12 @@ export function isBetterPerceptualCandidate(
   // MILO rawError: lower is better. Ignore noise-level differences.
   const margin = Math.max(0.00001, current.error * 0.02);
   if (next.error < current.error - margin) return true;
-  if (Math.abs(next.error - current.error) <= margin) {
+  // A smaller byte count is not, by itself, a visual-quality improvement.
+  // Allow additional resolution only if measured distortion did not worsen.
+  if (next.error <= current.error && Math.abs(next.error - current.error) <= margin) {
     const nextPixels = next.width * next.height;
     const currentPixels = current.width * current.height;
     if (nextPixels > currentPixels * 1.05) return true;
-    if (Math.abs(nextPixels - currentPixels) <= currentPixels * 0.05 &&
-        next.blob.size < current.blob.size * 0.92) return true;
   }
   return false;
 }

@@ -22,6 +22,12 @@ describe('M2 bounded perceptual plan', () => {
     expect(isBetterPerceptualCandidate(candidate(.001,51000),candidate(.014,48000),50000)).toBe(false);
     expect(isBetterPerceptualCandidate(candidate(NaN,40000),candidate(.014,48000),50000)).toBe(false);
   });
+  it('never treats byte savings with worse visual error as a quality improvement',()=>{
+    expect(isBetterPerceptualCandidate(candidate(.0101,36000),candidate(.0100,49000),50000)).toBe(false);
+  });
+  it('permits higher retained resolution when perceptual score does not worsen',()=>{
+    expect(isBetterPerceptualCandidate(candidate(.00999,48000,900,900),candidate(.0100,49000,800,800),50000)).toBe(true);
+  });
   it('rejects cosmetic score differences unless resolution improves',()=>{
     expect(isBetterPerceptualCandidate(candidate(.01001,48000),candidate(.01,49000),50000)).toBe(false);
   });
