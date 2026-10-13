@@ -26,7 +26,16 @@
     {#if controller.error}
       <div role="alert" class="mb-4 rounded-lg border border-destructive/30 bg-card p-3 text-meta text-destructive">{controller.error}</div>
     {/if}
-    {#if controller.loading}
+    {#if controller.syncNotice && !controller.error && controller.storageReady}
+      <div role="status" class="mb-4 rounded-lg border border-border bg-muted/30 px-3 py-2 text-meta text-muted-foreground">{controller.syncNotice}</div>
+    {/if}
+    {#if !controller.loading && !controller.storageReady}
+      <section class="rounded-[20px] border border-border bg-card p-5">
+        <h2 class="text-title font-medium">Daily storage needs attention</h2>
+        <p class="mt-2 text-ui text-muted-foreground">Your existing local data has not been changed. Check browser storage permissions or restore the original data before retrying.</p>
+        <button type="button" class="mt-4 rounded-lg border border-border px-3 py-2 text-meta font-medium hover:bg-muted/50" onclick={() => controller.reloadFromStorage()}>Retry loading</button>
+      </section>
+    {:else if controller.loading}
       <div class="py-8 text-meta text-muted-foreground">Loading activities…</div>
     {:else if controller.view === 'today'}
       <TodayView {controller} />
