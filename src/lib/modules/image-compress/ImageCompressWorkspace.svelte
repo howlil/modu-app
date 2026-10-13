@@ -10,7 +10,7 @@
 
 <section class="mx-auto w-full max-w-[1180px] px-4 py-8 max-[760px]:px-2.5 max-[760px]:py-6">
   <div class="mx-auto w-full max-w-[860px] min-w-0">
-    <ToolHeader title="Image Compressor" description="Set a target size. Keep the original resolution." />
+    <ToolHeader title="Image Compressor" description="Choose a target size. Resize only when you allow it." />
     <CompressorView {controller} />
   </div>
 </section>

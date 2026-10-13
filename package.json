@@ -19,10 +19,13 @@
     "preview": "bun run build && wrangler dev"
   },
   "dependencies": {
+    "@jsquash/jpeg": "^1.6.0",
     "bits-ui": "^2.19.5",
     "cn": "^0.3.1",
+    "lucide-svelte": "^0.468.0",
+    "pica": "^10.0.3",
     "tailwind-variants": "^3.3.1",
-    "lucide-svelte": "^0.468.0"
+    "wasm-webp": "^0.1.0"
   },
   "devDependencies": {
     "@sveltejs/adapter-cloudflare": "^8.0.0",
