@@ -15,8 +15,9 @@ try{
   ]){
     const resp=await page.request.get(new URL(resource,page.url()).toString());
     assert.equal(resp.status(),200,'Local face inference asset missing: '+resource);
-    assert.ok(Number(resp.headers()['content-length']||0)>100000,
-      'Face inference asset too small: '+resource);
+    const bytes=(await resp.body()).byteLength;
+    assert.ok(bytes>100000,
+      'Face inference asset too small: '+resource+' ('+bytes+' bytes)');
   }
   const buffer=Buffer.from(await page.evaluate(async()=>{
     const c=document.createElement('canvas');c.width=1200;c.height=800;
