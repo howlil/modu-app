@@ -19,8 +19,9 @@ scope.onmessage = async (event: MessageEvent<Request>) => {
     bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
     const source = { width: bitmap.width, height: bitmap.height };
     const resizer = createPica({ features: ['js', 'wasm'], concurrency: 1 });
-    originalCanvas = new OffscreenCanvas(source.width, source.height);
-    const originalContext = originalCanvas.getContext('2d', { willReadFrequently: true });
+    const sourceCanvas = new OffscreenCanvas(source.width, source.height);
+    originalCanvas = sourceCanvas;
+    const originalContext = sourceCanvas.getContext('2d', { willReadFrequently: true });
     if (!originalContext) throw new Error('Canvas initialization failed.');
     originalContext.drawImage(bitmap, 0, 0);
 
@@ -34,7 +35,7 @@ scope.onmessage = async (event: MessageEvent<Request>) => {
         currentPixels = originalContext.getImageData(0, 0, source.width, source.height);
       } else {
         const scaledCanvas = new OffscreenCanvas(dimensions.width, dimensions.height);
-        await resizer.resize(originalCanvas, scaledCanvas, { filter: 'mks2013' });
+        await resizer.resize(sourceCanvas, scaledCanvas, { filter: 'mks2013' });
         const ctx = scaledCanvas.getContext('2d', { willReadFrequently: true });
         if (!ctx) throw new Error('Unable to read the resized image.');
         currentPixels = ctx.getImageData(0, 0, dimensions.width, dimensions.height);
