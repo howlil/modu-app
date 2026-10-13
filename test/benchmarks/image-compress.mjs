@@ -48,6 +48,13 @@ async function one(name, bytes, mimeType, format, target, resize) {
   const toggle=page.getByRole('switch',{name:'Allow smart resize'});
   const current=await toggle.getAttribute('data-state')==='checked';
   if(current!==resize) await toggle.click();
+  await page.getByText(resize ? 'Adaptive' : 'Preserved', { exact: true }).waitFor({timeout:3000});
+  const checked=await toggle.getAttribute('data-state')==='checked';
+  if(checked!==resize) throw new Error('Switch UI state did not match resize permission');
+  const inputDimensions = await page.getByAltText('Original preview').evaluate(async img => {
+    await img.decode();
+    return {width:img.naturalWidth,height:img.naturalHeight};
+  });
   const started=performance.now();
   await page.getByRole('button',{name:'Compress image',exact:true}).click();
   await page.waitForFunction(() => {
@@ -67,6 +74,9 @@ async function one(name, bytes, mimeType, format, target, resize) {
     width:img.naturalWidth,height:img.naturalHeight
   }));
   if(!dimensions.width || !dimensions.height) throw new Error('Invalid encoded dimensions');
+  if(!resize && (dimensions.width!==inputDimensions.width || dimensions.height!==inputDimensions.height)) {
+    throw new Error('Resolution changed without permission: '+JSON.stringify({inputDimensions,dimensions}));
+  }
   if(status==='complete' && data.length>target*1000) throw new Error('False success: '+data.length+' > '+target*1000);
   const result={case:name,format,targetKB:target,allowResize:resize,status,inputBytes:bytes.length,
     outputBytes:data.length,...dimensions,elapsedMs};
