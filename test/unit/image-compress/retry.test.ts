@@ -182,6 +182,7 @@ describe('image compressor one-click recovery', () => {
     });
     await controller.optimizeVisualQuality();
     expect(adapters.encode.mock.calls.at(-1)?.[6]).toBe('perceptual');
+    expect(adapters.encode.mock.calls.at(-1)?.[7]?.blob).toBe(existing?.blob);
     expect(controller.output).toBe(existing);
     expect(controller.optimizationNotice).toContain('No better result');
     expect(controller.status).toBe('complete');
