@@ -41,6 +41,13 @@ export function createImageCompressController() {
   }
 
   function resetResult(): void {
+    // Changing settings while decoding a newly selected image must not
+    // invalidate the pending file inspection. Only encoding is abortable here.
+    if (status === 'inspecting') {
+      clearOutput();
+      error = '';
+      return;
+    }
     invalidateRunning();
     clearOutput();
     error = '';
