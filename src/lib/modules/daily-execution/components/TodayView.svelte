@@ -124,7 +124,7 @@
 {#if editing}
  {#key editing.id}
    <TaskDetailDrawer task={editing} onClose={() => editing = null}
-     onSave={fields => controller.editSimple(editing?.id ?? '', fields)}
+     onSave={fields => controller.editSimple(editing?.id ?? '', fields, editing ?? undefined)}
      onArchive={() => { controller.archiveSimple(editing?.id ?? ''); editing = null; }}/>
  {/key}
 {/if}
