@@ -14,6 +14,7 @@ export function createImageCompressController() {
   let allowResize = $state(false);
   let status = $state<CompressionStatus>('idle');
   let error = $state('');
+  let retryNotice = $state('');
   let attempts = $state(0);
   let revision = 0;
   let activeAbort: AbortController | null = null;
@@ -30,6 +31,7 @@ export function createImageCompressController() {
     outputUrl = '';
     output = null;
     attempts = 0;
+    retryNotice = '';
   }
 
   function releaseImage(): void {
@@ -99,41 +101,81 @@ export function createImageCompressController() {
     return '';
   }
 
-  async function compress(): Promise<void> {
+  /**
+   * Shared compression runner. Recovery keeps the prior result downloadable until
+   * a *within-target* replacement has been validated by the encoder adapter.
+   */
+  async function runCompression(
+    resize: boolean,
+    retainPrevious = false
+  ): Promise<void> {
     if (!file || !info || status === 'processing') return;
     const inputError = getTargetError();
     if (inputError) {
       error = inputError;
       return;
     }
+
     const selectedFile = file;
     const selectedFormat = format;
     const targetBytes = targetBytesFromKB(Number(targetInput));
+    const previousStatus = status;
+    const preserve = retainPrevious && Boolean(output && outputUrl);
     const run = invalidateRunning();
-    clearOutput();
+
+    if (!preserve) clearOutput();
+    attempts = 0;
     error = '';
+    retryNotice = '';
+    allowResize = resize;
     status = 'processing';
     const abort = new AbortController();
     activeAbort = abort;
 
     try {
       const encoded = await encodeImageToTarget(
-        selectedFile, selectedFormat, targetBytes,
+        selectedFile,
+        selectedFormat,
+        targetBytes,
         (count) => { if (run === revision) attempts = count; },
         abort.signal,
-        allowResize
+        resize
       );
       if (run !== revision) return;
+
+      // An unreachable retry must not replace a usable previous result.
+      if (preserve && encoded.status !== 'within-target') {
+        status = previousStatus;
+        retryNotice = 'Smart resize could not reach the target within the 640 px minimum. Previous result kept.';
+        return;
+      }
+
+      // The adapter validates output bytes and dimensions before resolving.
+      // Create the next URL before revoking the old one.
+      const nextUrl = URL.createObjectURL(encoded.blob);
+      const previousUrl = outputUrl;
       output = encoded;
-      outputUrl = URL.createObjectURL(encoded.blob);
+      outputUrl = nextUrl;
       status = encoded.status === 'within-target' ? 'complete' : 'quality-limited';
+      if (previousUrl) URL.revokeObjectURL(previousUrl);
     } catch (cause) {
       if (run !== revision) return;
       error = cause instanceof Error ? cause.message : 'Compression failed.';
-      status = 'error';
+      status = preserve ? previousStatus : 'error';
     } finally {
       if (run === revision) activeAbort = null;
     }
+  }
+
+  function compress(): Promise<void> {
+    return runCompression(allowResize);
+  }
+
+  function recompressWithResize(): Promise<void> {
+    if (status !== 'quality-limited' || allowResize || !file || !info || !output || !outputUrl) {
+      return Promise.resolve();
+    }
+    return runCompression(true, true);
   }
 
   function download(): void {
@@ -164,8 +206,9 @@ export function createImageCompressController() {
     get targetInput() { return targetInput; },
     get status() { return status; },
     get error() { return error; },
+    get retryNotice() { return retryNotice; },
     get attempts() { return attempts; },
     get targetError() { return getTargetError(); },
-    setFile, setTargetInput, setFormat, setAllowResize, compress, download, dispose
+    setFile, setTargetInput, setFormat, setAllowResize, compress, recompressWithResize, download, dispose
   };
 }

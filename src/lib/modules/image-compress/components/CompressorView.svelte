@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ArrowDown, Download, FileImage, ImageUp, RefreshCcw } from 'lucide-svelte';
+  import { ArrowDown, Download, FileImage, ImageUp, RefreshCcw, WandSparkles } from 'lucide-svelte';
   import { Button } from '#lib/components/ui/button/index.js';
   import { Switch } from '#lib/components/ui/switch/index.js';
   import { formatBytes, type ImageOutputFormat } from '../core/target-size.ts';
@@ -157,7 +157,7 @@
               {/if}
             </div>
             <figcaption class="mt-2 text-meta text-muted-foreground">
-              {controller.output ? 'Output · ' + formatBytes(controller.output.blob.size) : 'Not generated yet'}
+              {controller.output ? (controller.status === 'processing' ? 'Previous result · ' : 'Output · ') + formatBytes(controller.output.blob.size) : 'Not generated yet'}
             </figcaption>
           </figure>
         </div>
@@ -169,8 +169,12 @@
 
       <div role="status" aria-live="polite" class="mt-5">
         {#if controller.status === 'processing'}
-          <p class="text-ui">Optimizing image…</p>
-          <p class="mt-1 text-meta text-muted-foreground">Testing quality and, if allowed, resolution. Large images may take a moment.</p>
+          <p class="text-ui">{controller.output ? 'Resizing and recompressing…' : 'Optimizing image…'}</p>
+          <p class="mt-1 text-meta text-muted-foreground">
+            {controller.output
+              ? 'Your previous result remains available during this attempt.'
+              : 'Testing quality and, if allowed, resolution. Large images may take a moment.'}
+          </p>
         {:else if controller.status === 'complete' && controller.output}
           <p class="text-ui font-medium text-success">Target reached</p>
           <p class="mt-1 text-meta text-muted-foreground">
@@ -179,24 +183,44 @@
             · {controller.output.engine === 'wasm' ? 'WASM encoder' : controller.output.engine === 'browser-fallback' ? 'Browser encoder fallback' : 'Original file'}
           </p>
         {:else if controller.status === 'quality-limited' && controller.output}
-          <p class="text-ui font-medium text-destructive">Target cannot be reached within the quality and resolution limits</p>
+          <p class="text-ui font-medium">Target size not reached</p>
           <p class="mt-1 text-meta text-muted-foreground">
-            Best available: {formatBytes(controller.output.blob.size)} · {controller.output.width} × {controller.output.height} px
+            Current result: {formatBytes(controller.output.blob.size)} · {controller.output.width} × {controller.output.height} px
             · encoder setting {Math.round(controller.output.quality * 100)}.
-            {controller.allowResize ? 'The 640 px minimum short side was respected. Try a larger target.' : 'Enable smart resize or increase the target.'}
+            {#if !controller.allowResize}
+              Allow resizing to try reaching {controller.targetInput} KB.
+            {:else if !controller.retryNotice}
+              The 640 px minimum short side was respected. Try a larger target.
+            {/if}
           </p>
-        {:else if controller.error}
-          <p role="alert" class="text-ui text-destructive">{controller.error}</p>
+          {#if controller.retryNotice}
+            <p class="mt-2 text-meta text-muted-foreground">{controller.retryNotice}</p>
+          {/if}
         {:else if controller.status === 'ready'}
           <p class="text-ui text-muted-foreground">Choose a target and compress to see the result.</p>
+        {/if}
+        {#if controller.error}
+          <p role="alert" class="mt-2 text-ui text-destructive">{controller.error}</p>
         {/if}
       </div>
 
       {#if controller.output}
-        <div class="mt-5 border-t border-border pt-5">
-          <Button class="w-full" onclick={controller.download}>
+        <div class="mt-5 flex flex-col gap-3 border-t border-border pt-5">
+          {#if controller.status === 'quality-limited' && !controller.allowResize}
+            <p class="text-meta text-muted-foreground">
+              Resizing may reduce pixel dimensions. Your original image remains unchanged.
+            </p>
+            <Button class="w-full" onclick={() => void controller.recompressWithResize()}>
+              <WandSparkles class="size-4" strokeWidth={1.8} />
+              Smart resize &amp; retry {controller.targetInput} KB
+            </Button>
+          {/if}
+          <Button variant={controller.status === 'complete' ? 'default' : 'outline'} class="w-full"
+            onclick={controller.download}>
             <Download class="size-4" strokeWidth={1.8} />
-            {controller.status === 'quality-limited' ? 'Download larger result' : 'Download image'}
+            {controller.status === 'processing'
+              ? 'Download previous result'
+              : controller.status === 'quality-limited' ? 'Download larger result' : 'Download image'}
           </Button>
         </div>
       {/if}
