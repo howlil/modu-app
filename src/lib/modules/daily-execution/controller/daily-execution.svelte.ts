@@ -5,6 +5,10 @@ import { habitWeekSummary } from '../core/consistency.ts';
 import { adjustRemainingAllocation, weeklyRecommendation, type WeeklyRecommendation } from '../core/recommendations.ts';
 import { loadEvidenceRecords, saveEvidenceRecords, subscribeEvidence } from '../adapters/evidence-storage.ts';
 import { parseLocalEvidenceFile } from '../adapters/evidence-import.ts';
+import { githubConnection, loadPublicGithubIssues } from '../adapters/github-issues.ts';
+import { manualSource, parseActivityFile } from '../adapters/source-import.ts';
+import { detachActivity, disconnectSource, linkActivity, reconcileSource, sourceCandidates, sourceIdentity,
+  type SourceCandidate, type SourceConnection } from '../core/connected-activities.ts';
 import { assignFocusSession, loadFocusSessions, subscribeFocusSessions } from '#lib/shared/focus-sessions/repository.ts';
 import { writePendingFocusTask } from '#lib/shared/focus-sessions/context.ts';
 import type { FocusActivitySession } from '#lib/shared/focus-sessions/types.ts';
@@ -34,6 +38,9 @@ export function createDailyExecutionController() {
   let loading = $state(true);
   let storageReady = $state(false);
   let syncNotice = $state('');
+  let sourceError = $state('');
+  let sourceNotice = $state('');
+  let sourceSyncing = $state<string | null>(null);
   let observedRaw: string | null = null;
   let refreshVersion = 0;
 
@@ -42,6 +49,7 @@ export function createDailyExecutionController() {
   const availableTasks = $derived(state.tasks.filter(t=>t.status==='ready'&&!todayTasks.some(x=>x.id===t.id)));
   const selectedTodayTask = $derived(currentForDay(state,dayKey));
   const yesterdayTasks = $derived(unfinishedFromYesterday(state,dayKey));
+  const availableSources = $derived(sourceCandidates(state));
   const focusRecordedMs = $derived(sessions.filter((s) => localDayKey(s.endedAt) === dayKey).reduce((sum, s) => sum + s.actualDurationMs, 0));
   const manualRecordedMs = $derived(state.manualEntries.filter((entry) => localDayKey(entry.endedAt) === dayKey).reduce((sum, entry) => sum + entry.endedAt - entry.startedAt, 0));
   const recordedMs = $derived(focusRecordedMs + manualRecordedMs);
@@ -296,6 +304,110 @@ export function createDailyExecutionController() {
   }
 
 
+  function connectGithub(value:string):boolean {
+    try {
+      const next=githubConnection(value);
+      if(state.sourceConnections.some(c=>c.id===next.id)){
+        sourceNotice='Already added. Select Refresh to update issues.';
+        sourceError='';
+        return true;
+      }
+      if(state.sourceConnections.length>=30)throw new Error('Maximum 30 sources.');
+      const success=commit({...state,sourceConnections:[...state.sourceConnections,next]});
+      if(success){sourceNotice='Public GitHub repository added. Select Refresh to load issues.';sourceError='';}
+      return success;
+    }catch(e){sourceError=e instanceof Error?e.message:'Invalid repository.';return false;}
+  }
+
+  async function importActivities(file:File):Promise<boolean> {
+    try {
+      const {connection,items}=await parseActivityFile(file);
+      const value=reconcileSource(state,connection,items,Date.now());
+      const saved=commit(value);
+      if(saved){sourceError='';sourceNotice=items.length+' activities available to choose.';}
+      return saved;
+    }catch(e){sourceError=e instanceof Error?e.message:'Import failed.';return false;}
+  }
+
+  function addManualLink(title:string,url:string,intoToday=true):boolean {
+    try{
+      const {connection,item}=manualSource(title,url);
+      const connections=state.sourceConnections.some(c=>c.id===connection.id)
+        ? state.sourceConnections : [...state.sourceConnections,connection];
+      const exists=state.sourceItems.some(s=>sourceIdentity(s.source)===sourceIdentity(item.source));
+      const staged={...state,sourceConnections:connections,
+        sourceItems:exists?state.sourceItems:[...state.sourceItems,item]};
+      const linked=linkActivity(staged,item,crypto.randomUUID(),Date.now());
+      syncDay();
+      const next=intoToday?selectForDay(linked.state,linked.taskId,dayKey):linked.state;
+      const saved=commit(next);
+      if(saved){sourceError='';sourceNotice='Linked activity added to '+(intoToday?'Today.':'All activities.');}
+      return saved;
+    }catch(e){sourceError=e instanceof Error?e.message:'Could not add link.';return false;}
+  }
+
+  function linkCandidate(item:SourceCandidate,intoToday=true):boolean {
+    syncDay();
+    const candidate=state.sourceItems.find(s=>sourceIdentity(s.source)===sourceIdentity(item.source));
+    if(!candidate){sourceError='Activity is no longer in this source. Refresh and try again.';return false;}
+    try {
+      const result=linkActivity(state,candidate,crypto.randomUUID(),Date.now());
+      const next=intoToday?selectForDay(result.state,result.taskId,dayKey):result.state;
+      const saved=next!==state?commit(next):true;
+      if(saved){sourceError='';sourceNotice='Linked activity added.';}
+      return saved;
+    }catch(e){sourceError=e instanceof Error?e.message:'Unable to link activity.';return false;}
+  }
+
+  function detachLinked(id:string):boolean {
+    const next=detachActivity(state,id);
+    const saved=next!==state&&commit(next);
+    if(saved){sourceError='';sourceNotice='Activity detached; local progress remains.';}
+    return saved;
+  }
+
+  function removeConnection(id:string):boolean {
+    const connection=state.sourceConnections.find(c=>c.id===id);
+    if(!connection)return false;
+    const saved=commit(disconnectSource(state,id));
+    if(saved){sourceNotice='Disconnected. Linked tasks and focus history remain local.';sourceError='';}
+    return saved;
+  }
+
+  function pauseConnection(id:string):boolean {
+    const connection=state.sourceConnections.find(c=>c.id===id);
+    if(!connection||connection.providerId!=='github')return false;
+    const status=connection.status==='paused'?'idle':'paused';
+    return commit({...state,sourceConnections:state.sourceConnections.map(c=>
+      c.id===id?{...c,status,error:undefined}:c)});
+  }
+
+  async function refreshConnection(id:string):Promise<boolean> {
+    const connection=state.sourceConnections.find(c=>c.id===id);
+    if(!connection||connection.providerId!=='github'||connection.status==='paused'||sourceSyncing)return false;
+    sourceSyncing=id;
+    sourceError='';
+    try{
+      const items=await loadPublicGithubIssues(connection);
+      const current=state.sourceConnections.find(c=>c.id===id);
+      if(!current){sourceError='Source was removed before refresh completed.';return false;}
+      const next=reconcileSource(state,current,items,Date.now());
+      const saved=commit(next);
+      if(saved){sourceNotice=items.length+' public issues updated. Linked completion remains local.';sourceError='';}
+      return saved;
+    }catch(e){
+      sourceError=e instanceof Error?e.message:'Could not refresh the source.';
+      const current=state.sourceConnections.find(c=>c.id===id);
+      if(current){
+        const offline=typeof navigator!=='undefined'&&!navigator.onLine;
+        commit({...state,sourceConnections:state.sourceConnections.map(c=>c.id!==id?c:{
+          ...c,status:offline?'offline':'error',error:sourceError.slice(0,240)
+        })});
+      }
+      return false;
+    }finally{sourceSyncing=null;}
+  }
+
   function quickAdd(title:string,placement:'today'|'all'):boolean{
     syncDay();
     const clean=title.trim().slice(0,120);
@@ -457,6 +569,10 @@ export function createDailyExecutionController() {
     get availableTasks(){return availableTasks;},
     get selectedTodayTask(){return selectedTodayTask;},
     get yesterdayTasks(){return yesterdayTasks;},
+    get availableSources(){return availableSources;},
+    get sourceError(){return sourceError;},
+    get sourceNotice(){return sourceNotice;},
+    get sourceSyncing(){return sourceSyncing;},
     get dayNote(){return state.dayNotes[dayKey]??'';},
     get sessions() { return sessions; },
     get evidenceRecords() { return evidenceRecords; },
@@ -486,6 +602,7 @@ export function createDailyExecutionController() {
     get storageReady() { return storageReady; },
     get syncNotice() { return syncNotice; },
     reloadFromStorage,
+    connectGithub,importActivities,addManualLink,linkCandidate,detachLinked,removeConnection,pauseConnection,refreshConnection,
     quickAdd,addToToday,removeFromToday,chooseNext,moveToday,carryYesterday,completeQuick,reopenQuick,editSimple,archiveSimple,saveDayNote,
     setGoal, setMode, setAllocation, addTask, updateTask, setTaskStatus, completeTask,
     openFocus, assignSession, saveReflection, refreshSessions, focusMsForTask, focusMsForWorkstream, workMsForWorkstream,
