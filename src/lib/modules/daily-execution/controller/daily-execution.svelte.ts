@@ -9,7 +9,7 @@ import { assignFocusSession, loadFocusSessions, subscribeFocusSessions } from '#
 import { writePendingFocusTask } from '#lib/shared/focus-sessions/context.ts';
 import type { FocusActivitySession } from '#lib/shared/focus-sessions/types.ts';
 import { proposeReplan, overlapsExistingWork } from '../core/adaptive.ts';
-import { DAILY_STORAGE_KEY, DailyStorageConflictError, readExecutionSnapshot, saveExecutionStateIfCurrent } from '../adapters/persistence.ts';
+import { DAILY_STORAGE_KEY, DailyStorageConflictError, readExecutionSnapshot, saveExecutionStateIfCurrent, isSafeReferenceUrl } from '../adapters/persistence.ts';
 import {
   CAPACITY_PRESETS, emptyExecutionState, localDayKey, makePlan, minutesLabel, nextTask, plannedMinutes, weekKey,
   tasksForDay, currentForDay, selectForDay, removeFromDay, setNextForDay, completeSimply, reopenSimply,
@@ -321,10 +321,7 @@ export function createDailyExecutionController() {
     const minutes=fields.estimateMinutes??0;
     if(!Number.isFinite(minutes)||minutes<0||minutes>720)return false;
     const url=fields.referenceUrl?.trim()??'';
-    if(url){
-      try{const u=new URL(url);if(u.protocol!=='https:'||u.username||u.password||u.port||url.length>400)return false;}
-      catch{return false;}
-    }
+    if(url && !isSafeReferenceUrl(url))return false;
     return commit({...state,tasks:state.tasks.map(t=>t.id===id?{...t,title:fields.title.trim().slice(0,120),context:fields.context?.trim().slice(0,60)||undefined,nextAction:fields.nextAction?.trim().slice(0,240)??t.nextAction,estimateMinutes:Math.round(minutes),dueDate:fields.dueDate||undefined,referenceUrl:url||undefined}:t)});
   }
   function archiveSimple(id:string){
