@@ -49,6 +49,16 @@ describe('Daily M1.6 storage safety', () => {
     expect(entries.get(KEY)).toBe(raw);
   });
 
+  it('fails closed if normalization of a malformed legacy plan throws', () => {
+    const entries = setup();
+    const broken = JSON.stringify({...emptyExecutionState(), plans:{
+      '2026-10-13':{dateKey:'2026-10-13', allocations:{},revision:{reason:'incomplete'}}
+    }});
+    entries.set(KEY,broken);
+    expect(() => readExecutionSnapshot()).toThrow();
+    expect(entries.get(KEY)).toBe(broken);
+  });
+
   it('rejects inaccessible browser storage and keeps the original data', () => {
     vi.stubGlobal('localStorage', {
       getItem: () => {throw new Error('SecurityError');},
