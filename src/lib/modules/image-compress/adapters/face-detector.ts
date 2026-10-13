@@ -24,16 +24,17 @@ export async function detectFaces(source:OffscreenCanvas):Promise<ImportantRegio
     ctx.drawImage(source,0,0,width,height);
     bitmap=await createImageBitmap(scaled);
     const result=detector.detect(bitmap);
-    return selectRegions(result.detections.slice(0,4).map((face,index)=>{
+    const candidateRegions:ImportantRegion[]=[];
+    result.detections.slice(0,4).forEach((face,index)=>{
       const b=face.boundingBox;
       const pad=.15;
-      if(!b)return null;
-      return {id:'face-'+index,kind:'face',source:'detector',
+      if(!b)return;
+      candidateRegions.push({id:'face-'+index,kind:'face',source:'detector',
         confidence:Math.min(1,Math.max(0,face.categories?.[0]?.score??.7)),
         bounds:{x:(b.originX-b.width*pad)/width,y:(b.originY-b.height*pad)/height,
-          width:b.width*(1+2*pad)/width,height:b.height*(1+2*pad)/height}
-      } satisfies ImportantRegion;
-    }).filter((r):r is ImportantRegion=>r!==null));
+          width:b.width*(1+2*pad)/width,height:b.height*(1+2*pad)/height}});
+    });
+    return selectRegions(candidateRegions);
   } finally {
     bitmap?.close();
     scaled.width=0;scaled.height=0;
