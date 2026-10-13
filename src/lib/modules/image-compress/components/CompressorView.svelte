@@ -114,7 +114,7 @@
           </div>
           <Switch id="modu-smart-resize" checked={controller.allowResize} disabled={controller.status === 'processing'}
             aria-label="Allow smart resize"
-            onclick={() => controller.setAllowResize(!controller.allowResize)} />
+            onCheckedChange={(checked) => controller.setAllowResize(checked)} />
         </div>
       </div>
 
