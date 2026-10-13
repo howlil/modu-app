@@ -27,7 +27,7 @@ export function readExecutionSnapshot(): { state: ExecutionState; raw: string | 
       !candidate.days || typeof candidate.days !== 'object' || Array.isArray(candidate.days)
     )) throw new Error('Invalid dated selections.');
   }
-  return { state: readExecutionState(raw), raw };
+  return { state: parseExecutionState(raw), raw };
 }
 
 /** Best-effort optimistic cross-tab guard. localStorage has no atomic compare-and-swap. */
@@ -40,10 +40,8 @@ export function saveExecutionStateIfCurrent(value: ExecutionState, expectedRaw: 
 }
 
 
-export function readExecutionState(rawSnapshot?: string | null): ExecutionState {
-  if (typeof localStorage === 'undefined') return emptyExecutionState();
-  try {
-    const parsed: unknown = JSON.parse(rawSnapshot === undefined ? (localStorage.getItem(KEY) ?? 'null') : (rawSnapshot ?? 'null'));
+function parseExecutionState(rawSnapshot: string | null): ExecutionState {
+    const parsed: unknown = JSON.parse(rawSnapshot ?? 'null');
     if (!parsed || typeof parsed !== 'object') return emptyExecutionState();
     const raw = parsed as Partial<ExecutionState>;
     const validTasks = Array.isArray(raw.tasks) ? raw.tasks.filter((task): task is ExecutionTask =>
@@ -95,6 +93,12 @@ export function readExecutionState(rawSnapshot?: string | null): ExecutionState 
         raw.recommendationDecisions.filter((x): x is {id:string;status:'accepted'|'rejected';decidedAt:number} =>
           !!x && typeof x.id === 'string' && ['accepted','rejected'].includes(x.status) && Number.isFinite(x.decidedAt)).slice(-200) : []
     };
+}
+
+export function readExecutionState(rawSnapshot?: string | null): ExecutionState {
+  if (typeof localStorage === 'undefined') return emptyExecutionState();
+  try {
+    return parseExecutionState(rawSnapshot === undefined ? localStorage.getItem(KEY) : rawSnapshot);
   } catch { return emptyExecutionState(); }
 }
 
