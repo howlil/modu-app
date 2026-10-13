@@ -17,8 +17,8 @@ async function sourceImage(kind) {
     const bytes=await readFile('test/fixtures/image-compress/'+kind+'.jpg');
     return page.evaluate(async(bytes)=>{
       const image=await createImageBitmap(new Blob([new Uint8Array(bytes)],{type:'image/jpeg'}));
-      const width=Math.round(image.width*960/Math.max(image.width,image.height));
-      const height=Math.round(image.height*960/Math.max(image.width,image.height));
+      const width=Math.round(image.width*1600/Math.max(image.width,image.height));
+      const height=Math.round(image.height*1600/Math.max(image.width,image.height));
       const c=document.createElement('canvas');c.width=width;c.height=height;
       c.getContext('2d').drawImage(image,0,0,width,height);image.close();
       const blob=await new Promise(resolve=>c.toBlob(resolve,'image/png'));
@@ -26,22 +26,22 @@ async function sourceImage(kind) {
     },[...bytes]);
   }
   return page.evaluate(async(kind)=>{
-    const c=document.createElement('canvas');c.width=960;c.height=640;
+    const c=document.createElement('canvas');c.width=1440;c.height=960;
     const ctx=c.getContext('2d');
     if(kind==='screenshot'){
-      ctx.fillStyle='#f5f7f8';ctx.fillRect(0,0,960,640);
+      ctx.fillStyle='#f5f7f8';ctx.fillRect(0,0,1440,960);
       ctx.font='19px Arial';
       for(let i=0;i<15;i++){
-        ctx.fillStyle=i%2?'#dae3fb':'white';ctx.fillRect(40,20+i*39,880,34);
+        ctx.fillStyle=i%2?'#dae3fb':'white';ctx.fillRect(40,20+i*39,1360,34);
         ctx.fillStyle='#192e55';ctx.fillText('Compression benchmark — readable UI text '+i,55,44+i*39);
       }
     }else if(kind==='transparent'){
       for(let i=0;i<80;i++){
         ctx.fillStyle=`rgba(${(i*31)%255},${(i*53)%255},200,.65)`;
-        ctx.beginPath();ctx.arc(i*37%960,i*43%640,10+(i%20),0,Math.PI*2);ctx.fill();
+        ctx.beginPath();ctx.arc(i*37%1440,i*43%960,10+(i%20),0,Math.PI*2);ctx.fill();
       }
     }else{
-      const data=ctx.createImageData(960,640);
+      const data=ctx.createImageData(1440,960);
       let seed=123456789;
       for(let i=0;i<data.data.length;i+=4){
         seed=(1664525*seed+1013904223)>>>0;
