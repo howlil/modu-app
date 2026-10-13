@@ -46,6 +46,7 @@ export function createDailyExecutionController() {
   let sourceSyncing = $state<string | null>(null);
   let googleStatus = $state<GoogleConnectionStatus>({available:false,connected:false});
   let googleBusy = $state(false);
+  let googleChecked = $state(false);
   let observedRaw: string | null = null;
   let refreshVersion = 0;
 
@@ -312,9 +313,11 @@ export function createDailyExecutionController() {
   async function loadGoogleStatus(refreshAfterConnect=false):Promise<void> {
     try {
       googleStatus=await googleConnectionStatus();
+      googleChecked=true;
       if(refreshAfterConnect && googleStatus.connected) await refreshGoogle();
     }catch {
       googleStatus={available:false,connected:false};
+      googleChecked=true;
       sourceError='Unable to check Google Tasks connection.';
     }
   }
@@ -665,6 +668,7 @@ export function createDailyExecutionController() {
     get sourceSyncing(){return sourceSyncing;},
     get googleStatus(){return googleStatus;},
     get googleBusy(){return googleBusy;},
+    get googleChecked(){return googleChecked;},
     get dayNote(){return state.dayNotes[dayKey]??'';},
     get sessions() { return sessions; },
     get evidenceRecords() { return evidenceRecords; },
