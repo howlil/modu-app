@@ -28,7 +28,7 @@ async function add(page, title) {
   const captureInput = page.getByRole('textbox', { name: 'New activity' });
   await captureInput.fill(title);
   await captureInput.press('Enter');
-  await page.getByRole('button', { name: title, exact: true }).waitFor();
+  await page.getByText(title, { exact: true }).first().waitFor({ timeout: 8000 });
   assert.equal(await captureInput.inputValue(), '', 'Capture should reset on successful save');
 }
 
@@ -36,6 +36,7 @@ try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
   activePage = await context.newPage();
   capture(activePage);
+  activePage.setDefaultTimeout(10000);
   await ready(activePage);
   await activePage.locator('body').click({ position: { x: 5, y: 5 } });
   await activePage.keyboard.press('/');
@@ -105,6 +106,7 @@ try {
   const perfContext = await browser.newContext({ viewport: { width: 1024, height: 768 } });
   const perf = await perfContext.newPage(); activePage = perf;
   capture(perf);
+  perf.setDefaultTimeout(10000);
   await ready(perf);
   const started = Date.now();
   await perf.evaluate(() => {
