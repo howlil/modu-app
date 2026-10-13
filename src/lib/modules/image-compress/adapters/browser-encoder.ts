@@ -41,6 +41,7 @@ export interface EncodedImage extends TargetSizeResult, ImageInfo {
   format: ImageOutputFormat;
   resized: boolean;
   engine: 'wasm' | 'browser-fallback' | 'original';
+  qualityEvidence?: { metric: 'milo'; rawError: number; improved: boolean; scoredCandidates: number; comparisonLongSide: number };
 }
 
 function validateFile(file: File): void {
@@ -72,7 +73,8 @@ export async function encodeImageToTarget(
   targetBytes: number,
   onAttempt?: (attempts: number) => void,
   signal?: AbortSignal,
-  allowResize = false
+  allowResize = false,
+  mode: 'standard' | 'perceptual' = 'standard'
 ): Promise<EncodedImage> {
   validateFile(file);
   if (signal?.aborted) throw new DOMException('Compression canceled.', 'AbortError');
@@ -80,7 +82,7 @@ export async function encodeImageToTarget(
   if (signal?.aborted) throw new DOMException('Compression canceled.', 'AbortError');
 
   // An exact-format original below budget is always preferable to re-encoding.
-  if (file.type === format && file.size <= targetBytes) {
+  if (mode === 'standard' && file.type === format && file.size <= targetBytes) {
     const info = await inspectImage(file);
     return {
       blob: file, quality: 1, attempts: 0, status: 'within-target',
@@ -165,7 +167,7 @@ export async function encodeImageToTarget(
     signal?.addEventListener('abort', cancel, { once: true });
     if (signal?.aborted) { cancel(); return; }
     try {
-      worker.postMessage({ file, format, targetBytes, allowResize });
+      worker.postMessage({ file, format, targetBytes, allowResize, mode });
     } catch (error) {
       finish();
       reject(error);
