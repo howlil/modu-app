@@ -18,6 +18,7 @@ export function createImageCompressController() {
   let attempts = $state(0);
   let revision = 0;
   let activeAbort: AbortController | null = null;
+  let cancelRestores: CompressionStatus = 'ready';
 
   function invalidateRunning(): number {
     revision += 1;
@@ -128,6 +129,7 @@ export function createImageCompressController() {
     error = '';
     retryNotice = '';
     allowResize = resize;
+    cancelRestores = preserve ? previousStatus : 'ready';
     status = 'processing';
     const abort = new AbortController();
     activeAbort = abort;
@@ -171,6 +173,14 @@ export function createImageCompressController() {
     return runCompression(allowResize);
   }
 
+  function cancel(): void {
+    if (status !== 'processing') return;
+    invalidateRunning(); // Terminates the in-flight Web Worker via AbortSignal.
+    status = output ? cancelRestores : (file && info ? 'ready' : 'idle');
+    error = '';
+    attempts = 0;
+  }
+
   function recompressWithResize(): Promise<void> {
     if (status !== 'quality-limited' || allowResize || !file || !info || !output || !outputUrl) {
       return Promise.resolve();
@@ -209,6 +219,6 @@ export function createImageCompressController() {
     get retryNotice() { return retryNotice; },
     get attempts() { return attempts; },
     get targetError() { return getTargetError(); },
-    setFile, setTargetInput, setFormat, setAllowResize, compress, recompressWithResize, download, dispose
+    setFile, setTargetInput, setFormat, setAllowResize, compress, cancel, recompressWithResize, download, dispose
   };
 }
