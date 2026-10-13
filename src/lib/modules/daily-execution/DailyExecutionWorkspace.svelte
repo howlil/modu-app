@@ -11,7 +11,7 @@
 <section class="mx-auto min-h-[calc(100vh-76px)] w-full max-w-[1180px] px-4 pb-8 pt-8 max-[760px]:px-2.5 max-[760px]:pt-6">
   <div class="mx-auto mb-6 w-full max-w-[860px]">
     <ToolHeader title="Daily" />
-    <nav class="-mt-2 flex h-9 w-full items-center gap-1 rounded-full bg-muted/65 p-1" aria-label="Daily Execution views">
+    <nav class="-mt-2 flex h-9 w-full items-center gap-1 rounded-full bg-muted/65 p-1" aria-label="Daily views">
       {#each [['today', 'Today'], ['priorities', 'All'], ['review', 'Review']] as entry}
         {@const name = entry[0] as 'today' | 'priorities' | 'review'}
         <button
