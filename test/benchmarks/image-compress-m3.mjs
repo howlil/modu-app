@@ -43,20 +43,22 @@ async function download(label){
     page.getByRole('button',{name:label,exact:true}).click()]);
   return readFile(await file.path());
 }
-async function normalized(input,bounds){
-  return Buffer.from(await page.evaluate(async ({input,bounds})=>{
+async function normalized(input,bounds,referenceDimensions){
+  return Buffer.from(await page.evaluate(async ({input,bounds,referenceDimensions})=>{
     const bmp=await createImageBitmap(new Blob([new Uint8Array(input)]));
     const x=Math.floor(bounds.x*bmp.width),y=Math.floor(bounds.y*bmp.height);
     const w=Math.max(1,Math.ceil(bounds.width*bmp.width));
     const h=Math.max(1,Math.ceil(bounds.height*bmp.height));
-    const ratio=256/Math.max(w,h);
-    const tw=Math.max(16,Math.round(w*ratio)),th=Math.max(16,Math.round(h*ratio));
+    const rw=Math.max(1,Math.ceil(bounds.width*referenceDimensions.w));
+    const rh=Math.max(1,Math.ceil(bounds.height*referenceDimensions.h));
+    const ratio=256/Math.max(rw,rh);
+    const tw=Math.max(16,Math.round(rw*ratio)),th=Math.max(16,Math.round(rh*ratio));
     const c=document.createElement('canvas');c.width=tw;c.height=th;
     const ctx=c.getContext('2d');ctx.fillStyle='white';ctx.fillRect(0,0,tw,th);
     ctx.drawImage(bmp,x,y,w,h,0,0,tw,th);
     bmp.close();const output=await new Promise(ok=>c.toBlob(ok,'image/png'));
     return [...new Uint8Array(await output.arrayBuffer())];
-  },{input:[...input],bounds}));
+  },{input:[...input],bounds,referenceDimensions}));
 }
 let sampleCount=0;
 async function attempt(original,format,targetKB,resize){
@@ -118,14 +120,14 @@ async function attempt(original,format,targetKB,resize){
     const bounds={x:0,y:0,width:1,height:1};
     const id=String(sampleCount++).padStart(2,'0');
     for(const [label,bytes] of [['original',original],['baseline',prev],['optimized',last]]){
-      await writeFile(root+'/reference/'+id+'-global-'+label+'.png',await normalized(bytes,bounds));
+      await writeFile(root+'/reference/'+id+'-global-'+label+'.png',await normalized(bytes,bounds,sourceDims));
     }
     row.referenceIds.push(id+'-global');
     if(row.regions>0){
       const first=regionRows.first();
       const regionBounds=JSON.parse(await first.getAttribute('data-roi-bounds'));
       for(const [label,bytes] of [['original',original],['baseline',prev],['optimized',last]]){
-        await writeFile(root+'/reference/'+id+'-roi-'+label+'.png',await normalized(bytes,regionBounds));
+        await writeFile(root+'/reference/'+id+'-roi-'+label+'.png',await normalized(bytes,regionBounds,sourceDims));
       }
       row.referenceIds.push(id+'-roi');
     }
