@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ArrowDown, Download, FileImage, ImageUp, RefreshCcw, WandSparkles } from 'lucide-svelte';
+  import { ArrowDown, Download, FileImage, ImageUp, RefreshCcw, WandSparkles, X } from 'lucide-svelte';
   import { Button } from '#lib/components/ui/button/index.js';
   import { Switch } from '#lib/components/ui/switch/index.js';
   import { formatBytes, type ImageOutputFormat } from '../core/target-size.ts';
@@ -8,6 +8,8 @@
   let { controller }: { controller: ReturnType<typeof createImageCompressController> } = $props();
   let picker: HTMLInputElement;
   const presets = [50, 100, 200, 500];
+  let previewMode = $state<'compare' | 'original' | 'result'>('compare');
+  let zoom = $state<'fit' | 100 | 200>('fit');
 
   function picked(event: Event): void {
     const input = event.currentTarget as HTMLInputElement;
@@ -18,7 +20,7 @@
   function dropped(event: DragEvent): void {
     event.preventDefault();
     const file = event.dataTransfer?.files?.[0];
-    if (file) void controller.setFile(file);
+    if (file && controller.status !== 'processing') void controller.setFile(file);
   }
 </script>
 
@@ -60,7 +62,7 @@
         <label for="modu-target-kb" class="mb-2 block text-ui font-medium">Target size</label>
         <div class="relative">
           <input id="modu-target-kb" type="number" min="10" max="20480" step="1"
-            value={controller.targetInput}
+            value={controller.targetInput} disabled={controller.status === 'processing'}
             oninput={(event) => controller.setTargetInput(event.currentTarget.value)}
             aria-invalid={Boolean(controller.targetError)}
             aria-describedby="modu-target-description"
@@ -74,7 +76,7 @@
         <div class="mt-3 flex flex-wrap gap-2">
           {#each presets as preset}
             <Button variant={controller.targetInput === String(preset) ? 'secondary' : 'outline'}
-              size="sm" onclick={() => controller.setTargetInput(String(preset))}>
+              size="sm" disabled={controller.status === 'processing'} onclick={() => controller.setTargetInput(String(preset))}>
               {preset} KB
             </Button>
           {/each}
@@ -86,7 +88,7 @@
         <div class="flex flex-wrap gap-2" role="group" aria-label="Output format">
           {#each [{ label: 'WebP', value: 'image/webp' }, { label: 'JPEG', value: 'image/jpeg' }] as option}
             <Button variant={controller.format === option.value ? 'secondary' : 'outline'} size="sm"
-              aria-pressed={controller.format === option.value}
+              aria-pressed={controller.format === option.value} disabled={controller.status === 'processing'}
               onclick={() => controller.setFormat(option.value as ImageOutputFormat)}>
               {option.label}
             </Button>
@@ -110,7 +112,7 @@
             <label for="modu-smart-resize" class="text-ui font-medium">Allow smart resize</label>
             <p class="mt-1 text-meta text-muted-foreground">Find the largest image that fits the target. Minimum short side: 640 px.</p>
           </div>
-          <Switch id="modu-smart-resize" checked={controller.allowResize}
+          <Switch id="modu-smart-resize" checked={controller.allowResize} disabled={controller.status === 'processing'}
             aria-label="Allow smart resize"
             onclick={() => controller.setAllowResize(!controller.allowResize)} />
         </div>
@@ -125,6 +127,12 @@
         {/if}
         <ArrowDown class="size-4" strokeWidth={1.8} />
       </Button>
+      {#if controller.status === 'processing'}
+        <Button variant="outline" class="mt-2 w-full" onclick={controller.cancel}>
+          <X class="size-4" strokeWidth={1.8} />
+          Cancel compression
+        </Button>
+      {/if}
     </div>
 
     <div class="col-span-7 min-w-0 rounded-[20px] border border-border bg-card p-5 max-[720px]:col-span-1 max-[640px]:p-4">
@@ -139,27 +147,58 @@
       </div>
 
       {#if controller.originalUrl}
-        <div class="mt-4 grid grid-cols-2 gap-3">
+        {#if controller.outputUrl}
+          <div class="mt-4 flex flex-wrap items-center justify-between gap-2">
+            <div role="group" aria-label="Preview mode" class="flex flex-wrap gap-2">
+              {#each [{ id: 'compare', label: 'Compare' }, { id: 'original', label: 'Original' }, { id: 'result', label: 'Result' }] as item}
+                <Button size="sm" variant={previewMode === item.id ? 'secondary' : 'outline'}
+                  aria-pressed={previewMode === item.id}
+                  onclick={() => previewMode = item.id as typeof previewMode}>{item.label}</Button>
+              {/each}
+            </div>
+            <div role="group" aria-label="Preview zoom" class="flex flex-wrap gap-2">
+              {#each [{ id: 'fit', label: 'Fit' }, { id: 100, label: '100%' }, { id: 200, label: '200%' }] as option}
+                <Button size="sm" variant={zoom === option.id ? 'secondary' : 'outline'}
+                  aria-pressed={zoom === option.id}
+                  onclick={() => zoom = option.id as typeof zoom}>{option.label}</Button>
+              {/each}
+            </div>
+          </div>
+        {/if}
+        <div class={previewMode === 'compare' || !controller.outputUrl
+          ? 'mt-4 grid grid-cols-2 gap-3' : 'mt-4 grid grid-cols-1 gap-3'}>
+          {#if previewMode !== 'result' || !controller.outputUrl}
           <figure class="min-w-0">
-            <div class="flex h-48 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted max-[640px]:h-36">
-              <img src={controller.originalUrl} class="max-h-full max-w-full object-contain" alt="Original preview" />
+            <div class="h-48 overflow-auto rounded-xl border border-border bg-muted max-[640px]:h-36">
+              <div class={zoom === 'fit' ? 'flex h-full w-full items-center justify-center' : 'w-max min-w-full'}>
+                <img src={controller.originalUrl} alt="Original preview"
+                  class={zoom === 'fit' ? 'max-h-48 max-w-full object-contain max-[640px]:max-h-36' : 'max-w-none'}
+                  style={zoom === 'fit' ? '' : 'width: ' + (controller.info?.width ?? 0) * zoom / 100 + 'px; height: auto;'} />
+              </div>
             </div>
             <figcaption class="mt-2 text-meta text-muted-foreground">
               Original · {formatBytes(controller.file?.size ?? 0)}
             </figcaption>
           </figure>
+          {/if}
+          {#if previewMode !== 'original' || !controller.outputUrl}
           <figure class="min-w-0">
-            <div class="flex h-48 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted max-[640px]:h-36">
+            <div class="h-48 overflow-auto rounded-xl border border-border bg-muted max-[640px]:h-36">
+              <div class={zoom === 'fit' ? 'flex h-full w-full items-center justify-center' : 'w-max min-w-full'}>
               {#if controller.outputUrl}
-                <img src={controller.outputUrl} class="max-h-full max-w-full object-contain" alt="Compressed preview" />
+                <img src={controller.outputUrl} alt="Compressed preview"
+                  class={zoom === 'fit' ? 'max-h-48 max-w-full object-contain max-[640px]:max-h-36' : 'max-w-none'}
+                  style={zoom === 'fit' ? '' : 'width: ' + (controller.output?.width ?? 0) * zoom / 100 + 'px; height: auto;'} />
               {:else}
                 <span class="text-meta text-muted-foreground">Result</span>
               {/if}
+              </div>
             </div>
             <figcaption class="mt-2 text-meta text-muted-foreground">
               {controller.output ? (controller.status === 'processing' ? 'Previous result · ' : 'Output · ') + formatBytes(controller.output.blob.size) : 'Not generated yet'}
             </figcaption>
           </figure>
+          {/if}
         </div>
       {:else}
         <div class="mt-4 flex h-48 items-center justify-center rounded-xl border border-dashed border-border bg-muted/50">
