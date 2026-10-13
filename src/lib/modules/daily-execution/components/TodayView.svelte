@@ -1,5 +1,5 @@
 <script lang="ts">
- import { Play, Check, ChevronRight, ChevronDown, PanelRightClose, PanelRightOpen, Plus, Search, ArrowUp, ArrowDown, ArrowUpDown, Link2 } from 'lucide-svelte';
+ import { Play, Check, ChevronRight, ChevronDown, PanelRightClose, PanelRightOpen, Plus, Search, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-svelte';
  import { Button } from '#lib/components/ui/button/index.js';
  import QuickCapture from './QuickCapture.svelte';
  import TaskDetailDrawer from './TaskDetailDrawer.svelte';
@@ -37,7 +37,7 @@
    showAllYesterday = false;
  }
  function meta(task: ExecutionTask) {
-   return [task.source ? task.source.providerId+' · Linked' : (task.context ?? (task.workstream !== 'general' ? task.workstream : '')),
+   return [task.context ?? (task.workstream !== 'general' ? task.workstream : ''),
      task.dueDate === controller.dayKey ? 'Due today' : task.dueDate,
      task.estimateMinutes ? controller.minutesLabel(task.estimateMinutes) : ''].filter(Boolean).join(' · ');
  }
@@ -135,24 +135,6 @@
          <div><h2 class="text-title font-medium">From your list</h2><p class="mt-1 text-meta text-muted-foreground">Add existing activities</p></div>
          <span class="text-meta text-muted-foreground">{controller.availableTasks.length}</span>
        </div>
-       {#if controller.availableSources.length || controller.state.sourceConnections.length}
-         <div class="mt-4 border-b border-border pb-3">
-           <div class="flex items-center justify-between gap-2">
-             <h3 class="text-meta font-medium">From connected sources</h3>
-             <Button variant="ghost" size="sm" class="min-h-10 rounded-lg px-2 text-meta" onclick={() => controller.openSourcePanel()}>Manage</Button>
-           </div>
-           {#each controller.availableSources.slice(0,3) as item (item.source.providerId+item.source.connectionId+item.source.externalId)}
-             <div class="flex min-h-11 items-center gap-2">
-               <Link2 class="size-3.5 shrink-0 text-muted-foreground"/>
-               <p class="min-w-0 flex-1 truncate text-ui">{item.title}</p>
-               <Button size="icon" variant="ghost" class="size-10 rounded-lg" aria-label={'Add linked '+item.title+' to Today'} onclick={() => controller.linkCandidate(item,true)}><Plus class="size-4"/></Button>
-             </div>
-           {/each}
-           {#if !controller.availableSources.length}
-             <p class="text-meta text-muted-foreground">No unselected linked activities.</p>
-           {/if}
-         </div>
-       {/if}
        <div class="relative mt-4">
          <Search class="absolute left-3 top-3 size-4 text-muted-foreground"/>
          <input bind:value={query} oninput={searchChanged} aria-label="Search available activities" placeholder="Search activities..."
@@ -210,7 +192,6 @@
  {#key editing.id}
    <TaskDetailDrawer task={editing} onClose={() => editing = null}
      onSave={fields => controller.editSimple(editing?.id ?? '', fields, editing ?? undefined)}
-     onDetach={() => { if (controller.detachLinked(editing?.id ?? '')) editing = null; }}
      onRemoveFromToday={() => { if (controller.removeFromToday(editing?.id ?? '')) editing = null; }}
      onArchive={() => { if (controller.archiveSimple(editing?.id ?? '')) editing = null; }}/>
  {/key}
