@@ -148,6 +148,35 @@ try {
   assert.ok(corner[0]>245&&corner[1]>245&&corner[2]>245,
     'Transparent PNG must have white JPEG background; got '+JSON.stringify(corner));
 
+  // M1.5: EXIF orientation must survive decode -> WASM -> preview.
+  const orientedJpeg=await page.evaluate(async () => {
+    const c=document.createElement('canvas'); c.width=120;c.height=80;
+    const x=c.getContext('2d');
+    x.fillStyle='blue';x.fillRect(0,0,120,80);
+    x.fillStyle='yellow';x.fillRect(0,0,20,20);
+    const blob=await new Promise(resolve=>c.toBlob(resolve,'image/jpeg',0.95));
+    const raw=new Uint8Array(await blob.arrayBuffer());
+    // APP1 EXIF; little-endian TIFF Orientation=6 (rotate 90 degrees clockwise).
+    const app1=[255,225,0,34,69,120,105,102,0,0,73,73,42,0,8,0,0,0,
+      1,0,18,1,3,0,1,0,0,0,6,0,0,0,0,0,0,0];
+    return [...raw.slice(0,2),...app1,...raw.slice(2)];
+  });
+  await page.locator('#modu-image-input').setInputFiles({
+    name:'exif-orientation.jpg',mimeType:'image/jpeg',buffer:Buffer.from(orientedJpeg)
+  });
+  await page.getByText('exif-orientation.jpg').waitFor();
+  const orientedOriginal=await page.getByAltText('Original preview').evaluate(async img=>{
+    await img.decode();return {width:img.naturalWidth,height:img.naturalHeight};
+  });
+  assert.deepEqual(orientedOriginal,{width:80,height:120},
+    'EXIF orientation should rotate original preview');
+  await page.getByRole('button',{name:'WebP',exact:true}).click();
+  await page.locator('#modu-target-kb').fill('500');
+  await page.getByRole('button',{name:'Compress image',exact:true}).click();
+  await page.getByText('Target reached').waitFor({timeout:120000});
+  assert.deepEqual(await previewSize(),{width:80,height:120},
+    'Output should preserve orientation-correct dimensions');
+
   // M1.5: a forged MIME cannot bypass input inspection.
   await page.locator('#modu-image-input').setInputFiles({
     name:'fake.png',mimeType:'image/png',buffer:Buffer.from('not a png')
