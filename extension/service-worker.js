@@ -497,6 +497,42 @@ async function reconcileFloatingScripts(injectExisting = false) {
   await syncFloatingScripts(settings.enabled, injectExisting && settings.enabled);
 }
 
+// Clicking the pinned toolbar icon is an explicit, per-tab restore action.
+async function restoreFloatingWidgetOnTab(tab) {
+  if (!Number.isInteger(tab?.id) || !tab.url) return;
+  let url;
+  try {
+    url = new URL(tab.url);
+  } catch {
+    return;
+  }
+  if (!['http:', 'https:'].includes(url.protocol) ||
+      PROTECTED_DOMAINS.has(url.hostname) ||
+      url.hostname.endsWith('.modu.howlil.site')) return;
+
+  const preferences = await readFloatingSettings();
+  if (!preferences.enabled || preferences.excludedDomains.some(
+    (domain) => url.hostname === domain || url.hostname.endsWith('.' + domain)
+  )) return;
+
+  const saved = await chrome.storage.local.get(FLOATING_SNAPSHOT_KEY);
+  const snapshot = saved[FLOATING_SNAPSHOT_KEY];
+  if (!snapshot || !Number.isFinite(snapshot.updatedAt) ||
+      Date.now() - snapshot.updatedAt >= MAX_ACTIVE_SESSION_MS ||
+      !snapshot.timer || snapshot.timer.status === 'idle') return;
+
+  // Inject if necessary, then send the explicit restore message to the isolated world.
+  await chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    files: ['floating/widget.js']
+  });
+  await chrome.tabs.sendMessage(tab.id, { type: 'MODU_FLOATING_RESTORE' });
+}
+
+chrome.action.onClicked.addListener((tab) => {
+  void restoreFloatingWidgetOnTab(tab).catch(() => {});
+});
+
 let commandQueue = Promise.resolve();
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

@@ -42,12 +42,22 @@
     },
     {
       "resources": [
-        "floating/widget.css"
+        "floating/widget.css",
+        "floating/modu-logo.svg"
       ],
       "matches": [
         "http://*/*",
         "https://*/*"
       ]
     }
-  ]
+  ],
+  "action": {
+    "default_title": "Show Modu floating focus on this tab",
+    "default_icon": {
+      "48": "icons/modu-48.png"
+    }
+  },
+  "icons": {
+    "48": "icons/modu-48.png"
+  }
 }

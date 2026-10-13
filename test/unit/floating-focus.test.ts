@@ -149,6 +149,9 @@ describe('Modu Floating Focus', () => {
 
     expect((await extension.send({type:'SET_FLOATING_SETTINGS', settings:{enabled:false}})).ok).toBe(true);
     expect(extension.registered.size).toBe(0);
+    extension.clickAction({ id: 14, url: 'https://example.org/' });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(extension.restoredTabIds).toEqual([13]);
     await extension.send({type:'CLEAR_FLOATING_CONTEXT'});
     expect(extension.data.has('module-floating-focus-v1')).toBe(false);
   });

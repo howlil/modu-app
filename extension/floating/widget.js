@@ -1,14 +1,24 @@
-
 (() => {
-  // The ISOLATED world survives repeated programmatic injection in the same tab.
+  // A dynamically registered script may also be injected into an existing tab.
   if (globalThis.__moduFloatingInjectedV1) return;
   globalThis.__moduFloatingInjectedV1 = true;
 
   const SETTINGS_KEY = 'module-floating-settings-v1';
   const SNAPSHOT_KEY = 'module-floating-focus-v1';
   const HOST_ID = 'modu-floating-focus-root';
-  const ownOrigin = /^(modu\.howlil\.site|localhost|127\.0\.0\.1)$/i.test(location.hostname);
-  if (ownOrigin) return;
+  if (/^(modu\.howlil\.site|localhost|127\.0\.0\.1)$/i.test(location.hostname)) return;
+
+  const MODU_URL = 'https://modu.howlil.site/pomodoro';
+  const BRAND_IMAGE = '<img class="modu-logo" alt="" src="' +
+    chrome.runtime.getURL('floating/modu-logo.svg') + '">';
+  // Lucide icon paths. The unpacked MV3 content script cannot import Svelte components.
+  const glyphs = {
+    'chevron-up': '<path d="m18 15-6-6-6 6"/>',
+    'chevron-down': '<path d="m6 9 6 6 6-6"/>',
+    'eye-off': '<path d="M10.58 10.59a2 2 0 0 0 2.83 2.83"/><path d="M9.88 5.09A10.93 10.93 0 0 1 12 4.9c7 0 10 7.1 10 7.1a12.06 12.06 0 0 1-4.09 4.92"/><path d="M6.61 6.61C3.4 8.5 2 12 2 12s3 7.1 10 7.1c1.61 0 3.09-.37 4.4-1.01"/><path d="M2 2 22 22"/>',
+    'arrow-up-right': '<path d="M7 7h10v10"/><path d="M7 17 17 7"/>'
+  };
+  const icon = (name) => '<svg class="modu-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + glyphs[name] + '</svg>';
 
   let settings = { enabled: false, showTask: true, excludedDomains: [] };
   let snapshot = null;
@@ -18,12 +28,15 @@
   let shadow = null;
   let lastMarkupKind = '';
   let tickId = null;
+
   const isExcluded = () => (settings.excludedDomains || []).some(
     (domain) => location.hostname === domain || location.hostname.endsWith('.' + domain)
   );
-  const active = () => Boolean(settings.enabled && !isExcluded() && snapshot &&
+  const eligible = () => Boolean(settings.enabled && !isExcluded() && snapshot &&
     Number.isFinite(snapshot.updatedAt) && Date.now() - snapshot.updatedAt < 24 * 60 * 60 * 1000 &&
-    snapshot.timer && snapshot.timer.status !== 'idle' && snapshot.sessionId !== dismissedId);
+    snapshot.timer && snapshot.timer.status !== 'idle');
+  const active = () => eligible() && snapshot.sessionId !== dismissedId;
+
   const fmt = (ms) => {
     const total = Math.max(0, Math.ceil(ms / 1000));
     return String(Math.floor(total / 60)).padStart(2, '0') + ':' +
@@ -42,16 +55,19 @@
       : t.status === 'paused' ? 'Paused' : t.status === 'overtime' ? 'Overtime'
       : t.status === 'complete' ? 'Complete' : 'Ready';
     const text = t.status === 'overtime' ? '+' + fmt(elapsed) : fmt(remaining);
-    const progress = t.status === 'complete' || reached ? 100 :
-      t.status === 'overtime' ? 100 : Math.min(100, Math.max(0,
-        100 * (t.durationMs - remaining) / Math.max(1, t.durationMs)));
-    return { label, text, progress };
+    const progress = t.status === 'complete' || reached || t.status === 'overtime'
+      ? 100 : Math.min(100, Math.max(0, 100 * (t.durationMs - remaining) / Math.max(1, t.durationMs)));
+    return { label, text, progress, status: t.status };
   };
+
   function unmount() {
     if (tickId !== null) { clearInterval(tickId); tickId = null; }
     host?.remove();
-    host = null; shadow = null; lastMarkupKind = '';
+    host = null;
+    shadow = null;
+    lastMarkupKind = '';
   }
+
   function mount() {
     if (host?.isConnected) return;
     if (!document.documentElement) return;
@@ -69,43 +85,94 @@
     shadow.append(panel);
     document.documentElement.append(host);
   }
+
   function rebuild(kind) {
-    const panel = shadow.getElementById('modu-panel');
+    const panel = shadow?.getElementById('modu-panel');
     if (!panel) return;
     panel.className = kind === 'mini' ? 'modu-widget mini' : 'modu-widget';
+
     if (kind === 'mini') {
-      panel.innerHTML = '<button class="modu-mini" id="expand" type="button" aria-label="Expand Modu floating focus"><span class="modu-mark" aria-hidden="true">m</span><span class="modu-mini-copy"><span class="modu-mini-time" id="time"></span><span class="modu-label" style="display:block" id="state"></span></span><span aria-hidden="true">⌃</span></button>';
+      panel.innerHTML =
+        '<button class="modu-mini" id="expand" type="button" aria-label="Expand Modu floating timer">' +
+          '<span class="modu-mini-brand">' + BRAND_IMAGE + '</span>' +
+          '<span class="modu-mini-details"><strong id="time" class="modu-mini-time" role="timer"></strong><span id="state" class="modu-mini-state"></span></span>' +
+          '<span class="modu-mini-action">' + icon('chevron-up') + '</span>' +
+        '</button>' +
+        '<div class="modu-mini-progress" aria-hidden="true"><span id="progress"></span></div>';
       panel.querySelector('#expand').addEventListener('click', () => { mini = false; render(); });
     } else {
-      panel.innerHTML = '<div class="modu-head"><span class="modu-brand"><span class="modu-mark" aria-hidden="true">m</span>modu</span><span class="modu-controls"><button class="modu-quiet" id="hide" type="button" aria-label="Hide until next session">Hide</button><button class="modu-quiet" id="collapse" type="button" aria-label="Minimize floating focus">−</button></span></div><div class="modu-separator"></div><div class="modu-label" id="heading"></div><div class="modu-task" id="task"></div><div class="modu-next" id="next"></div><div class="modu-row modu-space"><span class="modu-timer" id="time" role="timer"></span><span class="modu-state" id="state"></span></div><div class="modu-progress" aria-hidden="true"><div id="progress"></div></div><div class="modu-row"><span class="modu-label">Focus companion</span><a class="modu-open" id="open" target="_blank" rel="noopener noreferrer">Open Modu ↗</a></div>';
+      panel.innerHTML =
+        '<header class="modu-header">' +
+          '<a class="modu-brand" href="' + MODU_URL + '" target="_blank" rel="noopener noreferrer" aria-label="Open Modu Pomodoro">' +
+            BRAND_IMAGE + '<span class="modu-brand-copy"><strong>Modu</strong><span>Focus companion</span></span></a>' +
+          '<div class="modu-controls">' +
+            '<button id="collapse" class="modu-icon-button" type="button" title="Minimize" aria-label="Minimize floating timer">' + icon('chevron-down') + '</button>' +
+            '<button id="hide" class="modu-icon-button" type="button" title="Hide until next session · click the extension toolbar icon to restore" aria-label="Hide floating timer until next session. Use the extension toolbar icon to restore.">' + icon('eye-off') + '</button>' +
+          '</div>' +
+        '</header>' +
+        '<div class="modu-content">' +
+          '<div id="heading" class="modu-section-label"></div>' +
+          '<div id="task" class="modu-task"></div>' +
+          '<div id="next" class="modu-next" hidden></div>' +
+          '<div class="modu-timer-row"><strong id="time" class="modu-timer" role="timer"></strong>' +
+            '<span class="modu-status"><span class="modu-status-dot" aria-hidden="true"></span><span id="state"></span></span>' +
+          '</div>' +
+          '<div class="modu-progress" aria-hidden="true"><span id="progress"></span></div>' +
+        '</div>' +
+        '<footer class="modu-footer"><span class="modu-footer-copy">Focus at your pace</span>' +
+          '<a class="modu-open" href="' + MODU_URL + '" target="_blank" rel="noopener noreferrer">Open timer ' + icon('arrow-up-right') + '</a>' +
+        '</footer>';
       panel.querySelector('#collapse').addEventListener('click', () => { mini = true; render(); });
-      panel.querySelector('#hide').addEventListener('click', () => { dismissedId = snapshot?.sessionId ?? null; unmount(); });
-      panel.querySelector('#open').href = 'https://modu.howlil.site/pomodoro';
+      panel.querySelector('#hide').addEventListener('click', () => {
+        dismissedId = snapshot?.sessionId ?? null;
+        unmount();
+      });
     }
     lastMarkupKind = kind;
   }
+
   function render() {
     if (!active()) { unmount(); return; }
     mount();
+    if (!shadow) return;
     if (tickId === null) tickId = setInterval(render, 1000);
     const kind = mini ? 'mini' : 'expanded';
     if (lastMarkupKind !== kind) rebuild(kind);
-    const values = timerValues();
     const panel = shadow.getElementById('modu-panel');
+    if (!panel) return;
+    const values = timerValues();
+    panel.dataset.status = values.status;
     panel.querySelector('#time').textContent = values.text;
     panel.querySelector('#state').textContent = values.label;
+    panel.querySelector('#progress').style.width = values.progress + '%';
     if (!mini) {
-      const taskVisible = settings.showTask && snapshot.timer.mode === 'focus' && snapshot.task?.title;
+      const hasTask = settings.showTask && snapshot.timer.mode === 'focus' && snapshot.task?.title;
+      const nextAction = hasTask ? snapshot.task.nextAction || '' : '';
+      const next = panel.querySelector('#next');
       panel.querySelector('#heading').textContent = snapshot.timer.mode === 'focus' ? 'CURRENT FOCUS' : 'BREAK';
-      panel.querySelector('#task').textContent = taskVisible ? snapshot.task.title :
+      panel.querySelector('#task').textContent = hasTask ? snapshot.task.title :
         snapshot.timer.mode === 'focus' ? 'Focus session' : 'Take a short break';
-      panel.querySelector('#next').textContent = taskVisible ? (snapshot.task.nextAction || '') : '';
-      panel.querySelector('#progress').style.width = values.progress + '%';
+      next.textContent = nextAction;
+      next.hidden = !nextAction;
     }
   }
+
+  // Toolbar action restores the widget in this tab even during the same session.
+  chrome.runtime.onMessage.addListener((message, _sender, respond) => {
+    if (message?.type !== 'MODU_FLOATING_RESTORE') return;
+    dismissedId = null;
+    mini = false;
+    render();
+    respond({ visible: Boolean(host?.isConnected) });
+  });
+
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
-    if (changes[SETTINGS_KEY]) settings = changes[SETTINGS_KEY].newValue || settings;
+    if (changes[SETTINGS_KEY]) {
+      const wasEnabled = settings.enabled;
+      settings = changes[SETTINGS_KEY].newValue || settings;
+      if (!wasEnabled && settings.enabled) { dismissedId = null; mini = true; }
+    }
     if (changes[SNAPSHOT_KEY]) {
       const oldId = snapshot?.sessionId;
       snapshot = changes[SNAPSHOT_KEY].newValue || null;
