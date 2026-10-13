@@ -117,7 +117,7 @@
        <Button class="rounded-lg" onclick={() => controller.openFocus(current)}><Play class="mr-1 size-4"/> Start focus</Button>
      {:else}
        <p class="text-meta text-muted-foreground">Your day is clear.</p>
-       <Button size="sm" variant="outline" class="rounded-lg" onclick={() => { mobileShelf = true; showShelf = true; }}>Browse list</Button>
+       <Button size="sm" variant="outline" class="rounded-lg min-[760px]:hidden" onclick={() => { mobileShelf = true; showShelf = true; }}>Browse list</Button>
      {/if}
    </div>
    <button type="button" class="mt-4 flex items-center gap-2 text-meta text-muted-foreground min-[760px]:hidden" aria-expanded={mobileShelf} onclick={() => mobileShelf = !mobileShelf}>
@@ -125,7 +125,7 @@
    </button>
  </section>
  {#if showShelf || mobileShelf}
-   <aside class={mobileShelf ? 'block' : 'hidden min-[760px]:block'}>
+   <aside class={showShelf ? (mobileShelf ? 'block' : 'hidden min-[760px]:block') : (mobileShelf ? 'block min-[760px]:hidden' : 'hidden')}>
      <section class="rounded-[20px] border border-border bg-card p-4">
        <div class="flex items-start justify-between gap-2">
          <div><h2 class="text-title font-medium">From your list</h2><p class="mt-1 text-meta text-muted-foreground">Add existing activities</p></div>
