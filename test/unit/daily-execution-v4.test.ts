@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { completeSimply, currentForDay, emptyExecutionState, removeFromDay, reopenSimply, selectForDay, setNextForDay, tasksForDay, type ExecutionTask } from '../../src/lib/modules/daily-execution/core/planning.ts';
+import { completeSimply, currentForDay, emptyExecutionState, removeFromDay, reopenSimply, selectForDay, setNextForDay, tasksForDay, moveForDay, unfinishedFromYesterday, bringForwardFromYesterday, previousLocalDayKey, type ExecutionTask } from '../../src/lib/modules/daily-execution/core/planning.ts';
 import { readExecutionState, saveExecutionState } from '../../src/lib/modules/daily-execution/adapters/persistence.ts';
 
 const task = (id:string):ExecutionTask => ({
@@ -29,6 +29,40 @@ describe('Daily v4', () => {
     expect(reopened.tasks[0].completedAt).toBeUndefined();
     expect(before.tasks[0].status).toBe('ready');
   });
+  it('reorders only actionable Today tasks and preserves explicit next selection', () => {
+    const date = '2026-10-13';
+    const done = {...task('done'),status:'done' as const};
+    const blocked = {...task('blocked'),status:'blocked' as const};
+    let state = {...emptyExecutionState(),tasks:[task('a'),done,blocked,task('b'),task('c')]};
+    for (const id of ['a','done','blocked','b','c']) state = selectForDay(state,id,date);
+    state = setNextForDay(state,'c',date);
+    const moved = moveForDay(state,'c',date,-1);
+    expect(moved.days[date].taskIds).toEqual(['a','done','blocked','c','b']);
+    expect(currentForDay(moved,date)?.id).toBe('c');
+    expect(moveForDay(moved,'a',date,-1)).toBe(moved);
+    expect(moveForDay(moved,'done',date,1)).toBe(moved);
+    expect(state.days[date].taskIds).toEqual(['a','done','blocked','b','c']);
+  });
+
+  it('suggests only ready activities selected yesterday, never auto-carries them', () => {
+    const day = '2026-10-13', yesterday = '2026-10-12';
+    let state = {...emptyExecutionState(),tasks:[task('a'),task('b'),{...task('blocked'),status:'blocked' as const},{...task('done'),status:'done' as const}]};
+    for (const id of ['a','blocked','b','done']) state = selectForDay(state,id,yesterday);
+    state = selectForDay(state,'b',day);
+    expect(unfinishedFromYesterday(state,day).map(t=>t.id)).toEqual(['a']);
+    expect(state.days[day].taskIds).toEqual(['b']);
+    const carried = bringForwardFromYesterday(state,day);
+    expect(carried.days[day].taskIds).toEqual(['b','a']);
+    expect(bringForwardFromYesterday(carried,day)).toBe(carried);
+    expect(state.days[yesterday].taskIds).toEqual(['a','blocked','b','done']);
+  });
+
+  it('handles previous-day calculation across months, leap years, and year boundaries', () => {
+    expect(previousLocalDayKey('2026-03-01')).toBe('2026-02-28');
+    expect(previousLocalDayKey('2024-03-01')).toBe('2024-02-29');
+    expect(previousLocalDayKey('2026-01-01')).toBe('2025-12-31');
+  });
+
   it('reads legacy storage while preserving IDs and checkpoints', () => {
     const data = new Map<string,string>();
     vi.stubGlobal('localStorage', {
