@@ -1,0 +1,56 @@
+name: Image Compressor Quality Benchmark
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'test/benchmarks/image-compress.mjs'
+      - 'test/fixtures/image-compress/manifest.json'
+      - '.github/workflows/image-quality-benchmark.yml'
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.2.15'
+      - run: bun install --frozen-lockfile
+      - name: Install browser
+        run: |
+          bun add -d playwright
+          bunx playwright install --with-deps chromium
+      - name: Fetch public-domain/CC0 photo fixtures
+        run: |
+          mkdir -p test/fixtures/image-compress
+          curl --fail --location --retry 3 --max-time 100 --user-agent 'ModuImageBench/1.0 (Open-source QA)' \
+            'https://commons.wikimedia.org/wiki/Special:Redirect/file/Portrait_of_woman.jpg?width=1280' \
+            -o test/fixtures/image-compress/portrait.jpg
+          curl --fail --location --retry 3 --max-time 100 --user-agent 'ModuImageBench/1.0 (Open-source QA)' \
+            'https://images-assets.nasa.gov/image/as16-120-19187/as16-120-19187~orig.jpg' \
+            -o test/fixtures/image-compress/earthrise.jpg
+          file test/fixtures/image-compress/*.jpg
+      - name: Build production bundle
+        run: bun run build
+      - name: Start Worker preview
+        run: |
+          bunx wrangler dev --port 8787 > /tmp/modu-bench-worker.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -fs http://127.0.0.1:8787/image/compress >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/modu-bench-worker.log
+          exit 1
+      - name: Benchmark 64 JPEG/WebP cases
+        run: node test/benchmarks/image-compress.mjs
+      - name: Save visual inspection evidence and CSV
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-compression-quality-benchmark
+          path: image-benchmark-results/
+          if-no-files-found: warn
+          retention-days: 14

@@ -1,0 +1,26 @@
+{
+  "usage": "Public test corpus used only in GitHub Actions benchmarks, not shipped to browser users.",
+  "sources": [
+    {
+      "file": "portrait.jpg",
+      "kind": "natural-portrait",
+      "url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Portrait_of_woman.jpg?width=1280",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Portrait_of_woman.jpg",
+      "license": "CC0 1.0",
+      "attribution": "Anthro Photo (Flickr/Commons)"
+    },
+    {
+      "file": "earthrise.jpg",
+      "kind": "natural-landscape",
+      "url": "https://images-assets.nasa.gov/image/as16-120-19187/as16-120-19187~orig.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Earth_rise_as_photographed_by_Apollo_16_(as16-120-19187).jpg",
+      "license": "Public domain, NASA",
+      "attribution": "NASA"
+    }
+  ],
+  "derivedCases": ["screenshot.png: generated typography test", "transparent.png: generated alpha test"],
+  "targetsKB": [50,100,200,500],
+  "formats": ["WebP","JPEG"],
+  "resizeModes": [false,true],
+  "note": "Human review is required; byte targets and quality encoder settings are not perceptual scores."
+}
