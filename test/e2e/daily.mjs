@@ -107,7 +107,7 @@ try {
   );
   assert.equal(beforeMigration.tasks.find(t=>t.id==='legacy-linked-task').source.externalId,'42');
   await activePage.getByRole('navigation', { name: 'Daily views' }).getByRole('button', { name: 'All' }).click();
-  await activePage.getByRole('button', { name: 'Legacy linked task', exact: true }).click();
+  await activePage.getByRole('button', { name: /^Legacy linked task/ }).click();
   const legacyDetails=activePage.getByRole('dialog', { name: 'Activity details' });
   await legacyDetails.getByRole('link', { name: 'Open reference' }).waitFor();
   await legacyDetails.getByRole('button', { name: 'Save' }).click();
