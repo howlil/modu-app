@@ -54,6 +54,12 @@ try {
   const body=await page.locator('body').innerText();
   if(!body.includes('Raw error')&&!body.includes('No better result found'))
     throw new Error('Perceptual scorer failed: '+body.slice(-1000));
+  if(body.includes('Raw error')) {
+    const match=body.match(/Raw error\s+([0-9.]+)\s+vs baseline\s+([0-9.]+)/);
+    assert.ok(match,'M2 must expose the actual baseline score alongside the selected score');
+    assert.ok(Number(match[1]) <= Number(match[2])+0.00001,
+      'Reported perceptual improvement must not worsen the previous result');
+  }
   const [final]=await Promise.all([
     page.waitForEvent('download'),
     page.getByRole('button',{name:'Download image'}).click()
