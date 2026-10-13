@@ -314,7 +314,11 @@ export function createDailyExecutionController() {
       }
       if(state.sourceConnections.length>=30)throw new Error('Maximum 30 sources.');
       const success=commit({...state,sourceConnections:[...state.sourceConnections,next]});
-      if(success){sourceNotice='Public GitHub repository added. Select Refresh to load issues.';sourceError='';}
+      if(success){
+        sourceNotice='Public GitHub repository added. Loading issues…';
+        sourceError='';
+        void refreshConnection(next.id);
+      }
       return success;
     }catch(e){sourceError=e instanceof Error?e.message:'Invalid repository.';return false;}
   }
