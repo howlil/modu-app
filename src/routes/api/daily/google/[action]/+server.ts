@@ -186,6 +186,12 @@ export const POST:RequestHandler=async ({params,request,url,cookies}) => {
   try{
     if(params.action==='start'){
       const now=Math.floor(Date.now()/1000);
+      // Opportunistic expiry purge: expired sessions must not retain recoverable credentials.
+      await config.db.batch([
+        config.db.prepare('DELETE FROM daily_google_tokens WHERE owner_hash IN (SELECT owner_hash FROM daily_oauth_sessions WHERE expires_at <= ?)').bind(now),
+        config.db.prepare('DELETE FROM daily_oauth_flows WHERE expires_at <= ?').bind(now),
+        config.db.prepare('DELETE FROM daily_oauth_sessions WHERE expires_at <= ?').bind(now)
+      ]);
       let raw=cookies.get(COOKIE);
       let hash=await owner(config,raw);
       if(!hash){raw=randomSecret();hash=await hashSecret(raw);}
