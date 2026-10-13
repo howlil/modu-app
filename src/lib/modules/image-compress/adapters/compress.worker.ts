@@ -1,6 +1,5 @@
 /// <reference lib="webworker" />
 import createPica from 'pica';
-import { encodeRGBA } from 'wasm-webp';
 import { optimizeAdaptive, type Dimensions } from '../core/adaptive.ts';
 import type { ImageOutputFormat } from '../core/target-size.ts';
 
@@ -48,13 +47,24 @@ scope.onmessage = async (event: MessageEvent<Request>) => {
       const pixels = await pixelsAt(dimensions);
       let bytes: ArrayBuffer | Uint8Array | null;
       if (format === 'image/webp') {
-        const raw = await encodeRGBA(
-          new Uint8Array(pixels.data.buffer, pixels.data.byteOffset, pixels.data.byteLength),
-          dimensions.width, dimensions.height, Math.round(quality * 100)
-        );
-        bytes = raw ? new Uint8Array(raw) : null;
+        try {
+          const { encodeRGBA } = await import('wasm-webp');
+          const raw = await encodeRGBA(
+            new Uint8Array(pixels.data.buffer, pixels.data.byteOffset, pixels.data.byteLength),
+            dimensions.width, dimensions.height, Math.round(quality * 100)
+          );
+          if (!raw) throw new Error('WebP WASM encoder returned no data.');
+          bytes = new Uint8Array(raw);
+        } catch {
+          const canvas = new OffscreenCanvas(dimensions.width, dimensions.height);
+          const ctx = canvas.getContext('2d');
+          if (!ctx) throw new Error('No fallback WebP encoder available.');
+          ctx.putImageData(pixels, 0, 0);
+          const fallback = await canvas.convertToBlob({ type: format, quality });
+          if (fallback.type !== format) throw new Error('WebP encoding is unsupported.');
+          bytes = await fallback.arrayBuffer();
+        }
       } else {
-        const jpeg = await import('@jsquash/jpeg/encode');
         // Flatten alpha against white: transparent PNGs must not become black.
         const rgba = new Uint8ClampedArray(pixels.data);
         for (let i = 0; i < rgba.length; i += 4) {
@@ -66,10 +76,21 @@ scope.onmessage = async (event: MessageEvent<Request>) => {
             rgba[i + 3] = 255;
           }
         }
-        bytes = await jpeg.default(
-          new ImageData(rgba, dimensions.width, dimensions.height),
-          { quality: Math.round(quality * 100), progressive: true, optimize_coding: true }
-        );
+        try {
+          const jpeg = await import('@jsquash/jpeg/encode');
+          bytes = await jpeg.default(
+            new ImageData(rgba, dimensions.width, dimensions.height),
+            { quality: Math.round(quality * 100), progressive: true, optimize_coding: true }
+          );
+        } catch {
+          const canvas = new OffscreenCanvas(dimensions.width, dimensions.height);
+          const ctx = canvas.getContext('2d');
+          if (!ctx) throw new Error('No fallback JPEG encoder available.');
+          ctx.putImageData(new ImageData(rgba, dimensions.width, dimensions.height), 0, 0);
+          const fallback = await canvas.convertToBlob({ type: 'image/jpeg', quality });
+          if (fallback.type !== 'image/jpeg') throw new Error('JPEG encoding is unsupported.');
+          bytes = await fallback.arrayBuffer();
+        }
       }
       if (!bytes || bytes.byteLength === 0) throw new Error('The encoder returned no image data.');
       return new Blob([bytes as BlobPart], { type: format });

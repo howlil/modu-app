@@ -4,12 +4,12 @@ import { findTargetSize, targetBytesFromKB, formatBytes } from '../../../src/lib
 const sizedBlob = (bytes: number) => new Blob([new Uint8Array(bytes)], { type: 'image/webp' });
 
 describe('image target-size controller', () => {
-  it('validates custom targets and uses binary KB', () => {
-    expect(targetBytesFromKB(200)).toBe(204800);
+  it('validates custom targets and uses decimal KB for strict upload limits', () => {
+    expect(targetBytesFromKB(200)).toBe(200000);
     expect(() => targetBytesFromKB(0)).toThrow();
     expect(() => targetBytesFromKB(20.5)).toThrow();
     expect(() => targetBytesFromKB(30000)).toThrow();
-    expect(formatBytes(204800)).toBe('200.0 KB');
+    expect(formatBytes(200000)).toBe('200.0 KB');
   });
 
   it('keeps full quality when it already meets the budget', async () => {
