@@ -1,3 +1,4 @@
+// @ts-nocheck — executed by the separate Playwright job; not part of the Svelte application typecheck.
 import { chromium } from 'playwright';
 import { stat } from 'node:fs/promises';
 import assert from 'node:assert/strict';
