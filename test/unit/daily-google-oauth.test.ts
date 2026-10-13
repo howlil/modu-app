@@ -5,7 +5,9 @@ import {beginGoogleConnection,fetchGoogleActivities,googleConnectionStatus,revok
   from '../../src/lib/modules/daily-execution/adapters/google-tasks.ts';
 
 const db = { prepare: (_query: string) => {throw new Error('unused');},batch:async()=>[]} as D1Store;
-const key = Buffer.alloc(32,7).toString('base64url');
+const makeKey=(length:number)=>btoa(String.fromCharCode(...new Uint8Array(length).fill(7)))
+  .replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/g,'');
+const key=makeKey(32);
 function config() {
   const value=googleOAuthConfig({
     DAILY_AUTH_DB:db,
@@ -33,7 +35,7 @@ describe('Google Tasks OAuth security contract',()=>{
      DAILY_AUTH_DB:db,GOOGLE_OAUTH_CLIENT_ID:valid.clientId,
      GOOGLE_OAUTH_CLIENT_SECRET:valid.clientSecret,
      GOOGLE_OAUTH_REDIRECT_URI:valid.redirectUri,
-     GOOGLE_TOKEN_ENCRYPTION_KEY:Buffer.alloc(16,7).toString('base64url')
+     GOOGLE_TOKEN_ENCRYPTION_KEY:makeKey(16)
    },'https://modu.howlil.site')).toBeNull();
  });
  it('requires exact origin for CSRF-sensitive POST routes',()=>{
