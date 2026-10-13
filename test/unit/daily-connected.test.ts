@@ -97,6 +97,18 @@ describe('M3 connected activities',()=>{
   expect(state.sourceItems).toHaveLength(0);
  });
 
+ it('fails closed on oversized source caches instead of truncating persisted data',()=>{
+  const entries=storage();
+  const oversized={...emptyExecutionState(),sourceConnections:[connection],
+    sourceItems:Array.from({length:1501},(_,i)=>item(String(i)))};
+  expect(()=>saveExecutionStateIfCurrent(oversized,null)).toThrow('storage limit');
+  expect(entries.size).toBe(0);
+  const raw=JSON.stringify(oversized);
+  entries.set('modu-daily-execution-v1',raw);
+  expect(()=>readExecutionSnapshot()).toThrow('Invalid source candidates');
+  expect(entries.get('modu-daily-execution-v1')).toBe(raw);
+ });
+
  it('roundtrips linked records in legacy localStorage without overwriting legacy fields',()=>{
   const entries=storage();
   const initial={...emptyExecutionState(),goal:'unchanged',sourceConnections:[connection],sourceItems:[item()]};
