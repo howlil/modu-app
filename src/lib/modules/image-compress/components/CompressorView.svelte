@@ -266,6 +266,23 @@
             {controller.contentReview.faceStatus === 'unavailable' ? 'Automatic face detection unavailable.' : ''}
             {controller.contentReview.improved ? 'A better matching result was found.' : 'Previous result retained.'}
           </p>
+          {#if controller.contentReview.regions.length && controller.contentReview.regionErrors}
+            <details class="mt-2 text-meta text-muted-foreground">
+              <summary class="cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Quality comparison details</summary>
+              <div class="mt-2 space-y-1">
+                <p>Global MILO error:
+                  {controller.contentReview.baselineGlobalError?.toFixed(5) ?? 'n/a'} →
+                  {controller.contentReview.globalError?.toFixed(5) ?? 'n/a'}.
+                </p>
+                {#each controller.contentReview.regions as region (region.id)}
+                  <p>{region.kind}:
+                    {controller.contentReview.baselineRegionErrors?.find((e) => e.regionId === region.id)?.error.toFixed(5) ?? 'n/a'} →
+                    {controller.contentReview.regionErrors?.find((e) => e.regionId === region.id)?.error.toFixed(5) ?? 'n/a'}.
+                  </p>
+                {/each}
+              </div>
+            </details>
+          {/if}
         {/if}
         {#if controller.error}
           <p role="alert" class="mt-2 text-ui text-destructive">{controller.error}</p>
