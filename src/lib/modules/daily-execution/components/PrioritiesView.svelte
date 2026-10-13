@@ -35,7 +35,7 @@
  <div class="mb-4 mt-5 flex flex-wrap gap-2">
    {#each [['all','All'],['today','Today'],['available','Not planned'],['done','Completed']] as entry}
      {@const key = entry[0] as typeof filter}
-     <Button size="sm" variant={filter === key ? 'secondary' : 'ghost'} class="h-8 rounded-full text-meta" onclick={() => changeFilter(key)}>{entry[1]}</Button>
+     <Button size="sm" variant={filter === key ? 'secondary' : 'ghost'} class="h-8 rounded-full text-meta" aria-pressed={filter === key} onclick={() => changeFilter(key)}>{entry[1]}</Button>
    {/each}
  </div>
  <div class="relative mb-3">
