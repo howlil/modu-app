@@ -86,6 +86,37 @@ jobs:
             const byteSize = (await stat(file)).size;
             if (byteSize>50000) throw new Error('WebP output over 50 KB: '+byteSize);
             console.log('WebP bytes:',byteSize, 'dimensions:',preview);
+            if (!(await page.locator('body').innerText()).includes('WASM encoder')) {
+              throw new Error('WebP output did not use the WASM encoder');
+            }
+
+            // The same source at a stricter budget must exercise adaptive resizing.
+            await page.locator('#modu-target-kb').fill('20');
+            await page.getByRole('button',{name:/Compress image/}).click();
+            await page.getByText('Target reached').waitFor({timeout:120000});
+            const resized = await page.getByAltText('Compressed image preview').evaluate(img=>({
+              width:img.naturalWidth,height:img.naturalHeight
+            }));
+            if (resized.width >= 1600 || resized.height >= 1200) {
+              throw new Error('Adaptive resize did not reduce dimensions: '+JSON.stringify(resized));
+            }
+            console.log('Adaptive 20KB dimensions:',resized);
+
+            // JPEG also uses WASM rather than silently falling back to Canvas.
+            await page.getByRole('button',{name:'JPEG',exact:true}).click();
+            await page.locator('#modu-target-kb').fill('200');
+            await page.getByRole('button',{name:/Compress image/}).click();
+            await page.getByText('Target reached').waitFor({timeout:120000});
+            if (!(await page.locator('body').innerText()).includes('WASM encoder')) {
+              throw new Error('JPEG output did not use the WASM encoder');
+            }
+            const [jpegDownload] = await Promise.all([
+              page.waitForEvent('download'),
+              page.getByRole('button',{name:'Download image'}).click()
+            ]);
+            const jpegSize = (await stat(await jpegDownload.path())).size;
+            if (jpegSize > 200000) throw new Error('JPEG output above 200KB: '+jpegSize);
+            console.log('JPEG bytes:',jpegSize);
             if (errors.length) throw new Error('Browser errors: '+errors.join('; '));
           } finally { await browser.close(); }
           JS
