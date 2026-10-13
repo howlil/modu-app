@@ -148,6 +148,47 @@ export function setNextForDay(state:ExecutionState,id:string,key:string):Executi
   if(!day?.taskIds.includes(id)||!state.tasks.some(t=>t.id===id&&t.status==='ready'))return state;
   return {...state,days:{...state.days,[key]:{...day,selectedTaskId:id}}};
 }
+/** Move only amongst actionable items; completed and blocked positions are untouched. */
+export function moveForDay(state: ExecutionState, id: string, key: string, direction: -1 | 1): ExecutionState {
+  const selection = state.days[key];
+  if (!selection) return state;
+  const byId = new Map(state.tasks.map(task => [task.id, task]));
+  const readyIds = selection.taskIds.filter(taskId => byId.get(taskId)?.status === 'ready');
+  const current = readyIds.indexOf(id);
+  const adjacent = current + direction;
+  if (current < 0 || adjacent < 0 || adjacent >= readyIds.length) return state;
+  const nextIds = [...selection.taskIds];
+  const from = nextIds.indexOf(id);
+  const to = nextIds.indexOf(readyIds[adjacent]);
+  [nextIds[from], nextIds[to]] = [nextIds[to], nextIds[from]];
+  return { ...state, days: { ...state.days, [key]: { ...selection, taskIds: nextIds } } };
+}
+
+/** The previous calendar day is computed at local noon to avoid DST midnight edge cases. */
+export function previousLocalDayKey(key: string): string {
+  const [year, month, day] = key.split('-').map(Number);
+  const date = new Date(year, month - 1, day, 12);
+  date.setDate(date.getDate() - 1);
+  return localDayKey(date.getTime());
+}
+
+export function unfinishedFromYesterday(state: ExecutionState, key: string): ExecutionTask[] {
+  const todayIds = new Set(state.days[key]?.taskIds ?? []);
+  return tasksForDay(state, previousLocalDayKey(key))
+    .filter(task => task.status === 'ready' && !todayIds.has(task.id));
+}
+
+/** Explicit only: never auto-carry activities across days. */
+export function bringForwardFromYesterday(state: ExecutionState, key: string): ExecutionState {
+  const previous = unfinishedFromYesterday(state, key);
+  if (!previous.length) return state;
+  const current = state.days[key] ?? { taskIds: [] };
+  return { ...state, days: {
+    ...state.days,
+    [key]: { ...current, taskIds: [...current.taskIds, ...previous.map(task => task.id)] }
+  } };
+}
+
 export function completeSimply(state:ExecutionState,id:string,at:number):ExecutionState{
   return {...state,tasks:state.tasks.map(t=>t.id===id&&t.status==='ready'?{...t,status:'done' as const,completedAt:at}:t)};
 }
