@@ -59,3 +59,25 @@ describe('image target-size controller', () => {
     await expect(findTargetSize(async () => new Blob(), 1000)).rejects.toThrow('empty');
   });
 });
+
+describe('quantized quality search', () => {
+  it('does not search fractional encoder quality levels', async () => {
+    const qualities: number[] = [];
+    const result = await findTargetSize(async (q) => {
+      qualities.push(q);
+      return sizedBlob(Math.round(q * 100) * 100 + 1000);
+    }, 9050);
+    expect(result.quality).toBe(0.8);
+    expect(result.blob.size).toBeLessThanOrEqual(9050);
+    expect(qualities.every(q => Math.abs(q * 100 - Math.round(q * 100)) < 0.00001)).toBe(true);
+  });
+
+  it('checks adjacent non-monotonic outputs', async () => {
+    const result = await findTargetSize(async (q) => {
+      const i = Math.round(q * 100);
+      return sizedBlob(i === 82 ? 7900 : i * 100);
+    }, 8050);
+    expect(result.quality).toBe(0.82);
+    expect(result.status).toBe('within-target');
+  });
+});
