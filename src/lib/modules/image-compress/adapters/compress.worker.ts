@@ -203,8 +203,9 @@ scope.onmessage = async (event: MessageEvent<Request>) => {
         const faces=await detectFaces(sourceCanvas);
         detected=faces;
         faceStatus=faces.length?'detected':'none';
-      }catch{
+      }catch(error){
         faceStatus='unavailable';
+        console.warn('M3 on-device face detector could not initialize:',error);
       }
       let textRegions:ImportantRegion[]=[];
       try{

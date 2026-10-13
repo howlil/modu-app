@@ -7,6 +7,7 @@ const browser=await {chromium,firefox,webkit}[type].launch({headless:true});
 const page=await browser.newPage({acceptDownloads:true,viewport:{width:1200,height:900}});
 const pageErrors=[];
 page.on('pageerror',e=>pageErrors.push(e.message));
+page.on('console',msg=>{if(msg.type()==='warning'||msg.type()==='error') console.log('M3 browser console:',msg.text());});
 try{
   await page.goto(process.env.MODU_E2E_URL||'http://127.0.0.1:8787/image/compress',{waitUntil:'networkidle'});
   for(const resource of [
