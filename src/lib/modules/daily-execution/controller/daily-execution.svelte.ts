@@ -391,7 +391,7 @@ export function createDailyExecutionController() {
       const items=await loadPublicGithubIssues(connection);
       const current=state.sourceConnections.find(c=>c.id===id);
       if(!current){sourceError='Source was removed before refresh completed.';return false;}
-      const next=reconcileSource(state,current,items,Date.now());
+      const next=reconcileSource(state,current,items,Date.now(),current.lastSyncedAt!==undefined);
       const saved=commit(next);
       if(saved){sourceNotice=items.length+' public issues updated. Linked completion remains local.';sourceError='';}
       return saved;
