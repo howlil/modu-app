@@ -59,10 +59,16 @@
      <div class="flex items-center gap-2">
        <span class="text-meta text-muted-foreground">{completed.length} / {planned.length} completed</span>
        {#if ready.length > 1}
-         <Button size="sm" variant={arranging ? 'secondary' : 'ghost'} class="h-8 rounded-lg px-2 text-meta" aria-pressed={arranging} onclick={() => arranging = !arranging}>
-           <ArrowUpDown class="mr-1 size-3.5"/> {arranging ? 'Done' : 'Arrange'}
+         <Button size="sm" variant={arranging ? 'secondary' : 'ghost'} class="min-h-10 rounded-lg px-2 text-meta focus-visible:ring-2 focus-visible:ring-primary" aria-pressed={arranging} onclick={() => arranging = !arranging}>
+           <ArrowUpDown class="mr-1 size-4"/> {arranging ? 'Done' : 'Arrange'}
          </Button>
        {/if}
+       <Button size="sm" variant="ghost" class="min-h-10 rounded-lg px-2 text-meta min-[760px]:hidden focus-visible:ring-2 focus-visible:ring-primary"
+         aria-expanded={mobileShelf} aria-controls="daily-available-list"
+         onclick={() => { mobileShelf = !mobileShelf; showShelf = true; }}>
+         {#if mobileShelf}<ChevronDown class="mr-1 size-4"/>{:else}<ChevronRight class="mr-1 size-4"/>{/if}
+         Browse list
+       </Button>
      </div>
    </div>
    <p class="sr-only" role="status">{orderNotice}</p>
@@ -71,7 +77,7 @@
    <div class="divide-y divide-border border-t border-border">
      {#each ready as task, index (task.id)}
        <div class={current?.id === task.id ? 'group flex min-h-14 items-center gap-2 rounded-lg bg-secondary/50 px-2 py-2' : 'group flex min-h-14 items-center gap-2 py-2'}>
-         <button type="button" class="flex size-7 shrink-0 items-center justify-center rounded-full" aria-label={'Complete ' + task.title} onclick={() => controller.completeQuick(task.id)}>
+         <button type="button" class="flex size-10 shrink-0 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" aria-label={'Complete ' + task.title} onclick={() => controller.completeQuick(task.id)}>
            <span class="size-[18px] rounded-full border border-muted-foreground/50"></span>
          </button>
          <button type="button" class="min-w-0 flex-1 py-1 text-left" onclick={() => editing = task}>
@@ -80,12 +86,12 @@
          </button>
          <div class="flex shrink-0 items-center gap-0.5">
            {#if arranging && ready.length > 1}
-             <Button size="icon" variant="ghost" class="size-8 rounded-lg text-muted-foreground" aria-label={'Move ' + task.title + ' up'} title="Move up" disabled={index === 0} onclick={() => move(task,-1)}><ArrowUp class="size-4"/></Button>
-             <Button size="icon" variant="ghost" class="size-8 rounded-lg text-muted-foreground" aria-label={'Move ' + task.title + ' down'} title="Move down" disabled={index === ready.length - 1} onclick={() => move(task,1)}><ArrowDown class="size-4"/></Button>
+             <Button size="icon" variant="ghost" class="size-10 rounded-lg text-muted-foreground" aria-label={'Move ' + task.title + ' up'} title="Move up" disabled={index === 0} onclick={() => move(task,-1)}><ArrowUp class="size-4"/></Button>
+             <Button size="icon" variant="ghost" class="size-10 rounded-lg text-muted-foreground" aria-label={'Move ' + task.title + ' down'} title="Move down" disabled={index === ready.length - 1} onclick={() => move(task,1)}><ArrowDown class="size-4"/></Button>
            {:else if current?.id === task.id}
              <span class="px-2 text-meta font-medium text-primary">Next</span>
            {:else}
-             <Button size="sm" variant="ghost" class="h-8 rounded-lg px-2 text-meta text-muted-foreground" aria-label={'Make ' + task.title + ' next'} onclick={() => controller.chooseNext(task.id)}>Next</Button>
+             <Button size="sm" variant="ghost" class="min-h-10 rounded-lg px-2 text-meta text-muted-foreground" aria-label={'Make ' + task.title + ' next'} onclick={() => controller.chooseNext(task.id)}>Next</Button>
            {/if}
          </div>
        </div>
@@ -105,7 +111,7 @@
      <div class="mt-2 divide-y divide-border">
        {#each completed as task (task.id)}
          <div class="flex min-h-12 items-center gap-2 py-2">
-           <button type="button" class="flex size-7 shrink-0 items-center justify-center text-primary" aria-label={'Reopen ' + task.title} onclick={() => controller.reopenQuick(task.id)}><Check class="size-4"/></button>
+           <button type="button" class="flex size-10 shrink-0 items-center justify-center text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" aria-label={'Reopen ' + task.title} onclick={() => controller.reopenQuick(task.id)}><Check class="size-4"/></button>
            <span class="min-w-0 flex-1 truncate text-ui text-muted-foreground line-through">{task.title}</span>
          </div>
        {/each}
@@ -120,12 +126,10 @@
        <Button size="sm" variant="outline" class="rounded-lg min-[760px]:hidden" onclick={() => { mobileShelf = true; showShelf = true; }}>Browse list</Button>
      {/if}
    </div>
-   <button type="button" class="mt-4 flex items-center gap-2 text-meta text-muted-foreground min-[760px]:hidden" aria-expanded={mobileShelf} onclick={() => mobileShelf = !mobileShelf}>
-     {#if mobileShelf}<ChevronDown class="size-4"/>{:else}<ChevronRight class="size-4"/>{/if} From your list ({controller.availableTasks.length})
-   </button>
+   <!-- Mobile Browse is placed at the top so long Today lists do not hide discovery. -->
  </section>
  {#if showShelf || mobileShelf}
-   <aside class={showShelf ? (mobileShelf ? 'block' : 'hidden min-[760px]:block') : (mobileShelf ? 'block min-[760px]:hidden' : 'hidden')}>
+   <aside id="daily-available-list" class={showShelf ? (mobileShelf ? 'block' : 'hidden min-[760px]:block') : (mobileShelf ? 'block min-[760px]:hidden' : 'hidden')}>
      <section class="rounded-[20px] border border-border bg-card p-4">
        <div class="flex items-start justify-between gap-2">
          <div><h2 class="text-title font-medium">From your list</h2><p class="mt-1 text-meta text-muted-foreground">Add existing activities</p></div>
@@ -144,14 +148,14 @@
                <p class="text-meta text-muted-foreground">{matchingYesterday.length} unfinished</p>
              </div>
              {#if !query.trim()}
-               <Button size="sm" variant="outline" class="h-8 shrink-0 rounded-lg px-2 text-meta" onclick={() => controller.carryYesterday()}>Add all</Button>
+               <Button size="sm" variant="outline" class="min-h-10 shrink-0 rounded-lg px-2 text-meta" onclick={() => controller.carryYesterday()}>Add all</Button>
              {/if}
            </div>
            <div class="mt-2 divide-y divide-border">
              {#each visibleYesterday as task (task.id)}
                <div class="flex min-h-11 items-center gap-2 py-1.5">
                  <p class="min-w-0 flex-1 truncate text-ui">{task.title}</p>
-                 <Button size="icon" variant="ghost" class="size-8 shrink-0 rounded-lg" aria-label={'Add ' + task.title + ' to Today'} onclick={() => controller.addToToday(task.id)}><Plus class="size-4"/></Button>
+                 <Button size="icon" variant="ghost" class="size-10 shrink-0 rounded-lg" aria-label={'Add ' + task.title + ' to Today'} onclick={() => controller.addToToday(task.id)}><Plus class="size-4"/></Button>
                </div>
              {/each}
            </div>
@@ -169,7 +173,7 @@
                <p class="truncate text-ui font-medium">{task.title}</p>
                {#if task.context}<p class="text-meta text-muted-foreground">{task.context}</p>{/if}
              </div>
-             <Button variant="ghost" size="icon" class="size-8 shrink-0 rounded-lg" aria-label={'Add ' + task.title + ' to Today'} onclick={() => controller.addToToday(task.id)}><Plus class="size-4"/></Button>
+             <Button variant="ghost" size="icon" class="size-10 shrink-0 rounded-lg" aria-label={'Add ' + task.title + ' to Today'} onclick={() => controller.addToToday(task.id)}><Plus class="size-4"/></Button>
            </div>
          {/each}
        </div>
