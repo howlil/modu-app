@@ -1,7 +1,16 @@
 import { emptyExecutionState, type ExecutionState, type ExecutionTask, type ManualWorkEntry } from '../core/planning.ts';
-import { isSourceReference, isSourceCandidate, isSourceConnection, sourceIdentity } from '../core/connected-activities.ts';
 const KEY = 'modu-daily-execution-v1';
 export const DAILY_STORAGE_KEY = KEY;
+
+/** Optional reference links are not provider connections and never trigger network calls. */
+export function isSafeReferenceUrl(value: string): boolean {
+  if (!value || value.length > 2048) return false;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'https:' && !parsed.username && !parsed.password &&
+      !parsed.port && !!parsed.hostname;
+  } catch { return false; }
+}
 
 export class DailyStorageConflictError extends Error {
   constructor() { super('Daily was modified in another tab.'); this.name = 'DailyStorageConflictError'; }
@@ -24,19 +33,6 @@ export function readExecutionSnapshot(): { state: ExecutionState; raw: string | 
         !['ready', 'blocked', 'done', 'archived'].includes(task.status)
       )
     )) throw new Error('Invalid Daily tasks. Original data has been preserved.');
-    if (candidate.tasks?.some(task => task.source !== undefined && !isSourceReference(task.source))) {
-      throw new Error('Invalid linked activity. Original data has been preserved.');
-    }
-    if (candidate.sourceConnections !== undefined &&
-      (!Array.isArray(candidate.sourceConnections) || candidate.sourceConnections.length>30 ||
-      candidate.sourceConnections.some(v=>!isSourceConnection(v)))) {
-      throw new Error('Invalid source connection. Original data has been preserved.');
-    }
-    if (candidate.sourceItems !== undefined &&
-      (!Array.isArray(candidate.sourceItems) || candidate.sourceItems.length>1500 ||
-      candidate.sourceItems.some(v=>!isSourceCandidate(v)))) {
-      throw new Error('Invalid source candidates. Original data has been preserved.');
-    }
     if (candidate.days !== undefined && (
       !candidate.days || typeof candidate.days !== 'object' || Array.isArray(candidate.days)
     )) throw new Error('Invalid dated selections.');
@@ -47,8 +43,6 @@ export function readExecutionSnapshot(): { state: ExecutionState; raw: string | 
 /** Best-effort optimistic cross-tab guard. localStorage has no atomic compare-and-swap. */
 export function saveExecutionStateIfCurrent(value: ExecutionState, expectedRaw: string | null): string {
   if (typeof localStorage === 'undefined') throw new Error('Local storage unavailable.');
-  if (value.sourceConnections.length>30 || value.sourceItems.length>1500)
-    throw new Error('Connected source storage limit exceeded.');
   if (localStorage.getItem(KEY) !== expectedRaw) throw new DailyStorageConflictError();
   const raw = JSON.stringify(value);
   localStorage.setItem(KEY, raw);
@@ -60,18 +54,23 @@ function parseExecutionState(rawSnapshot: string | null): ExecutionState {
     const parsed: unknown = JSON.parse(rawSnapshot ?? 'null');
     if (!parsed || typeof parsed !== 'object') return emptyExecutionState();
     const raw = parsed as Partial<ExecutionState>;
+    // M3 rollback: selected linked activities become plain local activities. Task IDs,
+    // local completion, checkpoints and day membership remain unchanged. Preserve the
+    // original link when present, without carrying provider status or credential metadata.
     const validTasks = Array.isArray(raw.tasks) ? raw.tasks.filter((task): task is ExecutionTask =>
       !!task && typeof task.id === 'string' && typeof task.title === 'string' &&
       typeof task.nextAction === 'string' && typeof task.workstream === 'string' &&
       ['ready', 'blocked', 'done', 'archived'].includes(task.status)
-    ) : [];
-    const seenRefs=new Set<string>();
-    for(const task of validTasks){
-      if(!task.source)continue;
-      const key=sourceIdentity(task.source);
-      if(seenRefs.has(key))throw new Error('Duplicate source identity.');
-      seenRefs.add(key);
-    }
+    ).map(task => {
+      const legacy = task as ExecutionTask & { source?: {url?: unknown} };
+      const { source, ...local } = legacy;
+      const reference = typeof source?.url === 'string' && isSafeReferenceUrl(source.url)
+        ? source.url : undefined;
+      return {
+        ...local,
+        ...(reference && !local.referenceUrl ? { referenceUrl: reference } : {})
+      };
+    }) : [];
     const validIds = new Set(validTasks.map(task => task.id));
     const days = Object.fromEntries(Object.entries(raw.days && typeof raw.days === 'object' ? raw.days : {})
       .filter(([date]) => /^\d{4}-\d{2}-\d{2}$/.test(date))
@@ -84,16 +83,8 @@ function parseExecutionState(rawSnapshot: string | null): ExecutionState {
     const dayNotes = Object.fromEntries(Object.entries(raw.dayNotes && typeof raw.dayNotes === 'object' ? raw.dayNotes : {})
       .filter(([date, value]) => /^\d{4}-\d{2}-\d{2}$/.test(date) && typeof value === 'string')
       .map(([date, value]) => [date, String(value).slice(0,1000)]));
-    const sourceConnections = Array.isArray(raw.sourceConnections)
-      ? raw.sourceConnections.filter(isSourceConnection).slice(0,30) : [];
-    const knownConnections = new Set(sourceConnections.map(c=>c.id));
-    const sourceItems = Array.isArray(raw.sourceItems)
-      ? [...new Map(raw.sourceItems.filter(isSourceCandidate)
-        .filter(item=>knownConnections.has(item.source.connectionId))
-        .slice(0,1500).map(item=>[sourceIdentity(item.source),item])).values()]
-      : [];
     return {
-      days, dayNotes, sourceConnections, sourceItems,
+      days, dayNotes,
       goal: typeof raw.goal === 'string' ? raw.goal : '',
       successCriteria: typeof raw.successCriteria === 'string' ? raw.successCriteria : '',
       tasks: validTasks,
