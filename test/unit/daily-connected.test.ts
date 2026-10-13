@@ -43,6 +43,17 @@ describe('M3 connected activities',()=>{
   expect(next.tasks[0].source?.remoteStatus).toBe('completed');
   expect(today.days['2026-10-13'].taskIds).toEqual(['local-uuid']);
  });
+ it('updates unchanged remote titles but preserves user-edited local titles',()=>{
+  const seed={...emptyExecutionState(),sourceConnections:[connection],sourceItems:[item()]};
+  const linked=linkActivity(seed,item(),'local-1',1).state;
+  const first=reconcileSource(linked,connection,[item('42','Updated by provider')],100);
+  expect(first.tasks[0].title).toBe('Updated by provider');
+  const modified={...first,tasks:[{...first.tasks[0],title:'My personal shorthand'}]};
+  const second=reconcileSource(modified,connection,[item('42','Updated again')],200);
+  expect(second.tasks[0].title).toBe('My personal shorthand');
+  expect(second.tasks[0].source?.remoteTitle).toBe('Updated again');
+  expect(linked.tasks[0].title).toBe('Review issue');
+ });
  it('disconnects or detaches without deleting task, checkpoint, Today, or history',()=>{
   const seed={...emptyExecutionState(),sourceConnections:[connection],sourceItems:[item()]};
   const linked=linkActivity(seed,item(),'linked-one',1).state;
