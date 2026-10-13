@@ -3,7 +3,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import {
   browserCookieSettings, decryptSecret, encryptSecret, googleOAuthConfig,
-  hashSecret, originAllowed, randomSecret, type GoogleOAuthConfig
+  hashSecret, originAllowed, randomSecret, type GoogleOAuthConfig, type GoogleOAuthEnv
 } from '#lib/server/daily-google-security.ts';
 
 const COOKIE = 'modu_daily_google_session';
@@ -123,6 +123,18 @@ async function readTasks(token:string,connectionId:string) {
   }
   return candidates;
 }
+async function quota(request:Request,type:'auth'|'tasks'):
+  Promise<'allowed'|'limited'|'unavailable'> {
+  const binding=env as unknown as GoogleOAuthEnv;
+  const limiter=type==='auth'?binding.DAILY_GOOGLE_AUTH_LIMITER:binding.DAILY_GOOGLE_TASKS_LIMITER;
+  if(!limiter)return 'unavailable';
+  try {
+    const ip=request.headers.get('cf-connecting-ip')||'unknown';
+    const result=await limiter.limit({key:'daily-google:'+type+':'+ip});
+    return result.success?'allowed':'limited';
+  }catch{return 'unavailable';}
+}
+
 function returnToDaily(ok:boolean):Response {
   return new Response(null,{status:303,headers:{
     location:ok?'/daily?google=connected':'/daily?google=failed',...noStore
@@ -167,6 +179,9 @@ export const GET:RequestHandler=async ({params,request,url,cookies}) => {
       if(!hash)return failure('Connect Google Tasks first.',401);
       const token=await tokenRow(config,hash);
       if(!token)return failure('Connect Google Tasks first.',401);
+      const quotaResult=await quota(request,'tasks');
+      if(quotaResult!=='allowed')
+        return failure(quotaResult==='limited'?'Google Tasks refresh limit reached.':'Google Tasks rate limiter unavailable.',quotaResult==='limited'?429:503);
       const access=await bearer(config,hash,token);
       const items=await readTasks(access,token.connection_id);
       return reply({connectionId:token.connection_id,items});
@@ -185,6 +200,9 @@ export const POST:RequestHandler=async ({params,request,url,cookies}) => {
   if(!config)return failure('Google Tasks connection is not configured.',503);
   try{
     if(params.action==='start'){
+      const quotaResult=await quota(request,'auth');
+      if(quotaResult!=='allowed')
+        return failure(quotaResult==='limited'?'Too many Google connection attempts.':'OAuth rate limiter unavailable.',quotaResult==='limited'?429:503);
       const now=Math.floor(Date.now()/1000);
       // Opportunistic expiry purge: expired sessions must not retain recoverable credentials.
       await config.db.batch([
