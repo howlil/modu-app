@@ -10,6 +10,7 @@ interface Request {
   targetBytes: number;
   allowResize: boolean;
   mode?: 'standard' | 'perceptual';
+  previousOutput?: { blob: Blob; width: number; height: number; quality: number; resized: boolean };
 }
 
 const scope = self as DedicatedWorkerGlobalScope;
@@ -17,7 +18,7 @@ scope.onmessage = async (event: MessageEvent<Request>) => {
   let bitmap: ImageBitmap | undefined;
   let originalCanvas: OffscreenCanvas | undefined;
   try {
-    const { file, format, targetBytes, allowResize, mode = 'standard' } = event.data;
+    const { file, format, targetBytes, allowResize, mode = 'standard', previousOutput } = event.data;
     bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
     const source = { width: bitmap.width, height: bitmap.height };
     const resizer = createPica({ features: ['js', 'wasm'], concurrency: 1 });
@@ -123,16 +124,34 @@ scope.onmessage = async (event: MessageEvent<Request>) => {
     let evidence: { metric: 'milo'; rawError: number; baselineRawError: number; improved: boolean; scoredCandidates: number; comparisonLongSide: number } | undefined;
     if (mode === 'perceptual' && result.status === 'within-target') {
       const { scorePerceptualMilo } = await import('./perceptual-scorer.ts');
-      // A scorer failure is surfaced, never fabricated as a score.
-      const baselineError = await scorePerceptualMilo(sourceCanvas, result.blob);
+      // Compare against the exact file already visible to the user.
+      // Re-encoding M1 may produce a different output; it is NOT the baseline.
+      if (!previousOutput || previousOutput.blob.size > targetBytes ||
+          previousOutput.blob.size === 0 ||
+          (!allowResize && (previousOutput.width !== source.width ||
+                             previousOutput.height !== source.height))) {
+        throw new Error('A valid previous result is required for visual optimization.');
+      }
+      const baselineError = await scorePerceptualMilo(sourceCanvas, previousOutput.blob);
       let error = baselineError;
+      best = { ...result, ...previousOutput, status: 'within-target' };
+      let scoredCandidates = 1;
+      let improvements = 0;
+      const newBaselineError = await scorePerceptualMilo(sourceCanvas, result.blob);
+      scoredCandidates++;
+      if (isBetterPerceptualCandidate(
+        { ...result, error: newBaselineError },
+        { ...best, error }, targetBytes
+      )) {
+        best = result;
+        error = newBaselineError;
+        improvements++;
+      }
       const plan = planPerceptualCandidates({
         source, baseline: result,
         allowResize, minShortSide: 640,
         maxCandidates: format === 'image/avif' ? 3 : 4
       });
-      let scoredCandidates = 1;
-      let improvements = 0;
       for (const candidate of plan) {
         // Soft budget limits additional encoding/scoring work. Worker can still
         // be terminated immediately on user cancellation.

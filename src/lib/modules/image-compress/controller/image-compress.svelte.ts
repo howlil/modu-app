@@ -148,7 +148,8 @@ export function createImageCompressController() {
         (count) => { if (run === revision) attempts = count; },
         abort.signal,
         resize,
-        mode
+        mode,
+        mode === 'perceptual' ? output ?? undefined : undefined
       );
       if (run !== revision) return;
 

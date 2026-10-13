@@ -74,7 +74,8 @@ export async function encodeImageToTarget(
   onAttempt?: (attempts: number) => void,
   signal?: AbortSignal,
   allowResize = false,
-  mode: 'standard' | 'perceptual' = 'standard'
+  mode: 'standard' | 'perceptual' = 'standard',
+  previousOutput?: EncodedImage
 ): Promise<EncodedImage> {
   validateFile(file);
   if (signal?.aborted) throw new DOMException('Compression canceled.', 'AbortError');
@@ -167,7 +168,11 @@ export async function encodeImageToTarget(
     signal?.addEventListener('abort', cancel, { once: true });
     if (signal?.aborted) { cancel(); return; }
     try {
-      worker.postMessage({ file, format, targetBytes, allowResize, mode });
+      worker.postMessage({ file, format, targetBytes, allowResize, mode,
+      previousOutput: mode === 'perceptual' && previousOutput ? {
+        blob: previousOutput.blob, width: previousOutput.width, height: previousOutput.height,
+        quality: previousOutput.quality, resized: previousOutput.resized
+      } : undefined });
     } catch (error) {
       finish();
       reject(error);
