@@ -11,6 +11,7 @@ export function createImageCompressController() {
   let output = $state<EncodedImage | null>(null);
   let format = $state<ImageOutputFormat>('image/webp');
   let targetInput = $state('200');
+  let allowResize = $state(false);
   let status = $state<CompressionStatus>('idle');
   let error = $state('');
   let attempts = $state(0);
@@ -78,6 +79,11 @@ export function createImageCompressController() {
     resetResult();
   }
 
+  function setAllowResize(value: boolean): void {
+    allowResize = value;
+    resetResult();
+  }
+
   function getTargetError(): string {
     const parsed = Number(targetInput);
     if (!targetInput.trim() || !Number.isInteger(parsed) || parsed < MIN_TARGET_KB || parsed > MAX_TARGET_KB) {
@@ -107,7 +113,8 @@ export function createImageCompressController() {
       const encoded = await encodeImageToTarget(
         selectedFile, selectedFormat, targetBytes,
         (count) => { if (run === revision) attempts = count; },
-        abort.signal
+        abort.signal,
+        allowResize
       );
       if (run !== revision) return;
       output = encoded;
@@ -146,11 +153,12 @@ export function createImageCompressController() {
     get outputUrl() { return outputUrl; },
     get output() { return output; },
     get format() { return format; },
+    get allowResize() { return allowResize; },
     get targetInput() { return targetInput; },
     get status() { return status; },
     get error() { return error; },
     get attempts() { return attempts; },
     get targetError() { return getTargetError(); },
-    setFile, setTargetInput, setFormat, compress, download, dispose
+    setFile, setTargetInput, setFormat, setAllowResize, compress, download, dispose
   };
 }

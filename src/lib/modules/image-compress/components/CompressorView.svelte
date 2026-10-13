@@ -1,6 +1,7 @@
 <script lang="ts">
   import { ArrowDown, Download, FileImage, ImageUp, RefreshCcw } from 'lucide-svelte';
   import { Button } from '$lib/components/ui/button/index.js';
+  import { Switch } from '$lib/components/ui/switch/index.js';
   import { formatBytes, type ImageOutputFormat } from '../core/target-size.ts';
   import type { createImageCompressController } from '../controller/image-compress.svelte.ts';
 
@@ -101,9 +102,18 @@
       <div class="mt-6 border-t border-border pt-5">
         <div class="flex items-center justify-between gap-2 text-ui">
           <span class="font-medium">Original resolution</span>
-          <span class="text-muted-foreground">Preserved</span>
+          <span class="text-muted-foreground">{controller.allowResize ? 'Adaptive' : 'Preserved'}</span>
         </div>
-        <p class="mt-2 text-meta text-muted-foreground">No automatic resizing. Very small targets can reduce image detail.</p>
+        <p class="mt-2 text-meta text-muted-foreground">Original dimensions stay unchanged unless you allow resizing.</p>
+        <div class="mt-4 flex items-center justify-between gap-3 border-t border-border pt-4">
+          <div class="min-w-0">
+            <label for="modu-smart-resize" class="text-ui font-medium">Allow smart resize</label>
+            <p class="mt-1 text-meta text-muted-foreground">Find the largest image that fits the target. Minimum short side: 640 px.</p>
+          </div>
+          <Switch id="modu-smart-resize" checked={controller.allowResize}
+            aria-label="Allow smart resize"
+            onclick={() => controller.setAllowResize(!controller.allowResize)} />
+        </div>
       </div>
 
       <Button class="mt-6 w-full" disabled={!controller.file || !controller.info || Boolean(controller.targetError) || controller.status === 'processing'}
@@ -159,20 +169,20 @@
 
       <div role="status" aria-live="polite" class="mt-5">
         {#if controller.status === 'processing'}
-          <p class="text-ui">Compressing at full resolution…</p>
-          <p class="mt-1 text-meta text-muted-foreground">Testing encoder quality levels. This may take a moment for large images.</p>
+          <p class="text-ui">Optimizing image…</p>
+          <p class="mt-1 text-meta text-muted-foreground">Testing quality and, if allowed, resolution. Large images may take a moment.</p>
         {:else if controller.status === 'complete' && controller.output}
           <p class="text-ui font-medium text-success">Target reached</p>
           <p class="mt-1 text-meta text-muted-foreground">
             {formatBytes(controller.output.blob.size)} · Quality setting {Math.round(controller.output.quality * 100)}%
-            · {controller.output.width} × {controller.output.height} px
+            · {controller.output.width} × {controller.output.height} px {controller.output.resized ? '(resized with permission)' : '(original resolution)'}
           </p>
         {:else if controller.status === 'quality-limited' && controller.output}
-          <p class="text-ui font-medium text-destructive">Target too small for the quality safeguard</p>
+          <p class="text-ui font-medium text-destructive">Target cannot be reached within the quality and resolution limits</p>
           <p class="mt-1 text-meta text-muted-foreground">
-            The encoder stopped before severe quality reduction. Result: {formatBytes(controller.output.blob.size)} at
-            quality setting {Math.round(controller.output.quality * 100)}%. Your resolution is unchanged.
-            Try a larger target or download this alternative.
+            Best available: {formatBytes(controller.output.blob.size)} · {controller.output.width} × {controller.output.height} px
+            · encoder setting {Math.round(controller.output.quality * 100)}.
+            {controller.allowResize ? 'The 640 px minimum short side was respected. Try a larger target.' : 'Enable smart resize or increase the target.'}
           </p>
         {:else if controller.error}
           <p role="alert" class="text-ui text-destructive">{controller.error}</p>
