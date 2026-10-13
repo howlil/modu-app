@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Modu Focus Companion",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "An optional floating focus timer and website protection for Modu.",
   "permissions": [
     "storage",
@@ -43,7 +43,8 @@
     {
       "resources": [
         "floating/widget.css",
-        "floating/modu-logo.svg"
+        "floating/modu-logo.svg",
+        "floating/quiet-dock-v2.css"
       ],
       "matches": [
         "http://*/*",

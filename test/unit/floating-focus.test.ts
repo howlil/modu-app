@@ -6,7 +6,8 @@ import { normalizePomodoroSnapshot } from '../../src/lib/modules/pomodoro/adapte
 
 const workerSource = readFileSync(new URL('../../extension/service-worker.js', import.meta.url), 'utf8');
 const widgetSource = readFileSync(new URL('../../extension/floating/widget.js', import.meta.url), 'utf8');
-const widgetStyles = readFileSync(new URL('../../extension/floating/widget.css', import.meta.url), 'utf8');
+const widgetStyles = readFileSync(new URL('../../extension/floating/quiet-dock-v2.css', import.meta.url), 'utf8');
+const legacyWidgetStyles = readFileSync(new URL('../../extension/floating/widget.css', import.meta.url), 'utf8');
 const appStyles = readFileSync(new URL('../../src/app.css', import.meta.url), 'utf8');
 
 type ExtensionResponse = { ok: boolean; data?: Record<string, unknown>; error?: string };
@@ -108,6 +109,11 @@ describe('Modu Floating Focus', () => {
     expect(widgetStyles).toContain('border-radius: 14px');
     expect(widgetStyles).toContain('border-radius: 16px');
     expect(widgetSource).toContain("attachShadow({ mode: 'closed' })");
+    expect(widgetSource).toContain("quiet-dock-v2.css");
+    expect(widgetSource).toContain("__moduFloatingQuietDockV2");
+    expect(widgetSource).not.toContain("if (globalThis.__moduFloatingInjectedV1) return");
+    expect(legacyWidgetStyles).toContain(".modu-mini-brand");
+    expect(widgetStyles).not.toContain(".modu-mini-brand");
     expect(widgetSource).toContain("MODU_FLOATING_RESTORE");
     expect(widgetSource).toContain("modu-logo.svg");
     expect(widgetSource).toContain("chevron-up");
@@ -143,6 +149,8 @@ describe('Modu Floating Focus', () => {
     const viewport = { width: 1200, height: 800 };
     const styles = new Map<string, string>();
     const writes: Record<string, unknown>[] = [];
+    let legacyRemovals = 0;
+    let runtimeListeners = 0;
     const panel = {
       id: '', className: '', innerHTML: '', dataset: {} as Record<string, string>,
       classList: { add: (_name: string) => {}, remove: (_name: string) => {} },
@@ -182,6 +190,8 @@ describe('Modu Floating Focus', () => {
         tag === 'div' ? (divCount++ === 0 ? host : panel) : {
           rel: '', href: '', addEventListener: (_name: string, _callback: () => void) => {}
         },
+      getElementById: (id: string) => id === 'modu-floating-focus-root'
+        ? { remove: () => { legacyRemovals++; } } : null,
       documentElement: { append: (_node: unknown) => { host.isConnected = true; } }
     };
     const resizeHandlers = new Map<string, () => void>();
@@ -193,7 +203,7 @@ describe('Modu Floating Focus', () => {
     const chrome = {
       runtime: {
         getURL: (name: string) => 'chrome-extension://test/' + name,
-        onMessage: { addListener: (_handler: unknown) => {} }
+        onMessage: { addListener: (_handler: unknown) => { runtimeListeners++; } }
       },
       storage: {
         onChanged: { addListener: (_handler: unknown) => {} },
@@ -206,18 +216,24 @@ describe('Modu Floating Focus', () => {
         }
       }
     };
-    new Function(
+    const isolatedWorld = {};
+    const runWidget = new Function(
       'chrome', 'document', 'window', 'location', 'globalThis', 'setInterval', 'clearInterval',
       widgetSource
-    )(chrome, document, window, { hostname: 'example.org' }, {},
-      (_fn: unknown, _ms: number) => 1, (_id: number) => {}
     );
+    const run = () => runWidget(chrome, document, window, { hostname: 'example.org' }, isolatedWorld,
+      (_fn: unknown, _ms: number) => 1, (_id: number) => {});
+    run();
+    run(); // Re-injection must be idempotent, and must replace a legacy V1 root.
+    expect(legacyRemovals).toBe(1);
+    expect(runtimeListeners).toBe(1);
     await Promise.resolve();
     await Promise.resolve();
 
     expect(panel.innerHTML).toContain('mini-task');
     expect(panel.innerHTML).toContain('modu-mini-led');
     expect(panel.innerHTML).not.toContain('modu-logo');
+    expect(panel.className).toBe('modu-widget mini');
     const fire = (type: string, x: number, y: number, interactive = false) => {
       const event: Pointer = {
         pointerId: 5, clientX: x, clientY: y, isPrimary: true, button: 0,

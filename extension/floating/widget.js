@@ -1,13 +1,18 @@
 (() => {
-  // A dynamically registered script may also be injected into an existing tab.
-  if (globalThis.__moduFloatingInjectedV1) return;
-  globalThis.__moduFloatingInjectedV1 = true;
+  // V2 has a distinct runtime and stylesheet: an old V1 script with the same
+  // extension ID must not keep the new design stuck behind the old injection guard.
+  if (/^(modu\.howlil\.site|localhost|127\.0\.0\.1)$/i.test(location.hostname)) return;
+  const INSTANCE_KEY = '__moduFloatingQuietDockV2';
+  const existing = globalThis[INSTANCE_KEY];
+  if (existing) { existing.refresh(); return; }
 
   const SETTINGS_KEY = 'module-floating-settings-v1';
   const SNAPSHOT_KEY = 'module-floating-focus-v1';
   const POSITION_KEY = 'module-floating-position-v1';
-  const HOST_ID = 'modu-floating-focus-root';
-  if (/^(modu\.howlil\.site|localhost|127\.0\.0\.1)$/i.test(location.hostname)) return;
+  const HOST_ID = 'modu-floating-quiet-dock-v2';
+  // An outdated content-script instance may leave its old Shadow DOM mounted
+  // after an unpacked extension reload, even when its JS context is gone.
+  document.getElementById?.('modu-floating-focus-root')?.remove();
 
   const MODU_URL = 'https://modu.howlil.site/pomodoro';
   const BRAND_IMAGE = '<img class="modu-logo" alt="" src="' +
@@ -63,7 +68,7 @@
     const elapsedMs = t.status === 'overtime'
       ? t.durationMs + elapsed
       : Math.min(t.durationMs, Math.max(0, t.durationMs - remaining));
-    return { label, text, progress, status: t.status, elapsedMs, durationMs: t.durationMs };
+    return { label, text, progress, status: reached ? 'complete' : t.status, elapsedMs, durationMs: t.durationMs };
   };
 
   // Fractions of available space keep placement visible across viewport sizes.
@@ -154,7 +159,7 @@
     shadow = host.attachShadow({ mode: 'closed' });
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = chrome.runtime.getURL('floating/widget.css');
+    link.href = chrome.runtime.getURL('floating/quiet-dock-v2.css');
     shadow.append(link);
     link.addEventListener('load', applyPosition);
     const panel = document.createElement('div');
@@ -240,7 +245,8 @@
     const hasTask = Boolean(settings.showTask && snapshot.timer.mode === 'focus' && snapshot.task?.title);
     if (mini) {
       panel.querySelector('#mini-task').textContent = hasTask ? snapshot.task.title :
-        values.status === 'paused' ? 'Paused' : snapshot.timer.mode === 'focus' ? 'Focus session' : 'Take a break';
+        values.status === 'paused' ? 'Paused' : values.status === 'complete' ? 'Time reached' :
+        snapshot.timer.mode === 'focus' ? 'Focus session' : 'Take a break';
     } else {
       panel.querySelector('#task').textContent = hasTask ? snapshot.task.title :
         snapshot.timer.mode === 'focus' ? 'Untitled focus' : 'Break session';
@@ -255,15 +261,16 @@
   window.addEventListener('resize', applyPosition);
 
   // Toolbar action restores the widget in this tab even during the same session.
-  chrome.runtime.onMessage.addListener((message, _sender, respond) => {
+  const onRestoreMessage = (message, _sender, respond) => {
     if (message?.type !== 'MODU_FLOATING_RESTORE') return;
     dismissedId = null;
     mini = false;
     render();
     respond({ visible: Boolean(host?.isConnected) });
-  });
+  };
+  chrome.runtime.onMessage.addListener(onRestoreMessage);
 
-  chrome.storage.onChanged.addListener((changes, area) => {
+  const onStorageChanged = (changes, area) => {
     if (area !== 'local') return;
     if (changes[SETTINGS_KEY]) {
       const wasEnabled = settings.enabled;
@@ -280,7 +287,21 @@
       if (snapshot?.sessionId !== oldId) { dismissedId = null; mini = true; }
     }
     render();
-  });
+  };
+  chrome.storage.onChanged.addListener(onStorageChanged);
+
+  // Programmatic injections are idempotent and can refresh state without
+  // creating duplicate intervals, overlays, or Chrome listeners.
+  globalThis[INSTANCE_KEY] = {
+    refresh() {
+      void chrome.storage.local.get([SETTINGS_KEY, SNAPSHOT_KEY, POSITION_KEY]).then((state) => {
+        settings = state[SETTINGS_KEY] || settings;
+        snapshot = state[SNAPSHOT_KEY] || null;
+        position = normalizePosition(state[POSITION_KEY]);
+        render();
+      }).catch(() => {});
+    }
+  };
   chrome.storage.local.get([SETTINGS_KEY, SNAPSHOT_KEY, POSITION_KEY]).then((state) => {
     settings = state[SETTINGS_KEY] || settings;
     snapshot = state[SNAPSHOT_KEY] || null;

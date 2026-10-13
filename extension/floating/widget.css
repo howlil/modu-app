@@ -1,6 +1,6 @@
 :host {
   all: initial;
-  /* Shadow DOM mirror of Modu app.css, never inherited from visited sites. */
+  /* Mirrors src/app.css. Custom properties stay local to the closed Shadow DOM. */
   --modu-primary: #2468f2;
   --modu-primary-foreground: #ffffff;
   --modu-secondary: #eaf1ff;
@@ -12,7 +12,10 @@
   --modu-muted-foreground: #7a7a7a;
   --modu-border: #e7e7e2;
   color: var(--modu-foreground);
-  font: 400 14px/20px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
   -webkit-font-smoothing: antialiased;
 }
 *, *::before, *::after { box-sizing: border-box; }
@@ -25,202 +28,215 @@ button:focus-visible, a:focus-visible {
 }
 [hidden] { display: none !important; }
 .modu-icon { display: block; width: 16px; height: 16px; flex-shrink: 0; }
-.modu-logo { display: block; width: 21px; height: 21px; border-radius: 6px; flex-shrink: 0; }
-
-/* Quiet Dock: restrained surface, two clearly distinct information densities. */
+.modu-logo { display: block; width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0; }
 .modu-widget {
-  width: min(276px, calc(100vw - 16px));
+  width: min(320px, calc(100vw - 32px));
   overflow: hidden;
   color: var(--modu-foreground);
   background: var(--modu-card);
   border: 1px solid var(--modu-border);
-  border-radius: 16px;
-  box-shadow: 0 10px 28px rgba(37,37,37,.11), 0 2px 6px rgba(37,37,37,.04);
+  border-radius: 20px;
+  box-shadow: 0 12px 32px rgba(37,37,37,.11), 0 2px 8px rgba(37,37,37,.035);
   font: 400 14px/20px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   touch-action: none;
   user-select: none;
 }
-.modu-widget.mini {
-  width: min(216px, calc(100vw - 16px));
-  border-radius: 14px;
-}
 .modu-widget.modu-dragging {
   animation: none !important;
   cursor: grabbing;
-  box-shadow: 0 18px 36px rgba(37,37,37,.18);
+  box-shadow: 0 16px 36px rgba(37,37,37,.17);
 }
-.modu-mini-grab, .modu-header, .modu-content { cursor: grab; }
-.modu-dragging .modu-mini-grab,
-.modu-dragging .modu-header,
-.modu-dragging .modu-content { cursor: grabbing; }
+.modu-header, .modu-content, .modu-mini-main { cursor: grab; }
+.modu-dragging .modu-header, .modu-dragging .modu-content,
+.modu-dragging .modu-mini-main { cursor: grabbing; }
 
-.modu-mini {
-  display: flex;
-  align-items: center;
-  min-height: 60px;
-  gap: 10px;
-  padding: 10px 10px 9px 13px;
+.modu-widget.mini {
+  width: min(260px, calc(100vw - 16px));
+  border-radius: 16px;
 }
-.modu-mini-grab {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-.modu-mini-led, .modu-status-dot {
-  display: inline-block;
-  flex-shrink: 0;
-  width: 7px;
-  height: 7px;
-  background: var(--modu-primary);
-  border-radius: 50%;
-}
-.modu-mini-info { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
-.modu-mini-digits {
-  display: block;
-  font-size: 23px;
-  line-height: 27px;
-  letter-spacing: -.75px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-.modu-mini-caption {
-  display: block;
-  overflow: hidden;
-  font-size: 11px;
-  line-height: 15px;
-  color: var(--modu-muted-foreground);
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-.modu-mini-expand, .modu-icon-button {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: #858585;
-}
-.modu-mini-expand:hover, .modu-icon-button:hover {
-  background: #f3f4f4;
-  color: var(--modu-foreground);
-}
-.modu-mini-progress {
-  height: 3px;
-  background: var(--modu-secondary);
-  overflow: hidden;
-}
-
-/* Expanded card: a shallow header, work context, countdown, quiet link. */
 .modu-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 46px;
-  padding: 10px 12px 7px;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 64px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--modu-border);
 }
-.modu-brand { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
-.modu-brand strong { font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: -.1px; }
-.modu-controls { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
-.modu-content { padding: 14px 18px 18px; }
-.modu-session-label {
-  color: #929292;
-  font-size: 11px;
+.modu-brand { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.modu-brand-copy { display: flex; flex-direction: column; min-width: 0; }
+.modu-brand-copy strong { font-size: 14px; line-height: 20px; font-weight: 600; letter-spacing: -.01em; }
+.modu-brand-copy > span { font-size: 12px; line-height: 16px; color: var(--modu-muted-foreground); }
+.modu-controls { display: flex; align-items: center; gap: 4px; }
+.modu-icon-button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--modu-muted-foreground);
+}
+.modu-icon-button:hover { background: var(--modu-muted); color: var(--modu-foreground); }
+.modu-content { padding: 16px; }
+.modu-section-label {
+  font-size: 12px;
   line-height: 16px;
+  font-weight: 500;
+  color: var(--modu-muted-foreground);
+  letter-spacing: .04em;
 }
 .modu-task {
-  overflow: hidden;
-  margin-top: 3px;
-  color: var(--modu-foreground);
-  font-size: 15px;
-  line-height: 21px;
+  margin-top: 8px;
+  font-size: 16px;
+  line-height: 24px;
   font-weight: 600;
-  letter-spacing: -.3px;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.modu-next {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
+  color: var(--modu-muted-foreground);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 .modu-timer-row {
   display: flex;
-  align-items: baseline;
+  align-items: flex-end;
   justify-content: space-between;
-  gap: 8px;
-  margin: 13px 0 12px;
+  gap: 12px;
+  margin-top: 24px;
 }
 .modu-timer {
-  display: block;
-  font-size: 46px;
-  line-height: 51px;
-  font-weight: 500;
-  letter-spacing: -2.1px;
+  font-size: 36px;
+  line-height: 40px;
+  font-weight: 400;
+  letter-spacing: -.04em;
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
 .modu-status {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  flex-shrink: 0;
-  color: var(--modu-muted-foreground);
-  font-size: 11px;
-  line-height: 16px;
+  gap: 6px;
+  padding-bottom: 6px;
   white-space: nowrap;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--modu-secondary-foreground);
 }
-.modu-status-dot { width: 6px; height: 6px; }
+.modu-status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--modu-primary); }
 .modu-widget[data-status="paused"] .modu-status-dot,
-.modu-widget[data-status="complete"] .modu-status-dot,
-.modu-widget[data-status="paused"] .modu-mini-led,
-.modu-widget[data-status="complete"] .modu-mini-led {
-  background: #aeaeae;
-}
-.modu-progress {
-  height: 3px;
-  overflow: hidden;
-  border-radius: 10px;
-  background: var(--modu-secondary);
-}
+.modu-widget[data-status="complete"] .modu-status-dot { background: var(--modu-muted-foreground); }
+.modu-widget[data-status="paused"] .modu-status { color: var(--modu-muted-foreground); }
+.modu-progress, .modu-mini-progress { height: 4px; overflow: hidden; border-radius: 999px; background: var(--modu-secondary); }
+.modu-progress { margin-top: 16px; }
 .modu-progress > span, .modu-mini-progress > span {
   display: block;
-  width: 0;
   height: 100%;
   border-radius: inherit;
   background: var(--modu-primary);
   transition: width .25s linear;
 }
-.modu-progress-labels {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  margin-top: 7px;
-  color: #9a9a9a;
-  font-size: 11px;
-  line-height: 16px;
-}
 .modu-footer {
   display: flex;
-  justify-content: flex-end;
   align-items: center;
-  padding: 9px 14px;
-  border-top: 1px solid #f0f0ee;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--modu-border);
 }
+.modu-footer-copy { font-size: 12px; line-height: 16px; color: var(--modu-muted-foreground); }
 .modu-open {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px;
-  border-radius: 6px;
-  color: #555;
-  font-size: 11px;
+  min-height: 32px;
+  border: 1px solid var(--modu-border);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
   line-height: 16px;
   font-weight: 500;
+  background: var(--modu-card);
 }
+.modu-open:hover { background: var(--modu-muted); }
 .modu-open .modu-icon { width: 14px; height: 14px; }
-.modu-open:hover { color: var(--modu-primary); }
-
+.modu-mini {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 8px 10px 12px;
+}
+.modu-mini-main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+.modu-mini-brand { flex-shrink: 0; }
+.modu-mini-details {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+.modu-mini-top { display: flex; align-items: baseline; gap: 8px; }
+.modu-mini-time {
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 600;
+  letter-spacing: -.025em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.modu-mini-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--modu-secondary-foreground);
+}
+.modu-mini-task {
+  overflow: hidden;
+  color: var(--modu-muted-foreground);
+  font-size: 12px;
+  line-height: 16px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.modu-mini-expand {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--modu-muted-foreground);
+  cursor: pointer;
+}
+.modu-mini-expand:hover {
+  background: var(--modu-muted);
+  color: var(--modu-primary);
+}
+.modu-mini-progress { height: 3px; border-radius: 0; }
 @media (prefers-reduced-motion: reduce) {
   .modu-progress > span, .modu-mini-progress > span { transition: none; }
 }

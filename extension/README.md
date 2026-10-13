@@ -10,7 +10,7 @@ The web app owns timer transitions and recorded session history; the extension n
 ## Install and validate
 
 1. Visit chrome://extensions, enable Developer mode, and Load unpacked using this extension/ folder.
-2. After pulling extension changes, click Reload on chrome://extensions and refresh already-open website tabs. A Cloudflare web deployment does **not** update the unpacked Chrome extension.
+2. After pulling extension changes, click **Reload** on brave://extensions (or chrome://extensions) and **reload the website tab** (Ctrl+R). If the old logo or overlapping text remains in mini, the tab is still running the old injected content script. Cloudflare deployment does **not** update the unpacked Chrome extension.
 3. Visit https://modu.howlil.site/pomodoro or the local development server.
 4. Open Settings → Floating focus. Check that the extension is connected and enable the widget. Start a Focus session or launch one from Daily.
 5. Switch to another HTTP(S) website and refresh that tab if needed. The widget is hidden on Modu itself, localhost, restricted Chrome pages, excluded domains, and while the timer is idle. Expand the timer to see the task and next action.
@@ -34,6 +34,8 @@ The web app owns timer transitions and recorded session history; the extension n
 Daily task → Pomodoro controller (single timer owner) → trusted Modu extension bridge → MV3 service worker → extension local storage → Shadow DOM floating widget.
 
 The widget is read-only. The displayed clock is derived from absolute timestamps; after the deadline it says Time reached until the authoritative Pomodoro state is reconciled. Snapshots older than 24 hours are hidden.
+
+Quiet Dock V2 has its own stylesheet (quiet-dock-v2.css) so stale V1 markup cannot accidentally inherit its selectors. It also replaces an orphaned V1 host and is idempotent when injected repeatedly into a tab. Reload the website tab when updating the unpacked extension to stop any still-running V1 script.
 
 Dynamically registered content scripts are unregistered when Floating is disabled; already-running scripts listen to settings and remove the overlay. Widget styles mirror Modu app.css tokens rather than adopting host-page styles. The toolbar action only requests a restore on the active eligible tab; it does not change timer state, save extra data, or enable floating globally.
 
