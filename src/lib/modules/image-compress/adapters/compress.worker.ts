@@ -136,6 +136,8 @@ scope.onmessage = async (event: MessageEvent<Request>) => {
       globalError?:number;
       baselineGlobalError?:number;
       evaluatedCandidates:number;
+      regionErrors?:Array<{regionId:string;error:number}>;
+      baselineRegionErrors?:Array<{regionId:string;error:number}>;
       improved:boolean;
     } | undefined;
     if (mode === 'perceptual' && result.status === 'within-target') {
@@ -241,6 +243,7 @@ scope.onmessage = async (event: MessageEvent<Request>) => {
         }
         contentEvidence={status:'complete',faceStatus,regions:all,
           baselineGlobalError:baselineScores.globalError,globalError:bestScores.globalError,
+          baselineRegionErrors:baselineScores.regions,regionErrors:bestScores.regions,
           evaluatedCandidates:scored,improved};
       }
     }

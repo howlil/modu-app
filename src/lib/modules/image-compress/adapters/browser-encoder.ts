@@ -43,7 +43,7 @@ export interface EncodedImage extends TargetSizeResult, ImageInfo {
   resized: boolean;
   engine: 'wasm' | 'browser-fallback' | 'original';
   qualityEvidence?: { metric: 'milo'; rawError: number; baselineRawError?: number; improved: boolean; scoredCandidates: number; comparisonLongSide: number };
-  contentEvidence?: { status:'complete'|'no-regions'|'degraded';faceStatus:'detected'|'none'|'unavailable'|'skipped';regions:ImportantRegion[];globalError?:number;baselineGlobalError?:number;evaluatedCandidates:number;improved:boolean };
+  contentEvidence?: { status:'complete'|'no-regions'|'degraded';faceStatus:'detected'|'none'|'unavailable'|'skipped';regions:ImportantRegion[];globalError?:number;baselineGlobalError?:number;regionErrors?:Array<{regionId:string;error:number}>;baselineRegionErrors?:Array<{regionId:string;error:number}>;evaluatedCandidates:number;improved:boolean };
 }
 
 function validateFile(file: File): void {
