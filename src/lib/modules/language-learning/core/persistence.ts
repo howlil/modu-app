@@ -1,7 +1,7 @@
 import {
   abandonSession, commitPracticeAttempt, createPracticeSession, pauseSession,
   resumeSession, revealAnswer, type CommitAttemptCommand, type LanguageIsland,
-  type PracticeMode, type PracticeSession, type PracticeAttempt
+  type PracticeMode, type PracticeSession, type PracticeAttempt, type RecallRating
 } from './learning.ts';
 
 /** Per-session durable record. No tenant/account key: one self-hosted instance = one learner. */
@@ -27,7 +27,8 @@ const object = (value: unknown): value is Record<string, unknown> =>
 const text = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
 const integer = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) >= 0;
 const revision = (value: unknown): value is number => integer(value) && value > 0;
-const rating = (value: unknown): boolean => ['again', 'hard', 'good', 'easy'].includes(String(value));
+const rating = (value: unknown): value is RecallRating =>
+  value === 'again' || value === 'hard' || value === 'good' || value === 'easy';
 const mode = (value: unknown): value is PracticeMode =>
   value === 'recall' || value === 'listening' || value === 'shadowing';
 
@@ -79,7 +80,8 @@ export function decodePracticeCommand(raw: unknown): PracticeCommand {
     throw new PracticeStorageRuleError('invalid_command', 'Session ID is required.');
   }
   if (raw.type === 'start') {
-    if (!text(raw.profileId) || !mode(raw.mode) || !object(raw.island)) {
+    if (!text(raw.profileId) || !mode(raw.mode) || !object(raw.island) ||
+      !Array.isArray(raw.island.sentences) || raw.island.sentences.length > 500) {
       throw new PracticeStorageRuleError('invalid_command', 'Invalid practice start request.');
     }
     return { type: 'start', sessionId: raw.sessionId, profileId: raw.profileId,
@@ -122,6 +124,7 @@ export function applyPracticeCommand(
 ): { next: StoredPractice; attempt: PracticeAttempt | null; changed: boolean } {
   if (command.type === 'start') {
     if (current) {
+      if (command.island.sentences.length > 500) throw new PracticeStorageRuleError('invalid_command', 'An Island supports up to 500 practice sentences per session.');
       const expected = createPracticeSession({
         sessionId: command.sessionId, profileId: command.profileId,
         mode: command.mode, island: command.island
@@ -134,6 +137,7 @@ export function applyPracticeCommand(
       }
       throw new PracticeStorageRuleError('conflict', 'Session ID already exists with different content.');
     }
+    if (command.island.sentences.length > 500) throw new PracticeStorageRuleError('invalid_command', 'An Island supports up to 500 practice sentences per session.');
     return { next: {schemaVersion: 1, revision: 1,
       session: createPracticeSession({
         sessionId: command.sessionId, profileId: command.profileId,
