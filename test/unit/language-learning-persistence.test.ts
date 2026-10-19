@@ -40,7 +40,9 @@ describe('Language Learning M1 — persisted business contracts', () => {
     }};
     const first=applyPracticeCommand(state,cmd);
     expect(first.next.revision).toBe(3);
-    expect(first.attempt?.evidence).toEqual({kind:'recall',rating:'good'});
+    expect(first.attempt?.evidence).toEqual({kind:'recall',rating:'good',assessment:{
+      version:1,source:'self_rating',outcome:'recalled',effort:'normal'
+    }});
     const retry=applyPracticeCommand(first.next,cmd);
     expect(retry.changed).toBe(false);
     expect(retry.attempt).toBe(null);
