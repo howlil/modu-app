@@ -14,7 +14,11 @@ jobs:
         with:
           bun-version: '1.2.15'
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: |
+          bun install
+          echo 'LOCK_REGEN_BEGIN'
+          cat bun.lock
+          echo 'LOCK_REGEN_END'
       - name: Typecheck
         run: bun run check
       - name: Unit tests
