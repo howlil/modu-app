@@ -10,6 +10,20 @@ import { browserLocalDate } from '../adapters/browser-date.ts';
 
 type HabitEditorState = { mode: 'create' | 'edit'; id?: string; title: string };
 export type TodayHabit = { habit: HabitDefinition; completed: boolean };
+export type CommitRefreshResult = 'refreshed' | 'committed-refresh-failed';
+
+/** Write confirmation is durable even when the subsequent read or projection fails. */
+export async function commitThenRefresh(
+  write: () => Promise<void>,
+  refresh: () => Promise<boolean>
+): Promise<CommitRefreshResult> {
+  await write(); // Write failures propagate; no commit is claimed.
+  try {
+    return await refresh() ? 'refreshed' : 'committed-refresh-failed';
+  } catch {
+    return 'committed-refresh-failed';
+  }
+}
 
 export function createHabitTrackerController() {
   let today = $state<LocalDate>('');
@@ -24,6 +38,7 @@ export function createHabitTrackerController() {
   let editor = $state<HabitEditorState | null>(null);
   let confirmDeleteId = $state<string | null>(null);
   let readVersion = 0;
+  let refreshQueued = false;
 
   const todayHabits = $derived.by<TodayHabit[]>(() => {
     if (!today) return [];
@@ -68,15 +83,31 @@ export function createHabitTrackerController() {
     error = '';
     notice = '';
     try {
-      await operation();
-      const loaded = await reload();
-      if (!loaded) return false;
+      const result = await commitThenRefresh(operation, () => {
+        // Any invalidations received before the write completed are included
+        // in this authoritative read. Events during the read remain queued.
+        refreshQueued = false;
+        return reload();
+      });
+      if (result === 'committed-refresh-failed') {
+        storageReady = false;
+        error = 'Your change was saved, but the updated data could not be loaded. Retry loading; do not repeat the action.';
+        return true; // The committed command must not be submitted twice.
+      }
       notice = message;
       return true;
     } catch (cause) {
       error = cause instanceof Error ? cause.message : 'Could not save your changes.';
       return false;
-    } finally { busy = false; }
+    } finally {
+      busy = false;
+      // A concurrent tab can broadcast while this controller is busy.
+      // Invalidation must not be lost when the local write finishes.
+      if (refreshQueued) {
+        refreshQueued = false;
+        if (storageReady) void reload();
+      }
+    }
   }
 
   function openCreate(): void { confirmDeleteId = null; editor = { mode: 'create', title: '' }; }
@@ -118,13 +149,15 @@ export function createHabitTrackerController() {
     today = browserLocalDate();
     void reload(true);
     const unsubscribe = subscribeHabitChanges(() => {
-      if (!busy) void reload();
+      if (busy) refreshQueued = true;
+      else void reload();
     });
     const refresh = () => {
       if (document.visibilityState !== 'visible') return;
       const currentDate = browserLocalDate();
       if (currentDate !== today) today = currentDate;
-      if (!busy) void reload();
+      if (busy) refreshQueued = true;
+      else void reload();
     };
     document.addEventListener('visibilitychange', refresh);
     window.addEventListener('focus', refresh);

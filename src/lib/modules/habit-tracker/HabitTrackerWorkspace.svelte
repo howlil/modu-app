@@ -36,6 +36,7 @@
       mode={controller.editor.mode}
       title={controller.editor.title}
       busy={controller.busy}
+      error={controller.error}
       onSave={controller.submitEditor}
       onCancel={controller.closeEditor}
     />

@@ -5,11 +5,12 @@
   import { Input } from '#lib/components/ui/input/index.js';
 
   let {
-    mode, title, busy, onSave, onCancel
+    mode, title, busy, error = '', onSave, onCancel
   }: {
     mode: 'create' | 'edit';
     title: string;
     busy: boolean;
+    error?: string;
     onSave: (title: string) => Promise<void>;
     onCancel: () => void;
   } = $props();
@@ -55,6 +56,9 @@
       <Input id="habit-title" name="habit-title" bind:value={draftTitle} maxlength={80} placeholder="e.g. Read every day" aria-invalid={touched && invalid} required/>
       {#if touched && invalid}
         <p role="alert" class="mt-2 text-meta text-destructive">Enter a habit name (up to 80 characters).</p>
+      {/if}
+      {#if error}
+        <p role="alert" class="mt-3 rounded-lg border border-destructive/30 bg-card p-3 text-ui text-destructive">{error}</p>
       {/if}
       {#if mode === 'create'}
         <div class="mt-6 rounded-lg border border-border bg-muted/50 p-4">

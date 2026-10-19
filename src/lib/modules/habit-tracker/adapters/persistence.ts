@@ -82,7 +82,8 @@ function enforceValid(result: ReturnType<typeof validateHabit>): void {
   if (!result.ok) throw new HabitStorageError('Stored habit data is invalid: ' + result.issues.join(' '));
 }
 
-function checkSnapshot(snapshot: HabitSnapshot): HabitSnapshot {
+/** Validate the complete loaded snapshot before any record reaches reactive UI. */
+export function validateHabitSnapshot(snapshot: HabitSnapshot): HabitSnapshot {
   const byId = new Map<string, HabitDefinition>();
   for (const habit of snapshot.habits) {
     enforceValid(validateHabit(habit));
@@ -98,6 +99,15 @@ function checkSnapshot(snapshot: HabitSnapshot): HabitSnapshot {
     if (seenPolicies.has(key)) throw new HabitStorageError('Conflicting habit policy versions.');
     seenPolicies.add(key);
   }
+  // Prevent a valid-looking habit without any applicable policy from throwing
+  // in the Today derived view after storageReady was set true.
+  for (const habit of snapshot.habits) {
+    try {
+      resolveEffectivePolicy(habit.id, habit.createdDate, snapshot.policies);
+    } catch {
+      throw new HabitStorageError('Habit ' + habit.id + ' is missing its initial policy; no data has been changed.');
+    }
+  }
   for (const checkin of snapshot.checkins) {
     if (!byId.has(checkin.habitId) || !isLocalDate(checkin.localDate)) {
       throw new HabitStorageError('Invalid saved check-in; no data has been changed.');
@@ -109,18 +119,28 @@ function checkSnapshot(snapshot: HabitSnapshot): HabitSnapshot {
 }
 
 function broadcastChange(): void {
+  // Notifications are best effort; an unavailable channel must never make an
+  // already-committed IndexedDB write appear to have failed.
   if (typeof window === 'undefined') return;
-  window.dispatchEvent(new Event(CHANGE));
+  try { window.dispatchEvent(new Event(CHANGE)); } catch { /* committed write is authoritative */ }
   if (typeof BroadcastChannel !== 'undefined') {
-    const channel = new BroadcastChannel(CHANNEL);
-    channel.postMessage('changed');
-    channel.close();
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel(CHANNEL);
+      channel.postMessage('changed');
+    } catch { /* other tabs can refresh on focus */ }
+    finally {
+      try { channel?.close(); } catch { /* best effort */ }
+    }
   }
 }
 
 export function subscribeHabitChanges(onChange: () => void): () => void {
   if (typeof window === 'undefined') return () => {};
-  const channel = typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel(CHANNEL);
+  let channel: BroadcastChannel | null = null;
+  try {
+    if (typeof BroadcastChannel !== 'undefined') channel = new BroadcastChannel(CHANNEL);
+  } catch { /* listening to same-tab changes and focus refresh still works */ }
   window.addEventListener(CHANGE, onChange);
   if (channel) channel.onmessage = () => onChange();
   return () => {
@@ -145,7 +165,7 @@ export async function loadHabitSnapshot(): Promise<HabitSnapshot> {
       };
     }
   ));
-  return checkSnapshot(snapshot);
+  return validateHabitSnapshot(snapshot);
 }
 
 export async function createDailyHabit(title: string, date: LocalDate): Promise<void> {

@@ -1,5 +1,5 @@
 import type { GoalPolicy, HabitCheckin, HabitDefinition, LocalDate } from './types.ts';
-import { addCalendarDays, isDueOnDate, isHabitActiveOn } from './scheduling.ts';
+import { addCalendarDays, isDueOnDate, isHabitActiveOn, isLocalDate } from './scheduling.ts';
 import { validateCheckin, validateGoalPolicy, validateHabit } from './validation.ts';
 
 function requireValid(result: ReturnType<typeof validateHabit>): void {
@@ -30,11 +30,15 @@ export function renameHabit(habit: HabitDefinition, title: string): HabitDefinit
 
 export function archiveHabit(habit: HabitDefinition, date: LocalDate): HabitDefinition {
   requireValid(validateHabit(habit));
+  if (!isLocalDate(date)) throw new RangeError('Invalid archive date.');
   if (habit.status === 'ARCHIVED') return habit;
   if (date < habit.createdDate) throw new RangeError('Cannot archive before creation.');
+  // Archiving hides the habit immediately, but preserves today's existing (and
+  // still-finalizing) outcome. The first non-obligatory day is tomorrow.
+  const firstInactiveDate = addCalendarDays(date, 1);
   const updated: HabitDefinition = {
     ...habit, status: 'ARCHIVED', inactiveRanges: [
-      ...(habit.inactiveRanges ?? []), { fromDate: date }
+      ...(habit.inactiveRanges ?? []), { fromDate: firstInactiveDate }
     ]
   };
   requireValid(validateHabit(updated));
@@ -43,11 +47,15 @@ export function archiveHabit(habit: HabitDefinition, date: LocalDate): HabitDefi
 
 export function restoreHabit(habit: HabitDefinition, date: LocalDate): HabitDefinition {
   requireValid(validateHabit(habit));
+  if (!isLocalDate(date)) throw new RangeError('Invalid restore date.');
   if (habit.status === 'ACTIVE') return habit;
   const ranges = [...(habit.inactiveRanges ?? [])];
   const last = ranges.pop();
-  if (!last || date < last.fromDate) throw new RangeError('Restore must follow archive.');
-  if (last.fromDate !== date) {
+  // A same-day restore must cancel tomorrow's scheduled inactive range.
+  if (!last || date < addCalendarDays(last.fromDate, -1)) {
+    throw new RangeError('Restore must follow archive.');
+  }
+  if (date > last.fromDate) {
     ranges.push({ fromDate: last.fromDate, throughDate: addCalendarDays(date, -1) });
   }
   const updated: HabitDefinition = { ...habit, status: 'ACTIVE', inactiveRanges: ranges };

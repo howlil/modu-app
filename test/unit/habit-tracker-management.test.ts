@@ -37,7 +37,8 @@ describe('M1: daily boolean habit lifecycle', () => {
     const archived = archiveHabit(habit, '2026-10-22');
     expect(archived.status).toBe('ARCHIVED');
     expect(isHabitActiveOn(archived, '2026-10-21')).toBe(true);
-    expect(isHabitActiveOn(archived, '2026-10-22')).toBe(false);
+    expect(isHabitActiveOn(archived, '2026-10-22')).toBe(true);
+    expect(isHabitActiveOn(archived, '2026-10-23')).toBe(false);
     const restored = restoreHabit(archived, '2026-10-26');
     expect(restored.status).toBe('ACTIVE');
     expect(isHabitActiveOn(restored, '2026-10-25')).toBe(false);
@@ -54,9 +55,22 @@ describe('M1: daily boolean habit lifecycle', () => {
     const a = restoreHabit(archiveHabit(habit, '2026-10-21'), '2026-10-23');
     const b = restoreHabit(archiveHabit(a, '2026-10-25'), '2026-10-27');
     expect(b.inactiveRanges).toEqual([
-      { fromDate: '2026-10-21', throughDate: '2026-10-22' },
-      { fromDate: '2026-10-25', throughDate: '2026-10-26' }
+      { fromDate: '2026-10-22', throughDate: '2026-10-22' },
+      { fromDate: '2026-10-26', throughDate: '2026-10-26' }
     ]);
+  });
+  it('keeps a completed day MET after archiving on that date', () => {
+    const { habit, policy } = make();
+    const recorded = booleanCheckin(habit, policy, '2026-10-20', true);
+    const archived = archiveHabit(habit, '2026-10-20');
+    expect(evaluateDailyOutcome(archived, policy, recorded!, '2026-10-20', '2026-10-20')).toBe('MET');
+    expect(evaluateDailyOutcome(archived, policy, undefined, '2026-10-21', '2026-10-21')).toBe('NOT_SCHEDULED');
+    expect(() => booleanCheckin(archived, policy, '2026-10-20', true)).toThrow(RangeError);
+  });
+  it('rejects invalid archive and restore dates', () => {
+    const { habit } = make();
+    expect(() => archiveHabit(habit, '2026-02-30')).toThrow(RangeError);
+    expect(() => restoreHabit(archiveHabit(habit, '2026-10-20'), '2026-02-30')).toThrow(RangeError);
   });
   it('rejects invalid creation dates and archive before creation', () => {
     expect(() => makeDailyBooleanHabit('id', 'Read', '2026-02-30')).toThrow(RangeError);
