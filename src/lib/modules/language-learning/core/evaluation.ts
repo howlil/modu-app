@@ -60,7 +60,7 @@ export function checkRecallAnswer(input: {
   acceptedVariants?: readonly string[];
 }): AnswerCheck {
   const normalize = (text: string) => text.normalize('NFC').trim()
-    .replace(/\s+/gu, ' ').replace(/[.!?。！？]+$/gu, '').trim();
+    .replace(/\s+/gu, ' ').replace(/[.。]+$/gu, '').trim();
   const answer = normalize(input.response);
   const reference = normalize(input.reference);
   if (!reference || input.reference.length > 2000 ||
