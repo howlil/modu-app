@@ -20,7 +20,18 @@ export function evaluateDailyOutcome(
   nowDate: LocalDate
 ): DailyOutcome {
   calendarDayOrdinal(nowDate);
-  if (!isHabitActiveOn(habit, date) || date < policy.effectiveFromDate || !isDueOnDate(policy.schedule, date)) {
+  if (!isHabitActiveOn(habit, date)) {
+    // Compatibility with M1's original same-day archive semantics:
+    // archival could hide an already-recorded MET on its first inactive day.
+    // Preserve that explicit evidence without modifying persisted ranges.
+    const originalArchiveDate = (habit.inactiveRanges ?? []).some(range => range.fromDate === date);
+    if (originalArchiveDate && date <= nowDate && date >= habit.createdDate &&
+      checkin?.habitId === habit.id && checkin.localDate === date &&
+      date >= policy.effectiveFromDate && isDueOnDate(policy.schedule, date) &&
+      isGoalMet(policy, checkin)) return 'MET';
+    return 'NOT_SCHEDULED';
+  }
+  if (date < policy.effectiveFromDate || !isDueOnDate(policy.schedule, date)) {
     return 'NOT_SCHEDULED';
   }
   if (date > nowDate) return 'PENDING';

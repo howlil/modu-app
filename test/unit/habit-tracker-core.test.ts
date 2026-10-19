@@ -115,6 +115,15 @@ describe('M0 progress and outcome contracts', () => {
       .toEqual({ met: 2, eligible: 3, rate: 2 / 3 });
     expect(calculateCompletionRate(['SKIPPED', 'PENDING'])).toEqual({ met: 0, eligible: 0, rate: null });
   });
+  it('preserves completed check-ins from legacy same-day archives', () => {
+    const archived: HabitDefinition = { ...habit, status: 'ARCHIVED',
+      inactiveRanges: [{ fromDate: '2026-10-20' }] };
+    expect(evaluateDailyOutcome(archived, policy,
+      checkin('2026-10-20', 1), '2026-10-20', '2026-10-21')).toBe('MET');
+    expect(evaluateDailyOutcome(archived, policy, undefined, '2026-10-20', '2026-10-21')).toBe('NOT_SCHEDULED');
+    expect(evaluateDailyOutcome(archived, policy,
+      checkin('2026-10-21', 1), '2026-10-21', '2026-10-21')).toBe('NOT_SCHEDULED');
+  });
   it('keeps historically archived dates not scheduled', () => {
     const archived: HabitDefinition = { ...habit, status: 'ARCHIVED', inactiveRanges: [{ fromDate: '2026-10-18' }] };
     expect(evaluateDailyOutcome(archived, policy, undefined, '2026-10-19', '2026-10-20')).toBe('NOT_SCHEDULED');
