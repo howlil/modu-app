@@ -34,12 +34,20 @@ try {
   conflict(()=>db.execute({type:'pause',sessionId:'a'},first.revision)); // stale competing tab
   const third=db.execute(rated('a','attempt-a'),second.revision);
   assert.equal(third.session.status,'completed');
+  assert.deepEqual(third.session.attempts[0].evidence, {
+    kind:'recall',rating:'good',assessment:{
+      version:1,source:'self_rating',outcome:'recalled',effort:'normal'
+    }
+  });
   assert.equal(db.attemptCount(),1);
   assert.deepEqual(db.execute(rated('a','attempt-a'),second.revision),third); // lost response replay
   assert.equal(db.attemptCount(),1);
   db.close();
   db=openLanguageLearningStorage(path);
   assert.equal(db.latest()?.session.attempts[0].id,'attempt-a'); // restart recovery
+  const afterRestart=db.latest()?.session.attempts[0].evidence;
+  assert.equal(afterRestart?.kind,'recall');
+  if(afterRestart?.kind==='recall')assert.equal(afterRestart.assessment?.outcome,'recalled');
   assert.equal(db.attemptCount(),1);
   first=db.execute(create('b'),null);
   db.execute({type:'reveal',sessionId:'b'},first.revision);
