@@ -17,8 +17,10 @@
       {#if controller.lastRecallFeedback}
         <p class="mt-3 text-ui text-muted-foreground">{controller.lastRecallFeedback}</p>
       {/if}
-      <p class="mt-3 text-meta text-muted-foreground">Practice results were confirmed by your self-hosted storage.</p>
-      <button class="mt-5 rounded-full bg-primary px-5 py-2 text-ui font-medium text-primary-foreground" disabled={controller.pending || controller.canRetry} onclick={() => controller.start(session.mode)}>Restart demo</button>
+      <p class="mt-3 text-meta text-muted-foreground">Practice results were saved in this browser.</p>
+      {#if session.mode !== 'recall'}
+        <button class="mt-5 rounded-full bg-primary px-5 py-2 text-ui font-medium text-primary-foreground" disabled={controller.pending || controller.canRetry} onclick={() => controller.start(session.mode)}>Restart practice</button>
+      {/if}
     </section>
   {:else if session.status === 'paused'}
     <section class="rounded-xl border border-border bg-card p-6">
