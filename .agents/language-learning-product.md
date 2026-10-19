@@ -231,3 +231,31 @@ This order is not an implementation authorization. Do not generate scaffolds/reg
 - The hosted Cloudflare UI cannot transparently access the owner's loopback service; same-origin private deployment/proxy must be designed and tested.
 - SRS scheduling, learning profiles UI, real content authoring, full history and export/restore are later milestones.
 - Next milestone M2: Recall and Evaluation contracts backed by M1 durable attempt state; then M3 SRS.
+
+## M2 checkpoint — Recall & Evaluation Engine (2026-10-20)
+
+**Scope:** inside existing language-learning module; no launcher, login, multi-tenancy, scheduler or deployed self-hosted instance.
+
+### X → A / E / R implementation graph
+
+- **A success:** prompt → optional ephemeral written response → persisted reveal → conservative literal comparison against reference/explicit accepted variants → learner self-rating → domain-derived v1 assessment → persisted attempt (M1 transaction) → future SRS consumer.
+- **E expected failures:** malformed rating rejected by core; external forged assessment dropped during command decode; mismatched durable assessment rejected on record decode; concurrent revision conflict, uncertain network result and missing self-hosted service retain M1 recovery behavior.
+- **R/context:** no AI, model, network or clock used by pure evaluation; existing controller supplies pending-state, client draft and M1 repository. No new service dependencies.
+- **Execution:** comparison one-shot, does not commit or rate; only a revealed recall answer is eligible to commit the learner's rating; one attempt ID remains idempotent.
+- **Trust boundary:** client may supply a rating but cannot author the persisted assessment. Assessment is derived after domain validation. Text comparison is an advisory exact/variant match, never a comprehensive translation grade.
+- **Recovery/legacy:** v1 assessment is optional in serialized historic attempts; `assessmentForAttempt` reconstructs v1 meaning for old M0/M1 records, while new committed records contain versioned metadata. Persisted mismatched metadata is corruption, not silently corrected.
+
+### Files
+
+- `src/lib/modules/language-learning/core/evaluation.ts`: `assessRecallRating`, `assessmentForAttempt`, `recallFeedback`, `checkRecallAnswer`, and assessment validation.
+- `core/learning.ts`: attaches server-side derived assessment to newly committed rated recalls, preserves separate exposure/skip evidence.
+- `core/persistence.ts`: guards restored evaluation metadata and continues decoding old records.
+- `controller/language-learning.svelte.ts` + `components/PracticeView.svelte`: optional local-only answer draft; evaluation feedback after reveal and independent self-rating.
+- `test/unit/language-learning-evaluation.test.ts`: rating meaning, SRS eligibility, conservative comparisons, accepted variant, legacy compatibility, forged metadata, retry.
+- `selfhost/verify-language-learning.ts`: asserts versioned assessment survives real SQLite close/reopen.
+
+### Explicit limits / next
+
+- UI written answers are **not stored** in SQLite. Literal comparisons are not correctness certificates: valid paraphrases/dialects may yield `needs_review`. No automatic FSRS grade derives from text matching.
+- M1 deployment limitation persists: hosted Cloudflare UI does not connect to an owner-managed loopback database by default; the language app remains unrouted.
+- **Next milestone M3:** Memory/SRS: versioned review-state model, exactly-once consumption of committed eligible recall attempts, due ordering, deterministic scheduler clock and transaction coupling in the self-hosted persistence owner.
