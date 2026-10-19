@@ -41,7 +41,9 @@ describe('Language learning kernel — domain invariants', () => {
     expect(result.inserted).toBe(true);
     expect(result.session.cursor).toBe(1);
     expect(result.session.phase).toBe('prompt');
-    expect(result.attempt.evidence).toEqual({ kind: 'recall', rating: 'good' });
+    expect(result.attempt.evidence).toEqual({ kind: 'recall', rating: 'good', assessment: {
+      version: 1, source: 'self_rating', outcome: 'recalled', effort: 'normal'
+    } });
   });
   it('retries an identical attempt idempotently, even after completion', () => {
     const first = rated(revealAnswer(makeSession()), 'a1');
