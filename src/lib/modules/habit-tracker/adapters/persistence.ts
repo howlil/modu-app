@@ -5,6 +5,7 @@ import {
 } from '../core/management.ts';
 import { validateCheckin, validateGoalPolicy, validateHabit } from '../core/validation.ts';
 import { browserLocalDate } from './browser-date.ts';
+import { applyCheckinCommand, makeConfiguredDailyHabit, type CheckinCommand, type HabitSetup } from '../core/progress.ts';
 
 const DATABASE = 'modu-habit-tracker';
 const VERSION = 1;
@@ -168,9 +169,17 @@ export async function loadHabitSnapshot(): Promise<HabitSnapshot> {
   return validateHabitSnapshot(snapshot);
 }
 
+/** M1 entrypoint retained for existing callers. */
 export async function createDailyHabit(title: string, date: LocalDate): Promise<void> {
+  await createConfiguredHabit({ title, direction: 'BUILD', measurement: 'BOOLEAN' }, date);
+}
+
+export async function createConfiguredHabit(input: HabitSetup, date: LocalDate): Promise<void> {
+  if (!isLocalDate(date) || date !== browserLocalDate()) {
+    throw new RangeError('New habits must begin on the current local day.');
+  }
   const id = crypto.randomUUID();
-  const { habit, policy } = makeDailyBooleanHabit(id, title, date);
+  const { habit, policy } = makeConfiguredDailyHabit(id, input, date);
   await withDatabase(db => transaction<void>(
     db, ['habits', 'policies'], 'readwrite', tx => {
       tx.objectStore('habits').add(habit);
@@ -231,28 +240,48 @@ export async function deleteHabit(id: string): Promise<void> {
   broadcastChange();
 }
 
-export async function setDailyCompleted(id: string, date: LocalDate, complete: boolean): Promise<void> {
-  if (!isLocalDate(date) || date !== browserLocalDate()) {
-    throw new RangeError('M1 can record only the current calendar date.');
+/**
+ * Atomic per-date read-modify-write. The read occurs within the same IDB
+ * readwrite transaction as the put, preventing lost increments across tabs.
+ * No write is allowed for future dates or a date outside the habit lifecycle.
+ */
+export async function mutateHabitCheckin(
+  id: string, date: LocalDate, command: CheckinCommand
+): Promise<void> {
+  if (!isLocalDate(date) || date > browserLocalDate()) {
+    throw new RangeError('Cannot record progress for a future or invalid date.');
   }
   await withDatabase(db => transaction<void>(
     db, ['habits', 'policies', 'checkins'], 'readwrite', (tx, _set, fail) => {
-      const getHabit = tx.objectStore('habits').get(id);
-      getHabit.onsuccess = () => {
-        const habit = getHabit.result as HabitDefinition | undefined;
+      const habitRequest = tx.objectStore('habits').get(id);
+      habitRequest.onsuccess = () => {
+        const habit = habitRequest.result as HabitDefinition | undefined;
         if (!habit) { fail(new HabitStorageError('Habit not found.')); return; }
-        const getPolicies = tx.objectStore('policies').index('habitId').getAll(id);
-        getPolicies.onsuccess = () => {
+        const policiesRequest = tx.objectStore('policies').index('habitId').getAll(id);
+        policiesRequest.onsuccess = () => {
           try {
-            const policy = resolveEffectivePolicy(id, date, getPolicies.result as GoalPolicy[]);
-            const entry = booleanCheckin(habit, policy, date, complete);
+            const policy = resolveEffectivePolicy(id, date, policiesRequest.result as GoalPolicy[]);
             const store = tx.objectStore('checkins');
-            if (entry) store.put({ ...entry, id: id + ':' + date });
-            else store.delete(id + ':' + date);
+            const currentRequest = store.get(id + ':' + date);
+            currentRequest.onsuccess = () => {
+              try {
+                const current = currentRequest.result as HabitCheckin | undefined;
+                if (current) enforceValid(validateCheckin(current, policy));
+                const next = applyCheckinCommand(habit, policy, current, date, command);
+                if (next) store.put({ ...next, id: id + ':' + date });
+                else store.delete(id + ':' + date);
+              } catch (error) { fail(error as Error); }
+            };
           } catch (error) { fail(error as Error); }
         };
       };
     }
   ));
   broadcastChange();
+}
+
+/** Compatibility for existing M1 boolean callers. */
+export async function setDailyCompleted(id: string, date: LocalDate, complete: boolean): Promise<void> {
+  if (date !== browserLocalDate()) throw new RangeError('M1 boolean check-ins require today.');
+  await mutateHabitCheckin(id, date, complete ? { type: 'set', value: 1 } : { type: 'clear' });
 }

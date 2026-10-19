@@ -3,6 +3,7 @@
   import { X } from 'lucide-svelte';
   import { Button } from '#lib/components/ui/button/index.js';
   import { Input } from '#lib/components/ui/input/index.js';
+  import type { HabitSetup } from '../core/progress.ts';
 
   let {
     mode, title, busy, error = '', onSave, onCancel
@@ -11,14 +12,22 @@
     title: string;
     busy: boolean;
     error?: string;
-    onSave: (title: string) => Promise<void>;
+    onSave: (input: HabitSetup) => Promise<void>;
     onCancel: () => void;
   } = $props();
 
   let dialog: HTMLDialogElement;
   let draftTitle = $state('');
+  let direction = $state<'BUILD' | 'QUIT'>('BUILD');
+  let measurement = $state<'BOOLEAN' | 'COUNT' | 'QUANTITY' | 'DURATION'>('BOOLEAN');
+  let target = $state(1);
+  let unit = $state('');
   let touched = $state(false);
-  const invalid = $derived(!draftTitle.trim() || draftTitle.trim().length > 80);
+  const numeric = $derived(direction === 'BUILD' && measurement !== 'BOOLEAN');
+  const invalid = $derived(!draftTitle.trim() || draftTitle.trim().length > 80 ||
+    (numeric && (!Number.isFinite(target) || target <= 0 || target > 1_000_000_000 ||
+      (measurement !== 'QUANTITY' && !Number.isInteger(target)) ||
+      (measurement === 'QUANTITY' && (!unit.trim() || Math.round(target * 1_000_000) / 1_000_000 !== target)))));
 
   onMount(() => {
     draftTitle = title;
@@ -30,7 +39,18 @@
     event.preventDefault();
     touched = true;
     if (invalid || busy) return;
-    void onSave(draftTitle.trim());
+    let input: HabitSetup;
+    if (mode === 'edit' || direction === 'BUILD' && measurement === 'BOOLEAN') {
+      input = { title: draftTitle.trim(), direction: 'BUILD', measurement: 'BOOLEAN' };
+    } else if (direction === 'QUIT') {
+      input = { title: draftTitle.trim(), direction: 'QUIT', measurement: 'AVOIDANCE' };
+    } else if (measurement === 'COUNT' || measurement === 'QUANTITY' || measurement === 'DURATION') {
+      input = { title: draftTitle.trim(), direction: 'BUILD', measurement,
+        target, unit: measurement === 'DURATION' ? 'min' : measurement === 'COUNT' ? 'times' : unit.trim() };
+    } else {
+      return;
+    }
+    void onSave(input);
   }
 </script>
 
@@ -45,7 +65,7 @@
     <header class="flex items-start justify-between gap-3 border-b border-border p-5">
       <div>
         <h2 id="habit-editor-title" class="text-title font-medium">{mode === 'create' ? 'New habit' : 'Edit habit'}</h2>
-        <p class="mt-1 text-meta text-muted-foreground">Daily check-off</p>
+        <p class="mt-1 text-meta text-muted-foreground">Daily tracking · stored locally</p>
       </div>
       <Button type="button" variant="ghost" size="icon" class="rounded-full" aria-label="Close editor" disabled={busy} onclick={onCancel}>
         <X class="size-4"/>
@@ -53,20 +73,53 @@
     </header>
     <div class="min-h-0 flex-1 overflow-y-auto p-5">
       <label for="habit-title" class="mb-2 block text-ui font-medium">Habit name</label>
-      <Input id="habit-title" name="habit-title" bind:value={draftTitle} maxlength={80} placeholder="e.g. Read every day" aria-invalid={touched && invalid} required/>
+      <Input id="habit-title" bind:value={draftTitle} maxlength={80} placeholder="e.g. Drink 2 litres of water" required aria-invalid={touched && !draftTitle.trim()}/>
+      {#if mode === 'create'}
+        <div class="mt-5">
+          <label for="habit-direction" class="mb-2 block text-ui font-medium">Habit direction</label>
+          <select id="habit-direction" bind:value={direction} class="h-10 w-full rounded-lg border border-input bg-card px-3 text-ui">
+            <option value="BUILD">Build a habit</option>
+            <option value="QUIT">Quit a habit</option>
+          </select>
+        </div>
+        {#if direction === 'BUILD'}
+          <div class="mt-5">
+            <label for="habit-measurement" class="mb-2 block text-ui font-medium">Track progress by</label>
+            <select id="habit-measurement" bind:value={measurement} class="h-10 w-full rounded-lg border border-input bg-card px-3 text-ui">
+              <option value="BOOLEAN">Check-off</option>
+              <option value="COUNT">Count</option>
+              <option value="QUANTITY">Quantity</option>
+              <option value="DURATION">Minutes (manual)</option>
+            </select>
+          </div>
+          {#if numeric}
+            <div class="mt-5 grid grid-cols-2 gap-3">
+              <div>
+                <label for="habit-target" class="mb-2 block text-ui font-medium">Daily target</label>
+                <Input id="habit-target" type="number" min="0.000001" max="1000000000" step={measurement === 'QUANTITY' ? 'any' : '1'} bind:value={target} required/>
+              </div>
+              <div>
+                <label for="habit-unit" class="mb-2 block text-ui font-medium">Unit</label>
+                {#if measurement === 'QUANTITY'}
+                  <Input id="habit-unit" bind:value={unit} maxlength={32} placeholder="ml, km, etc." required/>
+                {:else}
+                  <p class="flex h-10 items-center rounded-lg border border-border bg-muted/40 px-3 text-ui text-muted-foreground">{measurement === 'DURATION' ? 'min' : 'times'}</p>
+                {/if}
+              </div>
+            </div>
+          {/if}
+        {:else}
+          <p class="mt-4 text-ui text-muted-foreground">Each day, record Clean or Lapse explicitly. An unrecorded day is never counted as success.</p>
+        {/if}
+        <p class="mt-5 text-meta text-muted-foreground">Schedule: Every day. Flexible schedules arrive in the next milestone.</p>
+      {:else}
+        <p class="mt-4 text-meta text-muted-foreground">Renaming doesn't change goal policy or previous check-ins. Goal revisions are a separate milestone.</p>
+      {/if}
       {#if touched && invalid}
-        <p role="alert" class="mt-2 text-meta text-destructive">Enter a habit name (up to 80 characters).</p>
+        <p role="alert" class="mt-3 text-meta text-destructive">Enter a valid name and a positive target. Quantity requires a unit and up to 6 decimal places.</p>
       {/if}
       {#if error}
         <p role="alert" class="mt-3 rounded-lg border border-destructive/30 bg-card p-3 text-ui text-destructive">{error}</p>
-      {/if}
-      {#if mode === 'create'}
-        <div class="mt-6 rounded-lg border border-border bg-muted/50 p-4">
-          <p class="text-ui font-medium">Build · Daily</p>
-          <p class="mt-1 text-meta text-muted-foreground">Mark this habit complete once per day.</p>
-        </div>
-      {:else}
-        <p class="mt-3 text-meta text-muted-foreground">Renaming does not change your past check-ins.</p>
       {/if}
     </div>
     <footer class="flex justify-end gap-2 border-t border-border p-4">

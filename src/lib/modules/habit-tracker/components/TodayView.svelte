@@ -2,6 +2,7 @@
   import { Plus } from 'lucide-svelte';
   import { Button } from '#lib/components/ui/button/index.js';
   import HabitRow from './HabitRow.svelte';
+  import ProgressRow from './ProgressRow.svelte';
   import HabitEmptyState from './HabitEmptyState.svelte';
   import type { HabitTrackerController } from '../controller/habit-tracker.svelte.ts';
 
@@ -42,16 +43,9 @@
     {#if total}
       <div class="mt-3 rounded-[20px] border border-border bg-card px-4">
         {#each controller.todayHabits as item (item.habit.id)}
-          <HabitRow
-            habit={item.habit} completed={item.completed} busy={controller.busy}
-            confirming={controller.confirmDeleteId === item.habit.id}
-            onToggle={() => controller.setCompleted(item.habit.id, !item.completed)}
-            onEdit={() => controller.openEdit(item.habit.id)}
-            onArchive={() => controller.setArchived(item.habit.id, true)}
-            onDelete={() => controller.requestDelete(item.habit.id)}
-            onConfirmDelete={controller.confirmDelete}
-            onCancelDelete={controller.cancelDelete}
-          />
+          <ProgressRow {item} busy={controller.busy}
+            onCommand={(command) => { void controller.recordProgress(item.habit.id, controller.today, command); }}
+            onCorrect={() => controller.openCorrection(item.habit.id, controller.today)}/>
         {/each}
       </div>
     {:else}

@@ -1,23 +1,31 @@
 import { onMount } from 'svelte';
-import type { HabitCheckin, HabitDefinition, GoalPolicy, LocalDate } from '../core/types.ts';
+import type {
+  DailyOutcome, HabitCheckin, HabitDefinition, GoalPolicy, LocalDate
+} from '../core/types.ts';
+import type { HabitSetup, CheckinCommand } from '../core/progress.ts';
 import { evaluateDailyOutcome } from '../core/evaluation.ts';
-import { isHabitActiveOn, resolveEffectivePolicy } from '../core/scheduling.ts';
+import { isHabitActiveOn, isLocalDate, resolveEffectivePolicy } from '../core/scheduling.ts';
 import {
-  changeHabitTitle, createDailyHabit, deleteHabit, loadHabitSnapshot,
-  setDailyCompleted, setHabitArchived, subscribeHabitChanges
+  changeHabitTitle, createConfiguredHabit, deleteHabit, loadHabitSnapshot,
+  mutateHabitCheckin, setHabitArchived, subscribeHabitChanges
 } from '../adapters/persistence.ts';
 import { browserLocalDate } from '../adapters/browser-date.ts';
 
 type HabitEditorState = { mode: 'create' | 'edit'; id?: string; title: string };
-export type TodayHabit = { habit: HabitDefinition; completed: boolean };
+export type PeriodHabit = {
+  habit: HabitDefinition;
+  policy: GoalPolicy;
+  checkin?: HabitCheckin;
+  outcome: DailyOutcome;
+  completed: boolean;
+};
 export type CommitRefreshResult = 'refreshed' | 'committed-refresh-failed';
 
-/** Write confirmation is durable even when the subsequent read or projection fails. */
 export async function commitThenRefresh(
   write: () => Promise<void>,
   refresh: () => Promise<boolean>
 ): Promise<CommitRefreshResult> {
-  await write(); // Write failures propagate; no commit is claimed.
+  await write();
   try {
     return await refresh() ? 'refreshed' : 'committed-refresh-failed';
   } catch {
@@ -27,6 +35,8 @@ export async function commitThenRefresh(
 
 export function createHabitTrackerController() {
   let today = $state<LocalDate>('');
+  let selectedDate = $state<LocalDate>('');
+  let view = $state<'today' | 'history'>('today');
   let habits = $state<HabitDefinition[]>([]);
   let policies = $state<GoalPolicy[]>([]);
   let checkins = $state<HabitCheckin[]>([]);
@@ -36,24 +46,28 @@ export function createHabitTrackerController() {
   let error = $state('');
   let notice = $state('');
   let editor = $state<HabitEditorState | null>(null);
+  let correction = $state<{ id: string; date: LocalDate } | null>(null);
   let confirmDeleteId = $state<string | null>(null);
   let readVersion = 0;
   let refreshQueued = false;
 
-  const todayHabits = $derived.by<TodayHabit[]>(() => {
-    if (!today) return [];
-    return habits.filter(h => h.status === 'ACTIVE' && isHabitActiveOn(h, today))
+  function project(date: LocalDate, activeOnly: boolean): PeriodHabit[] {
+    if (!date || !today || date > today) return [];
+    return habits
+      .filter(h => isHabitActiveOn(h, date) && (!activeOnly || h.status === 'ACTIVE'))
       .map(h => {
-        const policy = resolveEffectivePolicy(h.id, today, policies);
-        const entry = checkins.find(c => c.habitId === h.id && c.localDate === today);
-        return {
-          habit: h,
-          completed: evaluateDailyOutcome(h, policy, entry, today, today) === 'MET'
-        };
-      });
-  });
+        const policy = resolveEffectivePolicy(h.id, date, policies);
+        const checkin = checkins.find(c => c.habitId === h.id && c.localDate === date);
+        const outcome = evaluateDailyOutcome(h, policy, checkin, date, today);
+        return { habit: h, policy, checkin, outcome, completed: outcome === 'MET' };
+      })
+      .filter(item => item.outcome !== 'NOT_SCHEDULED');
+  }
+
+  const todayHabits = $derived.by(() => project(today, true));
+  const historyHabits = $derived.by(() => project(selectedDate, false));
   const archivedHabits = $derived(habits.filter(h => h.status === 'ARCHIVED'));
-  const completedCount = $derived(todayHabits.filter(entry => entry.completed).length);
+  const completedCount = $derived(todayHabits.filter(item => item.completed).length);
 
   async function reload(showLoading = false): Promise<boolean> {
     const version = ++readVersion;
@@ -84,15 +98,13 @@ export function createHabitTrackerController() {
     notice = '';
     try {
       const result = await commitThenRefresh(operation, () => {
-        // Any invalidations received before the write completed are included
-        // in this authoritative read. Events during the read remain queued.
         refreshQueued = false;
         return reload();
       });
       if (result === 'committed-refresh-failed') {
         storageReady = false;
-        error = 'Your change was saved, but the updated data could not be loaded. Retry loading; do not repeat the action.';
-        return true; // The committed command must not be submitted twice.
+        error = 'Your change was saved, but fresh data could not be loaded. Retry loading; do not repeat the action.';
+        return true;
       }
       notice = message;
       return true;
@@ -101,8 +113,6 @@ export function createHabitTrackerController() {
       return false;
     } finally {
       busy = false;
-      // A concurrent tab can broadcast while this controller is busy.
-      // Invalidation must not be lost when the local write finishes.
       if (refreshQueued) {
         refreshQueued = false;
         if (storageReady) void reload();
@@ -110,28 +120,65 @@ export function createHabitTrackerController() {
     }
   }
 
-  function openCreate(): void { confirmDeleteId = null; editor = { mode: 'create', title: '' }; }
+  function selectView(next: 'today' | 'history'): void {
+    view = next;
+    editor = null;
+    correction = null;
+    if (next === 'history' && !selectedDate && today) selectedDate = today;
+  }
+  function selectHistoryDate(date: LocalDate): void {
+    if (!isLocalDate(date) || !today || date > today) {
+      error = 'Select a valid date no later than today.';
+      return;
+    }
+    selectedDate = date;
+    error = '';
+  }
+  function openCreate(): void {
+    if (busy) return;
+    error = '';
+    confirmDeleteId = null;
+    editor = { mode: 'create', title: '' };
+  }
   function openEdit(id: string): void {
     const habit = habits.find(h => h.id === id);
-    if (!habit) return;
+    if (!habit || busy) return;
+    error = '';
     confirmDeleteId = null;
     editor = { mode: 'edit', id, title: habit.title };
   }
   function closeEditor(): void { if (!busy) editor = null; }
 
-  async function submitEditor(title: string): Promise<void> {
+  async function submitEditor(input: HabitSetup): Promise<void> {
     const current = editor;
     if (!current || !today) return;
     const success = current.mode === 'create'
-      ? await perform(() => createDailyHabit(title, today), 'Habit created.')
-      : await perform(() => changeHabitTitle(current.id!, title), 'Habit updated.');
+      ? await perform(() => createConfiguredHabit(input, today), 'Habit created.')
+      : await perform(() => changeHabitTitle(current.id!, input.title), 'Habit updated.');
     if (success) editor = null;
+  }
+  function openCorrection(id: string, date: LocalDate): void {
+    if (busy || date > today) return;
+    const item = project(date, false).find(x => x.habit.id === id);
+    if (!item) return;
+    error = '';
+    correction = { id, date };
+  }
+  function closeCorrection(): void { if (!busy) correction = null; }
+
+  async function recordProgress(id: string, date: LocalDate, command: CheckinCommand): Promise<boolean> {
+    return perform(() => mutateHabitCheckin(id, date, command), 'Progress saved.');
+  }
+  async function submitCorrection(command: CheckinCommand): Promise<void> {
+    const current = correction;
+    if (!current) return;
+    const success = await recordProgress(current.id, current.date, command);
+    if (success) correction = null;
   }
 
   async function setCompleted(id: string, complete: boolean): Promise<void> {
     if (!today) return;
-    await perform(() => setDailyCompleted(id, today, complete),
-      complete ? 'Habit completed.' : 'Check-in cleared.');
+    await recordProgress(id, today, complete ? { type: 'set', value: 1 } : { type: 'clear' });
   }
   async function setArchived(id: string, archived: boolean): Promise<void> {
     if (!today) return;
@@ -147,6 +194,7 @@ export function createHabitTrackerController() {
 
   onMount(() => {
     today = browserLocalDate();
+    selectedDate = today;
     void reload(true);
     const unsubscribe = subscribeHabitChanges(() => {
       if (busy) refreshQueued = true;
@@ -155,7 +203,11 @@ export function createHabitTrackerController() {
     const refresh = () => {
       if (document.visibilityState !== 'visible') return;
       const currentDate = browserLocalDate();
-      if (currentDate !== today) today = currentDate;
+      if (currentDate !== today) {
+        const followingToday = selectedDate === today;
+        today = currentDate;
+        if (followingToday) selectedDate = currentDate;
+      }
       if (busy) refreshQueued = true;
       else void reload();
     };
@@ -171,7 +223,10 @@ export function createHabitTrackerController() {
 
   return {
     get today() { return today; },
+    get selectedDate() { return selectedDate; },
+    get view() { return view; },
     get todayHabits() { return todayHabits; },
+    get historyHabits() { return historyHabits; },
     get archivedHabits() { return archivedHabits; },
     get completedCount() { return completedCount; },
     get loading() { return loading; },
@@ -180,9 +235,15 @@ export function createHabitTrackerController() {
     get error() { return error; },
     get notice() { return notice; },
     get editor() { return editor; },
+    get correction() { return correction; },
+    get correctionItem() {
+      if (!correction) return null;
+      return project(correction.date, false).find(item => item.habit.id === correction!.id) ?? null;
+    },
     get confirmDeleteId() { return confirmDeleteId; },
     openCreate, openEdit, closeEditor, submitEditor, setCompleted, setArchived, confirmDelete,
-    requestDelete(id: string) { confirmDeleteId = id; editor = null; },
+    selectView, selectHistoryDate, recordProgress, openCorrection, closeCorrection, submitCorrection,
+    requestDelete(id: string) { if (!busy) { confirmDeleteId = id; editor = null; correction = null; } },
     cancelDelete() { confirmDeleteId = null; },
     retry() { void reload(true); }
   };
