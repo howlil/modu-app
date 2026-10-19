@@ -165,7 +165,7 @@ export function createHabitTrackerController() {
   }
   function closeEditor(): void { if (!busy) editor = null; }
 
-  async function submitEditor(input: HabitSetup & { effectiveFromDate?: LocalDate }): Promise<void> {
+  async function submitEditor(input: HabitSetup & { effectiveFromDate?: LocalDate; policyChanged?: boolean }): Promise<void> {
     const current = editor;
     if (!current || !today) return;
     const success = current.mode === 'create'
@@ -174,7 +174,7 @@ export function createHabitTrackerController() {
           target: input.measurement === 'AVOIDANCE' || input.measurement === 'BOOLEAN' ? 1 : input.target,
           schedule: input.schedule ?? { type: 'DAILY' },
           effectiveFromDate: input.effectiveFromDate ?? addCalendarDays(today, 1)
-        }, today), 'Habit updated. New policy begins on its effective date.');
+        }, today, input.policyChanged === true), input.policyChanged ? 'Habit updated. New policy begins on its effective date.' : 'Habit renamed.');
     if (success) editor = null;
   }
   function openCorrection(id: string, date: LocalDate): void {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { GoalPolicy, HabitCheckin } from '../../src/lib/modules/habit-tracker/core/types.ts';
 import { makeConfiguredDailyHabit } from '../../src/lib/modules/habit-tracker/core/progress.ts';
-import { createPolicyRevision } from '../../src/lib/modules/habit-tracker/core/policy.ts';
+import { createPolicyRevision, hasPolicyConfigurationChanged } from '../../src/lib/modules/habit-tracker/core/policy.ts';
 import { isDueOnDate, resolveEffectivePolicy, addCalendarDays, mondayOf } from '../../src/lib/modules/habit-tracker/core/scheduling.ts';
 import { evaluateDailyOutcome, evaluateWeeklyQuotaByRevisions } from '../../src/lib/modules/habit-tracker/core/evaluation.ts';
 
@@ -75,6 +75,22 @@ describe('M3 scheduling and immutable policy revisions', () => {
       { target: 15, schedule: { type: 'DAILY' }, effectiveFromDate: '2026-10-21' }, day, 'r1')!;
     expect(() => createPolicyRevision(count.habit, [count.policy, future],
       { target: 20, schedule: { type: 'DAILY' }, effectiveFromDate: '2026-10-21' }, day, 'r2')).toThrow(RangeError);
+  });
+
+  it('recognizes rename-only edits even when another future revision already exists', () => {
+    const future = createPolicyRevision(count.habit, [count.policy],
+      { target: 20, schedule: { type: 'DAILY' }, effectiveFromDate: '2026-10-21' },
+      day, 'future')!;
+    expect(future.target).toBe(20);
+    // UI displays today's baseline (10); changing just title cannot silently
+    // append a second policy that reverts a previously scheduled future target.
+    expect(hasPolicyConfigurationChanged(count.policy,
+      { target: 10, schedule: { type: 'DAILY' } })).toBe(false);
+    expect(hasPolicyConfigurationChanged(count.policy,
+      { target: 11, schedule: { type: 'DAILY' } })).toBe(true);
+    const daysPolicy = { ...count.policy, schedule: { type: 'WEEKDAYS' as const, weekdays: [1, 3, 5] } };
+    expect(hasPolicyConfigurationChanged(daysPolicy,
+      { target: 10, schedule: { type: 'WEEKDAYS', weekdays: [5, 1, 3] } })).toBe(false);
   });
 
   it('does not create a new revision for rename-only edits or identical schedule', () => {

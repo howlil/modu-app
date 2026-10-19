@@ -6,6 +6,7 @@
   import type { GoalPolicy, HabitDirection, LocalDate, Measurement, ScheduleRule } from '../core/types.ts';
   import type { HabitSetup } from '../core/progress.ts';
   import { addCalendarDays } from '../core/scheduling.ts';
+  import { hasPolicyConfigurationChanged } from '../core/policy.ts';
 
   let {
     mode, title, today, policy, initialDirection = 'BUILD',
@@ -18,7 +19,7 @@
     initialDirection?: HabitDirection;
     busy: boolean;
     error?: string;
-    onSave: (input: HabitSetup & { effectiveFromDate?: LocalDate }) => Promise<void>;
+    onSave: (input: HabitSetup & { effectiveFromDate?: LocalDate; policyChanged?: boolean }) => Promise<void>;
     onCancel: () => void;
   } = $props();
 
@@ -88,7 +89,14 @@
     event.preventDefault();
     touched = true;
     if (invalid || busy) return;
-    const base = { title: draftTitle.trim(), schedule: buildSchedule(),
+    const schedule = buildSchedule();
+    const policyChanged = mode === 'edit' && policy
+      ? hasPolicyConfigurationChanged(policy, {
+          target: direction === 'QUIT' || measurement === 'BOOLEAN' ? 1 : target,
+          schedule
+        })
+      : true;
+    const base = { title: draftTitle.trim(), schedule, policyChanged,
       ...(mode === 'edit' ? { effectiveFromDate: effectiveDate } : {}) };
     let input: HabitSetup & { effectiveFromDate?: LocalDate };
     if (direction === 'QUIT') {

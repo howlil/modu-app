@@ -213,7 +213,8 @@ export async function updateHabitConfiguration(
   id: string,
   title: string,
   policyInput: PolicyRevisionInput,
-  today: LocalDate
+  today: LocalDate,
+  revisePolicy: boolean
 ): Promise<void> {
   if (!isLocalDate(today) || today !== browserLocalDate()) {
     throw new RangeError('The local date changed. Reopen the editor before saving.');
@@ -230,9 +231,9 @@ export async function updateHabitConfiguration(
           try {
             const habit = getHabit.result as HabitDefinition;
             const renamed = renameHabit(habit, title);
-            const revision = createPolicyRevision(
+            const revision = revisePolicy ? createPolicyRevision(
               habit, getPolicies.result as GoalPolicy[], policyInput, today, crypto.randomUUID()
-            );
+            ) : null;
             if (renamed.title !== habit.title) habitStore.put(renamed);
             if (revision) policyStore.add(revision);
           } catch (error) { fail(error as Error); }

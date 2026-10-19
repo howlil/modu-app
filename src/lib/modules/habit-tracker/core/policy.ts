@@ -44,3 +44,25 @@ export function createPolicyRevision(
   }
   return next;
 }
+
+
+/** Compare semantic policy changes, not the effective policy of a different future date. */
+export function hasPolicyConfigurationChanged(
+  baseline: GoalPolicy,
+  input: { target: number; schedule: ScheduleRule }
+): boolean {
+  const a = baseline.schedule;
+  const b = input.schedule;
+  if (baseline.target !== input.target || a.type !== b.type) return true;
+  switch (a.type) {
+    case 'DAILY': return false;
+    case 'WEEKDAYS':
+      return b.type !== 'WEEKDAYS' ||
+        a.weekdays.slice().sort().join(',') !== b.weekdays.slice().sort().join(',');
+    case 'INTERVAL':
+      return b.type !== 'INTERVAL' ||
+        a.everyDays !== b.everyDays || a.anchorDate !== b.anchorDate;
+    case 'WEEKLY_QUOTA':
+      return b.type !== 'WEEKLY_QUOTA' || a.daysPerWeek !== b.daysPerWeek;
+  }
+}
