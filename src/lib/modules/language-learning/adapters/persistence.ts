@@ -19,7 +19,7 @@ const SESSIONS = 'sessions';
 const ATTEMPTS = 'attempts';
 const META = 'meta';
 const BACKUP_FORMAT = 'modu-language-learning';
-const MAX_BACKUP_LENGTH = 20 * 1024 * 1024;
+const MAX_BACKUP_LENGTH = 256 * 1024 * 1024;
 
 interface SessionRow {
   id: string;
@@ -144,7 +144,7 @@ async function transaction<T>(
 }
 function asBackup(text: string): {records: StoredPractice[]; attempts: PracticeAttempt[]; latestSessionId: string | null} {
   if (!text || text.length > MAX_BACKUP_LENGTH) {
-    throw new LearningPersistenceError('invalid', 'Backup is empty or exceeds the 20 MiB import limit.');
+    throw new LearningPersistenceError('invalid', 'Backup is empty or exceeds the 256 MiB import limit.');
   }
   let raw: unknown;
   try { raw = JSON.parse(text); }
@@ -296,10 +296,14 @@ export const learningPersistence = {
         };
       }
     );
-    return JSON.stringify({
+    const encoded = JSON.stringify({
       format: BACKUP_FORMAT, version: 1, exportedAt: new Date().toISOString(),
       sessions: backup.records, latestSessionId: backup.latestSessionId
-    } satisfies LearningBackup, null, 2);
+    } satisfies LearningBackup);
+    if (encoded.length > MAX_BACKUP_LENGTH) {
+      throw new LearningPersistenceError('quota', 'Learning history exceeds the backup size limit.');
+    }
+    return encoded;
   },
   async importBackup(text: string): Promise<void> {
     // Validate the entire source before opening the destructive transaction.
