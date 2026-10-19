@@ -15,11 +15,12 @@
   } = $props();
 
   let dialog: HTMLDialogElement;
-  let draftTitle = $state(title);
+  let draftTitle = $state('');
   let touched = $state(false);
   const invalid = $derived(!draftTitle.trim() || draftTitle.trim().length > 80);
 
   onMount(() => {
+    draftTitle = title;
     dialog.showModal();
     return () => { if (dialog.open) dialog.close(); };
   });
@@ -36,6 +37,7 @@
   bind:this={dialog}
   aria-labelledby="habit-editor-title"
   onclose={onCancel}
+  oncancel={(event) => { if (busy) event.preventDefault(); }}
   class="fixed inset-y-0 right-0 m-0 ml-auto h-full max-h-full w-full max-w-[420px] overflow-hidden border-0 bg-card p-0 text-foreground shadow-xl backdrop:bg-foreground/35"
 >
   <form onsubmit={submit} class="flex h-full flex-col">
