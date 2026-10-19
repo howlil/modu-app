@@ -295,13 +295,15 @@ References: https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API/Using
 
 - `sessions` object store: `{id, updatedAt, record: StoredPractice}` with `updatedAt` index. Existing `StoredPractice` v1 schema remains unchanged.
 - `attempts` object store: immutable `PracticeAttempt` keyed by globally unique ID, committed in the same readwrite transaction as the session.
-- `meta` object store: atomically updated pointer to latest session (avoids equal-millisecond timestamp collisions); schema v1 fallback uses timestamp index.
+- `meta` object store: atomically updated pointer to latest session (avoids equal-millisecond timestamp collisions) and non-exported storage generation. Restore rotates the generation, and the controller supplies its last observed generation so stale tabs cannot mutate a restored database even when a session revision coincidentally matches; schema v1 fallback uses timestamp index.
 - Backup is JSON `{format:'modu-language-learning', version:1, exportedAt, sessions, latestSessionId}`; explicit export/import actions on `LanguageLearningWorkspace.svelte`. All backup records are validated before destructive work. Import clears/rebuilds stores **atomically** in one transaction and preserves the latest-session pointer; malformed or duplicate attempts cannot partially wipe progress. Size limit 256 MiB is applied to export and import.
 - Optional `navigator.storage.persist()` request plus explicit user message: browser data may still disappear if site data is cleared, profile changes, or device fails. Exported backups are required for dependable recovery; importing into another origin/browser is manual.
-- Tests: `test/unit/language-learning-indexeddb.test.ts` with fake-indexeddb and existing M0/M2 domain tests. CI still runs `bun install --frozen-lockfile`, `bun run check`, `bun run test`, `bun run build`. Browser-native E2E remains a separate acceptance requirement.
+- Tests: `test/unit/language-learning-indexeddb.test.ts` with fake-indexeddb (atomic commit, retry, cross-session uniqueness, concurrent writers, schema upgrade, latest-session pointer, backup rollback and stale-tab restore fence) and existing M0/M2 domain tests. CI still runs `bun install --frozen-lockfile`, `bun run check`, `bun run test`, `bun run build`. Browser-native E2E remains a separate acceptance requirement.
 
 ### Removed implementation and migration boundary
 
 - Removed `selfhost/language-learning-server.ts`, `selfhost/language-learning-storage.ts`, `selfhost/verify-language-learning.ts`, `selfhost/README.md`, `language:storage` script, and SQLite-specific CI testing. No runtime SQLite path or silent network fallback remains.
 - **Important:** the refactor does not delete an external SQLite database that may exist in a user's environment, but it also does not automatically migrate its contents to IndexedDB. The previous pre-launch storage sidecar was not wired to the live Modu UI; an owner with actual SQLite data must retain that file and perform a deliberate conversion/export before retiring it. Do not imply automatic cross-device migration.
 - Next M3 SRS must use this **single** IDB repository as canonical transaction owner, adding review state to the same readwrite transaction as the rated attempt. Exposure and skip do not update memory.
+
+Latest verified M1 refactor CI: https://github.com/howlil/modu-app/actions/runs/39340683207 (frozen install, typecheck, unit tests, build passed). No production browser E2E or live module activation is implied.
