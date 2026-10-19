@@ -26,6 +26,7 @@ interface SessionRow {
   updatedAt: number;
   record: StoredPractice;
 }
+type BrowserPractice = StoredPractice & {storageEpoch: string | null};
 export interface LearningBackup {
   format: typeof BACKUP_FORMAT;
   version: 1;
@@ -185,9 +186,21 @@ function asBackup(text: string): {records: StoredPractice[]; attempts: PracticeA
 }
 /** No server endpoint. This browser origin owns the canonical practice history. */
 export const learningPersistence = {
-  latest(): Promise<StoredPractice | null> {
-    return transaction([SESSIONS, META], 'readonly', (tx, complete, fail) => {
+  latest(): Promise<BrowserPractice | null> {
+    return transaction<BrowserPractice | null>([SESSIONS, META], 'readonly', (tx, complete, fail) => {
       const store = tx.objectStore(SESSIONS);
+      const finish = (record: StoredPractice | null) => {
+        const generation = tx.objectStore(META).get('epoch');
+        generation.onsuccess = () => {
+          try {
+            const epoch: unknown = generation.result?.value ?? null;
+            if (epoch !== null && typeof epoch !== 'string') {
+              throw new LearningPersistenceError('corrupt', 'Invalid storage generation.');
+            }
+            complete(record ? {...record, storageEpoch: epoch as string | null} : null);
+          } catch (cause) { fail(cause); }
+        };
+      };
       const pointer = tx.objectStore(META).get('latest');
       pointer.onsuccess = () => {
         try {
@@ -201,7 +214,7 @@ export const learningPersistence = {
               try {
                 const record = decodeSessionRow(request.result);
                 if (!record) throw new LearningPersistenceError('corrupt', 'Latest session record is missing.');
-                complete(record);
+                finish(record);
               } catch (cause) { fail(cause); }
             };
             return;
@@ -209,63 +222,91 @@ export const learningPersistence = {
           // Upgrade from legacy schema v1 with no pointer.
           const cursor = store.index('updatedAt').openCursor(null, 'prev');
           cursor.onsuccess = () => {
-            try { complete(decodeSessionRow(cursor.result?.value)); }
+            try { finish(decodeSessionRow(cursor.result?.value)); }
             catch (cause) { fail(cause); }
           };
         } catch (cause) { fail(cause); }
       };
     });
   },
-  get(sessionId: string): Promise<StoredPractice | null> {
-    return transaction([SESSIONS], 'readonly', (tx, complete, fail) => {
+  get(sessionId: string): Promise<BrowserPractice | null> {
+    return transaction<BrowserPractice | null>([SESSIONS, META], 'readonly', (tx, complete, fail) => {
       const request = tx.objectStore(SESSIONS).get(sessionId);
       request.onsuccess = () => {
-        try { complete(decodeSessionRow(request.result)); }
-        catch (cause) { fail(cause); }
+        try {
+          const record = decodeSessionRow(request.result);
+          const generation = tx.objectStore(META).get('epoch');
+          generation.onsuccess = () => {
+            try {
+              const epoch: unknown = generation.result?.value ?? null;
+              if (epoch !== null && typeof epoch !== 'string') {
+                throw new LearningPersistenceError('corrupt', 'Invalid storage generation.');
+              }
+              complete(record ? {...record, storageEpoch: epoch as string | null} : null);
+            } catch (cause) { fail(cause); }
+          };
+        } catch (cause) { fail(cause); }
       };
     });
   },
-  execute(command: PracticeCommand, expectedRevision: number | null): Promise<StoredPractice> {
-    return transaction([SESSIONS, ATTEMPTS, META], 'readwrite', (tx, complete, fail) => {
+  execute(command: PracticeCommand, expectedRevision: number | null,
+    expectedEpoch?: string | null): Promise<BrowserPractice> {
+    return transaction<BrowserPractice>([SESSIONS, ATTEMPTS, META], 'readwrite', (tx, complete, fail) => {
       const sessions = tx.objectStore(SESSIONS);
       const attempts = tx.objectStore(ATTEMPTS);
+      const meta = tx.objectStore(META);
       const request = sessions.get(command.sessionId);
       request.onsuccess = () => {
-        try {
-          const current = decodeSessionRow(request.result);
-          // Lost response: a completed attempt or identical start is safe to replay,
-          // even with a now-stale expectedRevision.
-          if (current && (command.type === 'start' ||
-            (command.type === 'attempt' && current.session.attempts.some(
-              a => a.id === command.attempt.attemptId)))) {
-            complete(applyPracticeCommand(current, command).next);
-            return;
-          }
-          if ((current?.revision ?? null) !== expectedRevision) {
-            throw new LearningPersistenceError('conflict',
-              'Session changed in another tab. Reload saved progress.');
-          }
-          const commit = () => {
-            try {
-              const {next, attempt, changed} = applyPracticeCommand(current, command);
-              if (!changed) { complete(next); return; }
-              const row: SessionRow = {id: next.session.id, updatedAt: Date.now(), record: next};
-              sessions.put(row);
-              if (attempt) attempts.add(attempt);
-              tx.objectStore(META).put({key: 'latest', sessionId: next.session.id});
-              complete(next);
-            } catch (cause) { fail(cause); }
-          };
-          if (command.type === 'attempt') {
-            const existing = attempts.get(command.attempt.attemptId);
-            existing.onsuccess = () => {
-              if (existing.result !== undefined) {
-                fail(new LearningPersistenceError('conflict',
-                  'Attempt ID belongs to an existing record. Reload saved progress.'));
-              } else commit();
+        const generation = meta.get('epoch');
+        generation.onsuccess = () => {
+          try {
+            const current = decodeSessionRow(request.result);
+            const rawEpoch: unknown = generation.result?.value ?? null;
+            if (rawEpoch !== null && typeof rawEpoch !== 'string') {
+              throw new LearningPersistenceError('corrupt', 'Invalid storage generation.');
+            }
+            const epoch = rawEpoch as string | null;
+            // Backup restoration creates a fresh generation. Old tabs must reload,
+            // even when an imported session happens to have the same revision.
+            if (expectedEpoch !== undefined && expectedEpoch !== epoch &&
+              !(current === null && command.type === 'start' && expectedEpoch === null)) {
+              throw new LearningPersistenceError('conflict',
+                'Learning data was restored in another tab. Reload saved progress.');
+            }
+            if (current && (command.type === 'start' ||
+              (command.type === 'attempt' && current.session.attempts.some(
+                a => a.id === command.attempt.attemptId)))) {
+              complete({...applyPracticeCommand(current, command).next, storageEpoch: epoch});
+              return;
+            }
+            if ((current?.revision ?? null) !== expectedRevision) {
+              throw new LearningPersistenceError('conflict',
+                'Session changed in another tab. Reload saved progress.');
+            }
+            const commit = () => {
+              try {
+                const {next, attempt, changed} = applyPracticeCommand(current, command);
+                if (!changed) { complete({...next, storageEpoch: epoch}); return; }
+                const effectiveEpoch = epoch ?? crypto.randomUUID();
+                const row: SessionRow = {id: next.session.id, updatedAt: Date.now(), record: next};
+                sessions.put(row);
+                if (attempt) attempts.add(attempt);
+                if (epoch === null) meta.put({key: 'epoch', value: effectiveEpoch});
+                meta.put({key: 'latest', sessionId: next.session.id});
+                complete({...next, storageEpoch: effectiveEpoch});
+              } catch (cause) { fail(cause); }
             };
-          } else commit();
-        } catch (cause) { fail(cause); }
+            if (command.type === 'attempt') {
+              const existing = attempts.get(command.attempt.attemptId);
+              existing.onsuccess = () => {
+                if (existing.result !== undefined) {
+                  fail(new LearningPersistenceError('conflict',
+                    'Attempt ID belongs to an existing record. Reload saved progress.'));
+                } else commit();
+              };
+            } else commit();
+          } catch (cause) { fail(cause); }
+        };
       };
     });
   },
@@ -322,6 +363,7 @@ export const learningPersistence = {
       }
       for (const attempt of attempts) journal.add(attempt);
       if (latestSessionId !== null) meta.put({key: 'latest', sessionId: latestSessionId});
+      meta.put({key: 'epoch', value: crypto.randomUUID()});
       complete(undefined);
     });
   },
