@@ -9,7 +9,7 @@ import { STARTER_ISLAND } from '../adapters/starter-content.ts';
 
 /** No optimistic success: all state transitions are visible only after durable acknowledgement. */
 export function createLanguageLearningController() {
-  let record = $state<StoredPractice | null>(null);
+  let record = $state<(StoredPractice & {storageEpoch?: string | null}) | null>(null);
   let loading = $state(true);
   let pending = $state(false);
   let ready = $state(false);
@@ -17,7 +17,7 @@ export function createLanguageLearningController() {
   let answerDraft = $state('');
   let persistenceStatus = $state<'granted' | 'not-granted' | 'unavailable'>('unavailable');
   let answerDraftScope = $state<string | null>(null);
-  let retryCommand: {command: PracticeCommand; expectedRevision: number | null} | null = null;
+  let retryCommand: {command: PracticeCommand; expectedRevision: number | null; expectedEpoch: string | null} | null = null;
   const session = $derived<PracticeSession | null>(record?.session ?? null);
   const answerCheck = $derived.by((): AnswerCheck | null => {
     const s = session;
@@ -58,12 +58,12 @@ export function createLanguageLearningController() {
       error = cause instanceof Error ? cause.message : 'Learning storage could not be loaded.';
     } finally { pending = false; loading = false; }
   }
-  async function execute(command: PracticeCommand, expectedRevision: number | null) {
+  async function execute(command: PracticeCommand, expectedRevision: number | null, expectedEpoch: string | null) {
     if (!ready || pending) return;
     pending = true;
     error = '';
     try {
-      const saved = await learningPersistence.execute(command, expectedRevision);
+      const saved = await learningPersistence.execute(command, expectedRevision, expectedEpoch);
       const nextScope = practiceAnswerScope(saved.session);
       if (answerDraftScope !== nextScope) {
         answerDraft = '';
@@ -76,13 +76,13 @@ export function createLanguageLearningController() {
         retryCommand = null;
         error = 'Another tab updated this session. Reload and review the latest state.';
       } else {
-        retryCommand = {command, expectedRevision};
+        retryCommand = {command, expectedRevision, expectedEpoch};
         error = cause instanceof Error ? cause.message : 'Unable to persist learning progress.';
       }
     } finally { pending = false; }
   }
   function send(command: PracticeCommand) {
-    void execute(command, command.type === 'start' ? null : (record?.revision ?? null));
+    void execute(command, command.type === 'start' ? null : (record?.revision ?? null), record?.storageEpoch ?? null);
   }
   function start(mode: PracticeMode = 'recall') {
     if (pending || !ready || retryCommand) return;
@@ -140,8 +140,8 @@ export function createLanguageLearningController() {
   }
   function retry() {
     if (pending || !ready || !retryCommand) return;
-    const { command, expectedRevision } = retryCommand;
-    void execute(command, expectedRevision);
+    const { command, expectedRevision, expectedEpoch } = retryCommand;
+    void execute(command, expectedRevision, expectedEpoch);
   }
   return {
     get session() { return session; },
