@@ -4,7 +4,6 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  optimizeDeps: { exclude: ['@jsquash/jpeg', '@jsquash/avif', '@blazediff/milo-wasm', 'wasm-webp'] },
   plugins: [
     tailwindcss(),
     sveltekit({
