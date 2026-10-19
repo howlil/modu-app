@@ -17,7 +17,7 @@
     document.body.appendChild(link);
     link.click();
     link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
   }
   async function selectBackup(event: Event) {
     const input = event.currentTarget as HTMLInputElement;
@@ -25,11 +25,15 @@
     if (!file) return;
     try {
       if (!window.confirm('Replace all language learning history in this browser with this backup?')) return;
-      if (file.size > 20 * 1024 * 1024) {
-        await controller.importBackup('');
+      if (file.size > 256 * 1024 * 1024) {
+        window.alert('This backup exceeds the 256 MiB restore limit.');
         return;
       }
-      await controller.importBackup(await file.text());
+      try {
+        await controller.importBackup(await file.text());
+      } catch {
+        window.alert('Unable to read this backup file.');
+      }
     } finally { input.value = ''; }
   }
 </script>
