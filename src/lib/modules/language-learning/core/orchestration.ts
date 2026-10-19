@@ -1,4 +1,4 @@
-import type { LanguageIsland, Sentence, PracticeSession } from './learning.ts';
+import type { LanguageIsland, Sentence } from './learning.ts';
 import { decodeMemoryState, memoryKey, type MemoryState } from './memory.ts';
 
 const MAX_TIME = 8_640_000_000_000_000;
@@ -157,8 +157,10 @@ export function recommendedIsland(plan: LearningPlan, islands: readonly Language
     throw new OrchestrationRuleError('stale_plan','Recommendation references an unavailable Island.');
   }
   const selected:Sentence[]=[];
+  // Consume only the contiguous recommendation prefix: never pull a later
+  // new item ahead of an earlier due review from a different Island.
   for(const task of plan.tasks) {
-    if(task.islandId!==first.islandId)continue;
+    if(task.islandId!==first.islandId)break;
     const sentence=island.sentences.find(s=>s.id===task.sentenceId &&
       s.revision===task.sentenceRevision);
     if (!sentence) throw new OrchestrationRuleError('stale_plan','Recommended sentence was edited.');
