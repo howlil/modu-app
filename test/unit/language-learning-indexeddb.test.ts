@@ -89,7 +89,9 @@ describe('Language Learning — IndexedDB M1 repository', () => {
       .rejects.toMatchObject({code:'invalid'});
   });
   it('never clears existing data for invalid backup or duplicate attempts', async () => {
-    await learningPersistence.execute(makeStart('s1'),null);
+    const start=await learningPersistence.execute(makeStart('s1'),null);
+    const revealed=await learningPersistence.execute(reveal('s1'),start.revision);
+    await learningPersistence.execute(attempt('s1','unique-attempt'),revealed.revision);
     const original=await learningPersistence.exportBackup();
     const invalid=JSON.parse(original);
     invalid.sessions[0].session.cursor=99;
@@ -98,8 +100,9 @@ describe('Language Learning — IndexedDB M1 repository', () => {
     const duplicated=JSON.parse(original);
     const second=structuredClone(duplicated.sessions[0]);
     second.session.id='s2';
+    second.session.attempts[0].sessionId='s2';
     duplicated.sessions.push(second);
-    // Session ID differs, but duplicate row content is still independently validated.
+    // Valid individual histories must still reject a shared global attempt ID.
     await expect(learningPersistence.importBackup(JSON.stringify(duplicated)))
       .rejects.toBeInstanceOf(LearningPersistenceError);
     expect(await learningPersistence.exportBackup()).toBeDefined();
