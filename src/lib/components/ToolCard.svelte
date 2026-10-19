@@ -5,13 +5,11 @@
   let preview = $derived(module.status === 'coming-soon');
 
   let tileStyle = $derived({
-    'daily-execution': 'background: linear-gradient(145deg, #BDD4FF 0%, #9ABAF7 54%, #81A6EE 100%);',
     pomodoro: 'background: linear-gradient(145deg, #9BC2F7 0%, #80AEEF 54%, #709DE5 100%);',
     'habit-tracker': 'background: linear-gradient(145deg, #D4E3FF 0%, #BED4FD 55%, #9CBCFA 100%);',
   }[module.id]);
 
   let tileClass = $derived({
-    'daily-execution': 'text-[#17437A] border-[#86A9EA]',
     pomodoro: 'text-[#163A6B] border-[#6F9FE8]',
     'habit-tracker': 'text-[#17437A] border-[#86A9EA]',
   }[module.id] ?? 'text-foreground border-border');
@@ -42,27 +40,7 @@
   </div>
 
 
-  {#if module.id === 'daily-execution'}
-    <div class="tool-art tool-art--daily" aria-hidden="true">
-      <svg class="size-full" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <g transform="rotate(-9 120 130)">
-          <rect x="50" y="43" width="142" height="165" rx="23" fill="#5689D7"/>
-          <rect x="45" y="37" width="142" height="165" rx="23" fill="#F5F9FF" stroke="#6A9CE7" stroke-width="3"/>
-          <rect x="68" y="63" width="96" height="16" rx="8" fill="#B9D1FA"/>
-          <rect x="68" y="91" width="19" height="19" rx="6" fill="#2468F2"/>
-          <path d="m73 100 5 5 9-11" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M99 101h57" stroke="#8DB1EC" stroke-width="8" stroke-linecap="round"/>
-          <rect x="68" y="122" width="19" height="19" rx="6" fill="#2468F2"/>
-          <path d="m73 131 5 5 9-11" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M99 131h49" stroke="#8DB1EC" stroke-width="8" stroke-linecap="round"/>
-          <rect x="68" y="153" width="19" height="19" rx="6" stroke="#8DB1EC" stroke-width="3"/>
-          <path d="M99 163h62" stroke="#C5D8F7" stroke-width="8" stroke-linecap="round"/>
-        </g>
-        <circle cx="174" cy="187" r="33" fill="#2468F2" stroke="#F5F9FF" stroke-width="7"/>
-        <path d="m163 187 8 8 15-18" stroke="white" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </div>
-  {:else if module.id === 'habit-tracker'}
+  {#if module.id === 'habit-tracker'}
     <div class="tool-art tool-art--habit" aria-hidden="true">
       <svg class="size-full" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
         <g transform="rotate(-8 120 120)">
@@ -116,7 +94,6 @@
   }
 
 
-  .tool-art--daily { --art-rotation: -8deg; --art-duration: 7s; --art-delay: -1s; }
 
   .tool-art--habit { --art-rotation: -8deg; --art-duration: 8s; --art-delay: -1.5s; }
 

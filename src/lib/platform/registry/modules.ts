@@ -2,13 +2,6 @@ import type { ModuleDefinition } from '#lib/platform/registry/types.ts';
 
 export const modules: ModuleDefinition[] = [
   {
-    id: 'daily-execution',
-    name: 'Daily',
-    route: '/daily',
-    layout: 'focus',
-    status: 'available'
-  },
-  {
     id: 'habit-tracker',
     name: 'Habit Tracker',
     route: '/habit',

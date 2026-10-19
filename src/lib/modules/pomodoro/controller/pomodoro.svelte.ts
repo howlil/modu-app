@@ -600,7 +600,7 @@ export function createPomodoroController() {
     const target = partialIntent === 'reset' ? null
       : partialIntent === 'skip' ? getNextMode(timer) : partialTargetMode;
     applyTimerExit(target);
-    contextNotice = save ? 'Partial focus saved. You can add a checkpoint in Daily Execution.' : 'Partial focus discarded.';
+    contextNotice = save ? 'Partial focus saved.' : 'Partial focus discarded.';
   }
 
   function cancelPartial() {
@@ -944,7 +944,7 @@ export function createPomodoroController() {
     wakeLockSupported = 'wakeLock' in navigator;
 
     restore();
-    let startFromDaily = false;
+    let startFromHandoff = false;
     const requestedTaskId = new URLSearchParams(window.location.search).get('taskId');
     if (requestedTaskId) {
       const pendingTask = consumePendingFocusTask(requestedTaskId);
@@ -952,7 +952,7 @@ export function createPomodoroController() {
         linkedTask = pendingTask;
         focusText = pendingTask.title;
         focusDraft = pendingTask.title;
-        startFromDaily = pendingTask.autoStart === true;
+        startFromHandoff = pendingTask.autoStart === true;
       } else if (pendingTask) {
         contextNotice = 'Finish or reset your current session before switching tasks.';
       }
@@ -962,7 +962,7 @@ export function createPomodoroController() {
     if (!wakeLockSupported) preferences = { ...preferences, keepAwake: false };
 
     hydrated = true;
-    if (startFromDaily && timer.mode === 'focus' && timer.status === 'idle') start();
+    if (startFromHandoff && timer.mode === 'focus' && timer.status === 'idle') start();
     if (expiredFocusEndAt !== null && sessionStartedAt !== null) {
       focusAccounting = pauseFocus(focusAccounting, clockNow, expiredFocusEndAt);
       if (timer.status === 'complete') {

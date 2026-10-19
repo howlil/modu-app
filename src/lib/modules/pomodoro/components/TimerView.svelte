@@ -103,8 +103,3 @@
     </div>
   </div>
 {/if}
-{#if controller.linkedTask && controller.contextNotice.includes('Partial focus saved')}
-  <a href={'/daily?checkpointTaskId=' + encodeURIComponent(controller.linkedTask.id)} class="mt-3 inline-flex rounded-full border border-border bg-card px-4 py-2 text-meta font-medium text-primary hover:bg-muted">
-    Continue with a task checkpoint →
-  </a>
-{/if}

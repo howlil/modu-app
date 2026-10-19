@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 const sources = {
   ...import.meta.glob<string>('../../src/lib/modules/**/*.{ts,svelte}', { eager: true, query: '?raw', import: 'default' }),
   ...import.meta.glob<string>('../../src/lib/components/ui/**/*.{ts,svelte}', { eager: true, query: '?raw', import: 'default' }),
-  ...import.meta.glob<string>('../../src/routes/{pomodoro,daily}/+page.svelte', { eager: true, query: '?raw', import: 'default' }),
+  ...import.meta.glob<string>('../../src/routes/pomodoro/+page.svelte', { eager: true, query: '?raw', import: 'default' }),
   ...import.meta.glob<string>('../../extension/content-bridge.js', { eager: true, query: '?raw', import: 'default' })
 };
 
@@ -76,34 +76,9 @@ describe('Module boundary rules', () => {
     }
   });
 
-  it('keeps M3 intelligence inside Daily Execution without a second timer or focus store', () => {
-    const review = read('src/lib/modules/daily-execution/components/ReviewView.svelte');
-    const controller = read('src/lib/modules/daily-execution/controller/daily-execution.svelte.ts');
-    const analytics = read('src/lib/modules/daily-execution/core/analytics.ts');
-    const evidence = read('src/lib/modules/daily-execution/adapters/evidence-storage.ts');
-    expect(review).toContain('IntelligenceView');
-    expect(review).toContain('EvidenceView');
-    expect(review).toContain('SourcesView');
-    expect(controller).toContain('loadFocusSessions');
-    expect(analytics).not.toMatch(/\\b(localStorage|indexedDB|window|document)\\b/);
-    expect(evidence).toContain('module-daily-execution-evidence');
-    for (const file of sourceFiles('src/lib/modules/daily-execution')) {
-      const source = read(file);
-      expect(source, file).not.toMatch(/\b(createTimer|startTimer|pauseTimer|resetTimer)\s*\(/);
-      expect(source, file).not.toContain('module-pomodoro-activity');
-    }
-  });
-
   it('keeps Pomodoro route thin and feature-owned', () => {
     const route = read('src/routes/pomodoro/+page.svelte');
     expect(route).toContain('PomodoroWorkspace');
-    expect(route.split('\n').length).toBeLessThan(35);
-    expect(route).not.toMatch(/\$state\s*\(|\bonMount\s*\(|\blocalStorage\b|\bindexedDB\b/);
-  });
-
-  it('keeps Daily Execution route thin and feature-owned', () => {
-    const route = read('src/routes/daily/+page.svelte');
-    expect(route).toContain('DailyExecutionWorkspace');
     expect(route.split('\n').length).toBeLessThan(35);
     expect(route).not.toMatch(/\$state\s*\(|\bonMount\s*\(|\blocalStorage\b|\bindexedDB\b/);
   });
