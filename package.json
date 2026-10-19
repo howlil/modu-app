@@ -14,9 +14,10 @@
     "dev": "vite dev",
     "build": "vite build",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "test": "vitest run",
+    "test": "vitest run && bun run selfhost/verify-language-learning.ts",
     "deploy": "bun run build && wrangler deploy",
-    "preview": "bun run build && wrangler dev"
+    "preview": "bun run build && wrangler dev",
+    "language:storage": "bun run selfhost/language-learning-server.ts"
   },
   "dependencies": {
     "bits-ui": "^2.19.5",
