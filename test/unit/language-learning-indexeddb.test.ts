@@ -65,8 +65,6 @@ describe('Language Learning — IndexedDB M1 repository', () => {
     const three=await learningPersistence.execute(command,two.revision);
     expect(await learningPersistence.execute(command,two.revision)).toEqual(three);
     expect((await learningPersistence.get('s1'))?.session.attempts).toHaveLength(1);
-    expect((await learningPersistence.get('japanese'))?.session.items[0].prompt)
-      .toBe('お茶をください');
     await expect(learningPersistence.execute(attempt('s1','a1','easy'),two.revision))
       .rejects.toMatchObject({code:'invalid'});
   });
@@ -141,6 +139,8 @@ describe('Language Learning — IndexedDB M1 repository', () => {
     await learningPersistence.importBackup(backup);
     expect(await learningPersistence.get('discard-this')).toBe(null);
     expect((await learningPersistence.get('s1'))?.session.attempts).toHaveLength(1);
+    expect((await learningPersistence.get('japanese'))?.session.items[0].prompt)
+      .toBe('お茶をください');
     await expect(learningPersistence.execute(attempt('s1','a1','easy'),revealed.revision))
       .rejects.toMatchObject({code:'invalid'});
   });
