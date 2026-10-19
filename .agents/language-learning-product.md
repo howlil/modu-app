@@ -204,3 +204,30 @@ This order is not an implementation authorization. Do not generate scaffolds/reg
 - **Durability not implemented:** controller demo is ephemeral. Never treat completion as persisted. Self-hosted deployment/storage topology and atomic attempt/review commit remain a blocking architectural decision before releasing this module.
 - **Next vertical slice:** choose a secure per-instance self-hosted persistence topology and implement a durable repository/transaction contract, then attach real practice UI; only then add review scheduling and content authoring. Keep core independent of I/O and rating/exposure semantics unchanged.
 - **Verification:** new unit tests committed, but check/build/test results must be confirmed from GitHub Actions; a queued run is not a passing run.
+
+## M1 checkpoint — self-hosted persistence and recovery (2026-10-20)
+
+**M1 implemented on master. Storage is not published through the current Cloudflare frontend.**
+
+### Selected topology
+
+- User-managed Bun + SQLite service, loopback-bound, with a same-origin user-managed reverse proxy; the Cloudflare Worker has no durable SQLite disk.
+- No application account, tenant, subscription or silent browser storage fallback. The owner controls service lifecycle, secure access, disk and backup.
+- The service MUST NOT be exposed directly to the public internet. See `selfhost/README.md` for deployment prerequisites.
+
+### Code and business guarantees
+
+- `core/persistence.ts`: versioned record and commands, untrusted ingress validation, replay-safe practice transitions.
+- `adapters/persistence.ts`: same-origin transport, explicit errors, no false saved state.
+- `controller/language-learning.svelte.ts`: hydration, acknowledged saves, retry/reload and revision conflict behavior.
+- `selfhost/language-learning-storage.ts`: SQLite WAL, FULL sync, BEGIN IMMEDIATE, session revisions, globally unique attempt IDs and atomic attempt/session writes.
+- `selfhost/language-learning-server.ts`: Bun localhost HTTP entrypoint, exact origin checks, no permissive CORS; networking authority must be enforced by deployment.
+- `test/unit/language-learning-persistence.test.ts` and `selfhost/verify-language-learning.ts`: decoding, command retry, revision conflict, real SQLite restart recovery and transactional rollback.
+- Existing Verify remains strict with `bun install --frozen-lockfile`; the lockfile was regenerated after parallel Modu dependency cleanup.
+
+### Remaining product and deployment gates
+
+- No public route or launcher tile yet, and no live self-hosted reverse proxy was configured in this milestone.
+- The hosted Cloudflare UI cannot transparently access the owner's loopback service; same-origin private deployment/proxy must be designed and tested.
+- SRS scheduling, learning profiles UI, real content authoring, full history and export/restore are later milestones.
+- Next milestone M2: Recall and Evaluation contracts backed by M1 durable attempt state; then M3 SRS.
