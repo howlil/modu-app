@@ -7,6 +7,11 @@ import {
   MemoryRuleError, memoryKey, scheduleRatedAttempt, rebuildMemoryStates,
   decodeMemoryState, type MemoryState
 } from '../core/memory.ts';
+import {
+  catalogKeys, createLearningPlan, OrchestrationRuleError,
+  type LearningProfile, type LearningPlan, type PlanOptions
+} from '../core/orchestration.ts';
+import type { LanguageIsland } from '../core/learning.ts';
 
 /** Browser-local, single-learner storage. All authoritative writes use one IDB transaction. */
 export class LearningPersistenceError extends Error {
@@ -50,6 +55,9 @@ function translateError(cause: unknown): LearningPersistenceError {
   }
   if (cause instanceof LearningRuleError) return new LearningPersistenceError('invalid', cause.message);
   if (cause instanceof MemoryRuleError) return new LearningPersistenceError(cause.code === 'invalid_state' ? 'corrupt' : 'invalid', cause.message);
+  if (cause instanceof OrchestrationRuleError) {
+    return new LearningPersistenceError('invalid', cause.message);
+  }
   if (cause instanceof DOMException && cause.name === 'QuotaExceededError') {
     return new LearningPersistenceError('quota', 'Browser storage quota is full. Export data and free space.');
   }
@@ -473,6 +481,28 @@ export const learningPersistence = {
       if (latestSessionId !== null) meta.put({key: 'latest', sessionId: latestSessionId});
       meta.put({key: 'epoch', value: crypto.randomUUID()});
       complete(undefined);
+    });
+  },
+  /** One consistent browser snapshot; never use a limited due queue as the
+   * source for joining current content, because stale revisions could crowd it. */
+  async plan(profile: LearningProfile, islands: readonly LanguageIsland[],
+    options: PlanOptions): Promise<LearningPlan> {
+    // Validate the external catalog before touching storage.
+    try { catalogKeys(profile, islands); }
+    catch (cause) { throw translateError(cause); }
+    await ensureMemoryInitialized();
+    return transaction<LearningPlan>([REVIEWS], 'readonly', (tx, complete, fail) => {
+      const range = IDBKeyRange.bound([profile.id, 0],[profile.id, 8_640_000_000_000_000]);
+      const request = tx.objectStore(REVIEWS).index('profileDue').getAll(range);
+      request.onsuccess = () => {
+        try {
+          complete(createLearningPlan({
+            profile, islands,
+            states:(request.result as unknown[]).map(decodeMemoryState),
+            options
+          }));
+        } catch (cause) { fail(cause); }
+      };
     });
   },
   async getMemory(profileId: string, islandId: string,
