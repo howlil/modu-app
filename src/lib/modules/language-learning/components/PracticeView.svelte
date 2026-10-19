@@ -30,11 +30,24 @@
       <p class="mt-8 text-center text-title-lg font-medium">{session.mode === 'recall' ? item.prompt : item.answer}</p>
       {#if session.mode === 'recall'}
         {#if session.phase === 'prompt'}
+          <div class="mt-6">
+            <label for="language-recall-draft" class="block text-meta text-muted-foreground">Optional written response</label>
+            <textarea id="language-recall-draft" rows="2" maxlength="2000"
+              class="mt-2 w-full rounded-xl border border-border bg-background p-3 text-ui"
+              placeholder="Type what you remember…"
+              value={controller.answerDraft}
+              disabled={controller.pending || controller.canRetry}
+              oninput={(event) => controller.setAnswerDraft(event.currentTarget.value)}></textarea>
+          </div>
           <div class="mt-8 flex justify-center">
             <button class="rounded-full bg-primary px-5 py-3 text-ui font-medium text-primary-foreground" disabled={controller.pending || controller.canRetry} onclick={controller.reveal}>Reveal answer</button>
           </div>
         {:else}
           <p class="mt-6 rounded-lg bg-secondary p-4 text-center text-body text-secondary-foreground">{item.answer}</p>
+          {#if controller.answerCheck}
+            <p role="status" class="mt-3 text-ui text-muted-foreground">{controller.answerCheck.feedback}</p>
+          {/if}
+          <p class="mt-4 text-meta text-muted-foreground">Rate your actual recall, not just whether the wording matches.</p>
           <div class="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {#each ['again', 'hard', 'good', 'easy'] as rating}
               <button class="rounded-full border border-border px-3 py-3 text-ui capitalize hover:bg-muted" disabled={controller.pending || controller.canRetry} onclick={() => controller.rate(rating as 'again'|'hard'|'good'|'easy')}>{rating}</button>
