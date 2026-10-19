@@ -1,68 +1,95 @@
 import {
-  abandonSession, commitPracticeAttempt, createPracticeSession, currentSentence,
-  pauseSession, resumeSession, revealAnswer, summarizePractice,
-  type PracticeMode, type PracticeSession, type RecallRating
+  currentSentence, summarizePractice,
+  type PracticeMode, type RecallRating, type PracticeSession
 } from '../core/learning.ts';
+import type { PracticeCommand, StoredPractice } from '../core/persistence.ts';
+import { learningPersistence, LearningPersistenceError } from '../adapters/persistence.ts';
 import { STARTER_ISLAND } from '../adapters/starter-content.ts';
 
-/** Pre-launch in-memory controller. Does not claim durable progress; storage is a later milestone. */
+/** No optimistic success: all state transitions are visible only after durable acknowledgement. */
 export function createLanguageLearningController() {
-  let session = $state<PracticeSession | null>(null);
+  let record = $state<StoredPractice | null>(null);
+  let loading = $state(true);
+  let pending = $state(false);
+  let ready = $state(false);
   let error = $state('');
-  function perform(run: () => void) {
-    try { run(); error = ''; }
-    catch (cause) { error = cause instanceof Error ? cause.message : 'Practice could not continue.'; }
+  let retryCommand: {command: PracticeCommand; expectedRevision: number | null} | null = null;
+  const session = $derived<PracticeSession | null>(record?.session ?? null);
+
+  async function load() {
+    if (pending) return;
+    loading = true;
+    pending = true;
+    try {
+      record = await learningPersistence.latest();
+      ready = true;
+      retryCommand = null;
+      error = '';
+    } catch (cause) {
+      ready = false;
+      error = cause instanceof Error ? cause.message : 'Learning storage could not be loaded.';
+    } finally { pending = false; loading = false; }
+  }
+  async function execute(command: PracticeCommand, expectedRevision: number | null) {
+    if (!ready || pending) return;
+    pending = true;
+    error = '';
+    try {
+      const saved = await learningPersistence.execute(command, expectedRevision);
+      record = saved;
+      retryCommand = null;
+    } catch (cause) {
+      if (cause instanceof LearningPersistenceError && cause.code === 'conflict') {
+        retryCommand = null;
+        error = 'Another tab updated this session. Reload and review the latest state.';
+      } else {
+        retryCommand = {command, expectedRevision};
+        error = cause instanceof Error ? cause.message : 'Unable to persist learning progress.';
+      }
+    } finally { pending = false; }
+  }
+  function send(command: PracticeCommand) {
+    void execute(command, command.type === 'start' ? null : (record?.revision ?? null));
   }
   function start(mode: PracticeMode = 'recall') {
-    perform(() => {
-      session = createPracticeSession({
-        sessionId: crypto.randomUUID(), profileId: 'starter-id-en',
-        island: STARTER_ISLAND, mode
-      });
-    });
+    if (pending || !ready || retryCommand) return;
+    send({type: 'start', sessionId: crypto.randomUUID(), profileId: 'starter-id-en',
+      island: STARTER_ISLAND, mode});
   }
-  function reveal() {
-    perform(() => { if (session) session = revealAnswer(session); });
+  function act(type: 'reveal' | 'pause' | 'resume' | 'abandon') {
+    if (!session || pending || retryCommand) return;
+    send({type, sessionId: session.id});
   }
-  function rate(rating: RecallRating) {
-    perform(() => {
-      if (!session) return;
-      const item = currentSentence(session);
-      if (!item) return;
-      session = commitPracticeAttempt(session, {
-        attemptId: crypto.randomUUID(), sentenceId: item.id, sentenceRevision: item.revision,
-        evidence: { kind: 'recall', rating }, recordedAt: Date.now()
-      }).session;
-    });
+  function attempt(evidence: {kind:'recall';rating:RecallRating} |
+    {kind:'skip'} | {kind:'exposure'; medium:'listening'|'shadowing'}) {
+    if (!session || pending || retryCommand) return;
+    const item = currentSentence(session);
+    if (!item) return;
+    send({type:'attempt', sessionId: session.id, attempt: {
+      attemptId:crypto.randomUUID(), sentenceId:item.id,
+      sentenceRevision:item.revision, recordedAt:Date.now(), evidence
+    }});
   }
-  function skip() {
-    perform(() => {
-      if (!session) return;
-      const item = currentSentence(session);
-      if (!item) return;
-      session = commitPracticeAttempt(session, {
-        attemptId: crypto.randomUUID(), sentenceId: item.id, sentenceRevision: item.revision,
-        evidence: { kind: 'skip' }, recordedAt: Date.now()
-      }).session;
-    });
-  }
+  function rate(rating: RecallRating) { attempt({kind:'recall',rating}); }
+  function skip() { attempt({kind:'skip'}); }
   function nextExposure() {
-    perform(() => {
-      if (!session) return;
-      const item = currentSentence(session);
-      if (!item || session.mode === 'recall') return;
-      session = commitPracticeAttempt(session, {
-        attemptId: crypto.randomUUID(), sentenceId: item.id, sentenceRevision: item.revision,
-        evidence: { kind: 'exposure', medium: session.mode }, recordedAt: Date.now()
-      }).session;
-    });
+    if (session && session.mode !== 'recall') attempt({kind:'exposure',medium:session.mode});
   }
-  function pause() { perform(() => { if (session) session = pauseSession(session); }); }
-  function resume() { perform(() => { if (session) session = resumeSession(session); }); }
-  function abandon() { perform(() => { if (session) session = abandonSession(session); }); }
+  function retry() {
+    if (pending || !ready || !retryCommand) return;
+    const { command, expectedRevision } = retryCommand;
+    void execute(command, expectedRevision);
+  }
   return {
-    get session() { return session; }, get error() { return error; },
+    get session() { return session; },
+    get loading() { return loading; },
+    get pending() { return pending; },
+    get ready() { return ready; },
+    get error() { return error; },
+    get canRetry() { return !!retryCommand; },
     get summary() { return summarizePractice(session?.attempts ?? []); },
-    start, reveal, rate, skip, nextExposure, pause, resume, abandon
+    load, retry, start, reveal: () => act('reveal'), pause: () => act('pause'),
+    resume: () => act('resume'), abandon: () => act('abandon'),
+    rate, skip, nextExposure
   };
 }
