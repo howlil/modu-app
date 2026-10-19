@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { createLanguageLearningController } from '../controller/language-learning.svelte.ts';
   import { currentSentence } from '../core/learning.ts';
+  import { recallFeedback } from '../core/evaluation.ts';
   let { controller }: { controller: ReturnType<typeof createLanguageLearningController> } = $props();
 </script>
 
@@ -13,6 +14,9 @@
       <p class="mt-2 text-ui text-muted-foreground">
         {controller.summary.ratedRecalls} rated recalls · {controller.summary.exposures} exposures · {controller.summary.skips} skips
       </p>
+      {#if controller.lastRecallFeedback}
+        <p class="mt-3 text-ui text-muted-foreground">{controller.lastRecallFeedback}</p>
+      {/if}
       <p class="mt-3 text-meta text-muted-foreground">Practice results were confirmed by your self-hosted storage.</p>
       <button class="mt-5 rounded-full bg-primary px-5 py-2 text-ui font-medium text-primary-foreground" disabled={controller.pending || controller.canRetry} onclick={() => controller.start(session.mode)}>Restart demo</button>
     </section>
@@ -50,7 +54,8 @@
           <p class="mt-4 text-meta text-muted-foreground">Rate your actual recall, not just whether the wording matches.</p>
           <div class="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {#each ['again', 'hard', 'good', 'easy'] as rating}
-              <button class="rounded-full border border-border px-3 py-3 text-ui capitalize hover:bg-muted" disabled={controller.pending || controller.canRetry} onclick={() => controller.rate(rating as 'again'|'hard'|'good'|'easy')}>{rating}</button>
+              <button class="rounded-full border border-border px-3 py-3 text-ui capitalize hover:bg-muted" title={recallFeedback(rating as 'again'|'hard'|'good'|'easy')}
+                disabled={controller.pending || controller.canRetry} onclick={() => controller.rate(rating as 'again'|'hard'|'good'|'easy')}>{rating}</button>
             {/each}
           </div>
         {/if}
