@@ -279,3 +279,29 @@ This order is not an implementation authorization. Do not generate scaffolds/reg
 - **No persistence adapter migration has been performed by this research step**. Do not remove SQLite, introduce dual synchronization, or change the Cloudflare deployment as if the choice were finalized. Decide whether authoritative storage is per browser or per self-hosted installation before M3, because scheduling needs one clear canonical journal and transaction owner.
 
 References: https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API/Using_IndexedDB ; https://developer.mozilla.org/en-US/docs/Web/API/StorageManager/persist ; https://developer.mozilla.org/en-US/docs/Web/API/IDBDatabase/transaction ; https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API/Basic_Terminology .
+
+## M1 refactor checkpoint — IndexedDB primary storage (2026-10-20)
+
+**Current architecture decision (supersedes M1 SQLite plan above):** one browser profile + one origin owns one learner's language-learning database; no Bun persistence server, backend login, multi-tenant DB, or dual-write. The language-learning module remains unregistered/unrouted pending later product milestones.
+
+### Implementation graph: A / E / R
+
+- **A (success):** controller sends `PracticeCommand` → `adapters/persistence.ts` opens browser IndexedDB → one strict-durability readwrite transaction reads session and checks revision/attempt ID → applies pure `core/persistence.ts` state transition → writes session, globally unique attempt, and latest-session pointer → controller receives saved state **only on transaction.oncomplete**.
+- **E (failures):** `conflict`, `invalid`, `corrupt`, `quota`, `blocked`, `unavailable`; failed transaction aborts without acknowledging changes. Duplicate attempt ID retries are idempotent within an existing session; cross-session duplicate IDs are rejected. Corrupt records never silently become empty history. Browser storage permission is best-effort, not a permanent backup.
+- **R (capabilities):** native browser IndexedDB and optional StorageManager; no backend/database service, no network request and no new UI storage framework. Browser connections are opened per operation and closed on commit/abort/versionchange.
+- **Execution:** transactions synchronously enqueue requests; no awaits inside an active IDB transaction. `readwrite` serializes overlapping writers and enforces revision CAS within that transaction.
+
+### Schema v2, backup and recovery
+
+- `sessions` object store: `{id, updatedAt, record: StoredPractice}` with `updatedAt` index. Existing `StoredPractice` v1 schema remains unchanged.
+- `attempts` object store: immutable `PracticeAttempt` keyed by globally unique ID, committed in the same readwrite transaction as the session.
+- `meta` object store: atomically updated pointer to latest session (avoids equal-millisecond timestamp collisions); schema v1 fallback uses timestamp index.
+- Backup is JSON `{format:'modu-language-learning', version:1, exportedAt, sessions, latestSessionId}`; explicit export/import actions on `LanguageLearningWorkspace.svelte`. All backup records are validated before destructive work. Import clears/rebuilds stores **atomically** in one transaction and preserves the latest-session pointer; malformed or duplicate attempts cannot partially wipe progress. Size limit 256 MiB is applied to export and import.
+- Optional `navigator.storage.persist()` request plus explicit user message: browser data may still disappear if site data is cleared, profile changes, or device fails. Exported backups are required for dependable recovery; importing into another origin/browser is manual.
+- Tests: `test/unit/language-learning-indexeddb.test.ts` with fake-indexeddb and existing M0/M2 domain tests. CI still runs `bun install --frozen-lockfile`, `bun run check`, `bun run test`, `bun run build`. Browser-native E2E remains a separate acceptance requirement.
+
+### Removed implementation and migration boundary
+
+- Removed `selfhost/language-learning-server.ts`, `selfhost/language-learning-storage.ts`, `selfhost/verify-language-learning.ts`, `selfhost/README.md`, `language:storage` script, and SQLite-specific CI testing. No runtime SQLite path or silent network fallback remains.
+- **Important:** the refactor does not delete an external SQLite database that may exist in a user's environment, but it also does not automatically migrate its contents to IndexedDB. The previous pre-launch storage sidecar was not wired to the live Modu UI; an owner with actual SQLite data must retain that file and perform a deliberate conversion/export before retiring it. Do not imply automatic cross-device migration.
+- Next M3 SRS must use this **single** IDB repository as canonical transaction owner, adding review state to the same readwrite transaction as the rated attempt. Exposure and skip do not update memory.
