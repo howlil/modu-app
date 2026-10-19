@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   assessRecallRating, assessmentForAttempt, checkRecallAnswer,
-  isValidRecallAssessment, recallFeedback
+  isValidRecallAssessment, practiceAnswerScope, recallFeedback
 } from '../../src/lib/modules/language-learning/core/evaluation.ts';
 import {
   applyPracticeCommand, decodePracticeCommand, decodeStoredPractice,
@@ -84,8 +84,53 @@ describe('Language Learning M2 — Recall Evaluation', () => {
       .toBe('needs_review');
     expect(checkRecallAnswer({response:'Hello.',reference:'Hello'}).status)
       .toBe('reference_match');
-    expect(() => checkRecallAnswer({response:'x'.repeat(2001),reference:'Hello'}))
-      .toThrow(RangeError);
+    expect(checkRecallAnswer({response:'x'.repeat(2001),reference:'Hello'}).status)
+      .toBe('needs_review');
+  });
+  it('does not throw when long M0/M1 sentence is valid but exceeds comparison limit', () => {
+    const longIsland = {...island, sentences:[
+      {id:'long',revision:1,prompt:'Translate',answer:'A'.repeat(2500)}
+    ]};
+    const session = applyPracticeCommand(null,{...start,island:longIsland}).next;
+    const revealed = applyPracticeCommand(session,{
+      type:'reveal',sessionId:start.sessionId
+    }).next;
+    expect(decodeStoredPractice(revealed)).toEqual(revealed);
+    const feedback = checkRecallAnswer({
+      response:'Short response',reference:revealed.session.items[0].answer
+    });
+    expect(feedback.status).toBe('needs_review');
+    expect(feedback.feedback).toContain('manually');
+  });
+  it('keeps answer identity through reveal/pause and changes it for a new session or question', () => {
+    const twoSentenceIsland = {...island, sentences:[
+      ...island.sentences,
+      {id:'two',revision:1,prompt:'Terima kasih',answer:'Thank you'}
+    ]};
+    const first = applyPracticeCommand(null,{...start,island:twoSentenceIsland}).next;
+    const scope = practiceAnswerScope(first.session);
+    expect(scope).not.toBe(null);
+    const revealed = applyPracticeCommand(first,{
+      type:'reveal',sessionId:start.sessionId
+    }).next;
+    expect(practiceAnswerScope(revealed.session)).toBe(scope);
+    const paused = applyPracticeCommand(revealed,{
+      type:'pause',sessionId:start.sessionId
+    }).next;
+    expect(practiceAnswerScope(paused.session)).toBe(scope);
+    const afterRating = applyPracticeCommand(
+      applyPracticeCommand(paused,{type:'resume',sessionId:start.sessionId}).next,
+      command('good')
+    ).next;
+    expect(practiceAnswerScope(afterRating.session)).not.toBe(scope);
+    const second = applyPracticeCommand(null,{
+      ...start,sessionId:'session-m2-b',island:twoSentenceIsland
+    }).next;
+    expect(practiceAnswerScope(second.session)).not.toBe(scope);
+    const abandoned = applyPracticeCommand(second,{
+      type:'abandon',sessionId:'session-m2-b'
+    }).next;
+    expect(practiceAnswerScope(abandoned.session)).toBe(null);
   });
   it('rejects tampered durable assessment and permits legacy absent metadata', () => {
     let s = applyPracticeCommand(null,start).next;
