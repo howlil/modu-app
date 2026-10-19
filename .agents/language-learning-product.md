@@ -1,0 +1,199 @@
+# Language Learning — Product Research State (Modu)
+
+> Status: **research baseline only — not implemented**  
+> Saved: **2026-10-20**  
+> Product: new independent app/module inside `howlil/modu-app`  
+> Reference: HyperLingua learning methodology, **not** its codebase or commercial tier model  
+> Next requested phase: detailed per-domain implementation graph via the user's saved `$design-thinking` skill. **Do not implement features from this document until explicitly requested.**
+
+## 1. Source of truth and interpretation
+
+This is the durable state checkpoint for the requested language-learning feature. It preserves the research and decisions across conversations; it is **not** a claim that any of these features already exist in Modu.
+
+Read in this order before planning implementation:
+1. `AGENTS.md`
+2. `.agents/architecture.md`
+3. `DESIGN.md`
+4. This product-state document
+5. Actual module code and tests at the time of implementation
+
+If current repository code contradicts a proposal below, inspect and resolve the discrepancy explicitly. Do not silently rewrite existing modules to fit the proposal.
+
+### Verified from current Modu repository (master, 2026-10-20)
+
+- Stack: Svelte 5, SvelteKit 3, TypeScript, Bun, Tailwind CSS v4, shadcn-svelte, Cloudflare Workers Builds/adapter.
+- Modu is presently **local-first browser utilities**. There is **no existing self-hosted server persistence architecture** for learning data.
+- Existing implemented modules: `daily-execution`, `pomodoro`, `typing`, `image-compress`. Merge PDF is coming soon.
+- Actual registry: `src/lib/platform/registry/modules.ts` with `file-transform | focus` layouts; do not add a language-learning tile yet.
+- Mandatory implemented module layout: one `<Feature>Workspace.svelte` at module root, with `core/` (pure behavior), `adapters/` (browser/provider/storage integration), `controller/` (per-mounted Svelte 5 state factory), and `components/` (feature UI).
+- Routes must remain thin; do not import other modules' private code. No app-wide plugin framework or speculative abstraction.
+- Typing Practice has a keyboard-specific adaptive trainer and localStorage persistence. **Do not reuse keyboard trainer logic as a language SRS**.
+- Daily Execution uses a guarded localStorage snapshot; Pomodoro activity history uses an IndexedDB-backed shared focus-session repository. Existing persistence demonstrates local-first patterns but **does not provide an appropriate durable multi-record transaction design for this new learning domain**.
+- Tests include `test/unit/architecture-boundaries.test.ts`, which enforces the canonical folder layout/import rules on future modules.
+- Existing `AGENTS.md` says work on `master` unless the user specifically requests a branch; this state file alone must not create a route/module.
+
+### Verified learning-product reference
+
+HyperLingua publicly describes **vocabulary associations → listening/shadowing → active recall → repeated review** with topic-based **Language Islands** and custom materials. Its paid tiers, accounts and community features are **not** part of this requested product. The exact original HyperLingua code architecture and internal scheduling algorithm are not publicly established.
+
+Sources:
+- https://hyperlingua.app/method/
+- https://hyperlingua.app/method/active-recall/
+- https://hyperlingua.app/method/shadowing/
+- https://hyperlingua.app/method/language-islands/
+- FSRS **candidate, not confirmed HyperLingua technology**: https://github.com/open-spaced-repetition/ts-fsrs
+
+## 2. Fixed product decisions (user-authorized)
+
+| ID | Decision |
+| --- | --- |
+| SYS-01 | New Language Learning app is part of **Modu**, not a new independent repo. |
+| SYS-02 | One personal learner per deployment/instance; not multi-tenant. |
+| SYS-03 | **No application login, account, user-role hierarchy, tenant, subscription, paywall, or entitlement checks.** |
+| SYS-04 | All learning capabilities are available under the same rules. |
+| SYS-05 | One learner can study multiple target languages; memory/progress is isolated **by learning-language profile**, not by user ID. |
+| SYS-06 | User owns data; durable persistence/backup is to be handled through **user-controlled self-hosting**. Exact storage and deployment topology is pending research and decision (§7). |
+| SYS-07 | Core study must work **without AI keys**; AI translation, content generation and TTS are optional integrations. |
+| SYS-08 | Manual content creation, modification, import/export, backup and restore belong to the eventual product contract. |
+| SYS-09 | No shared social content network, leaderboards, provider account sync, or monetization logic in core. |
+| SYS-10 | Every learning attempt is idempotent and recoverable; learning evidence must not be inflated by playback/skip. |
+| SYS-11 | Existing Modu modules, registry, UI styles, deployment and storage keys must remain unaffected during this **research-only** milestone. |
+| SYS-12 | No implementation or UI changes until the user explicitly requests the next milestone. |
+
+## 3. Product job and observable loop
+
+**Actor:** one personal learner operating a self-controlled Modu installation.
+
+**Trigger:** wants to learn practical sentences and vocabulary in a chosen language without assembling a complete course manually.
+
+**Job:** turn passive recognition into usable, repeatable recall and speech practice while retaining learning history across sessions.
+
+**Primary behavior:** `Choose Language → Discover/Create Language Island → Understand Vocabulary & Sentences → Listen/Shadow → Recall → Reveal & Evaluate → Commit Attempt → Schedule Review → Return Later`.
+
+**Proof:** without signing in or configuring a paid service, a learner can complete a recall practice session, close/reopen, view correct prior evidence, and later review an appropriately scheduled item.
+
+**Important distinction:** recognizing a word, listening to audio, and speaking along with audio are not the same as successful unaided recall. A practice event must declare its evidence type.
+
+## 4. Planned domain / engine boundaries (logical, NOT microservices)
+
+A *domain* owns behavior/data invariants. A named *engine* is logic in that domain. These are not one folder, route, service, database, or UI page per engine.
+
+| Domain | Owns | Critical requirements | Expected behavior graph | Priority |
+| --- | --- | --- | --- | --- |
+| **Learning orchestration** | Active language profile, learner goals/preferences, recommended plan | LE-01..07: many languages, due/weak/new ranking, manual override, resume, replan without rewriting evidence | `Load profile → due/weak/new candidates → plan → learner selects → practice → refresh plan` | Core |
+| **Content & curriculum** | Built-in collection, Language Island, Sentence revision/provenance, language and accepted variants | CT-01..07: catalog, topic collection, variants, revisions, favorites, archive | `Browse → Island → Sentence snapshot → Start practice` | Core |
+| **Vocabulary acquisition** | Lexical item, meaning/context/example/mnemonic, linkage to sentences | VO-01..06: vocabulary discovery, exposure vs recall, cross-sentence references | `Introduce → Context → Listen → Hide → Recall → Review evidence` | Core |
+| **Practice session** | Session lifecycle, item navigation, attempts and durable completion | PR-01..09: start, mode, pause/resume, crash recovery, unique attempt, skip, session snapshot | `Created → Active ↔ Paused → Completed/Abandoned`; interruption recoverable | Core |
+| **Recall & evaluation** | Evidence classification, reveal, self-rating, challenge grading, accepted alternatives | EV-01..07: self-rated vs objectively scored vs AI-assisted; only eligible evidence updates memory | `Prompt → Attempt → Reveal → Evaluate → Commit → eligible SRS update` | Core |
+| **Memory & review** | Memory state, review logs, scheduler config/version, due queue | SR-01..09: due, learning/relearning, suspend, reschedule, idempotency, rebuildability | `Committed eligible attempt → transition memory → next due → planner` | Core |
+| **Audio & shadowing** | Playback/repeat/speed/pause/voice policy, audio availability | AU-01..08: spoken reference, controllable playback, graceful text-only fallback | `Load media → Listen → Shadow/repeat → Complete exposure` | Core |
+| **Content authoring & processing** | Manual/imported drafts, normalization, preview, dedup, optional translation/TTS jobs | CG-01..10: manual-first, partial job recovery, revision and import safety | `Draft → Validate → Preview → Save → optional job → Ready/Partial/Failed` | Core |
+| **Progress/history** | Rebuildable summaries and learner-visible metrics derived from durable evidence | PG-01..08: per-language history, due/attempt stats, honesty about exposure/mastery | `History → Project aggregate → Learning Home` | Core |
+| **Configuration** | Per-instance and language-specific learning/media/provider preferences | provider optional, prevent unexpected network use | `Edit preferences → validate → apply` | Supporting |
+| **Persistence/recovery** | Contract for durable content, attempts, review state, media references, export/restore | PS-01..09: schema version, transactional or recoverable commit, migration, backup, error visibility | `Validate → persist → confirm`; failures never misrepresented as success | Supporting but required from first functional slice |
+| **Assessment** | Transfer tasks measuring skills beyond memorized items | AS-01..05: diagnostic, skill-specific evidence, uncertainty | `Unseen task → response → assessment → feedback` | Later |
+| **Engagement** | Optional goals, reminders, badges | must not contaminate ability/memory measurements | `Activity → optional goal feedback` | Later |
+
+Scope reduction: **Focus Mode is a practice presentation variant**, not a new core engine; **Challenge is an evaluation/practice mode**; **Custom Batch** is practice selection; **Favorites** is a content reference. No premature separate module for each.
+
+## 5. Cross-domain invariants (non-negotiable)
+
+1. One instance = one learner scope, but many languages; there is no `user_id` or `tenant_id` requirement.
+2. Due queues and learning progress are isolated by language profile.
+3. Playback, exposure, shadowing, skipped items, and reveal do **not** automatically count as successful recall.
+4. An attempt ID is committed at most once, even on double-click, reload, timeout, or retry.
+5. Only explicitly eligible evaluated recall evidence updates SRS.
+6. Editing/archiving a sentence does not silently mutate old attempts or change the meaning of memory records. A session uses a stable content revision.
+7. Progress is a projection of actual activity; it is not a replacement source of truth for attempts or SRS.
+8. No AI or TTS provider may be required for manual sentence authoring and text recall.
+9. Storage failure must remain visible and must not be converted into a successful save.
+10. Restart, recovery, export and restore must preserve committed history and memory links.
+11. Untrusted imports and provider responses must be validated before creating domain records.
+12. No subscription, account or privilege branch is allowed in a core learning behavior path.
+13. Self-hosted, unauthenticated access must not be presumed safe on public networks: deployment/network access policy is a separate trust boundary.
+
+## 6. Modu integration fit (investigation outcome)
+
+**Intended placement once authorized:**
+
+```text
+src/routes/<to-be-decided>/+page.svelte                  # thin route only
+src/lib/modules/<feature-name>/                          # new independent app
+  <Feature>Workspace.svelte
+  core/                 # all pure learning/content/practice/FSRS rules
+  adapters/             # persistence/AI/TTS/audio/import integrations
+  controller/           # per-mounted Svelte 5 state/orchestration
+  components/           # module-specific UI
+src/lib/platform/registry/modules.ts                       # add only when app is launchable
+test/unit/<feature>/                                       # deterministic and boundary tests
+```
+
+Use the current `focus` layout **only if** it proves appropriate for this app; do not invent new registry layouts just for naming. Reuse generic shadcn-svelte primitives and existing typography/spacing tokens. No private imports from Typing, Pomodoro or Daily Execution; if a future actual cross-feature capability is needed, agree on an explicit shared ownership boundary. Existing modules must keep behavior/storage backward compatible.
+
+**Deployment tension:** Modu currently runs as a Cloudflare-hosted, browser-local-first utility suite. “Persistent state handled by self-hosted user” is **not yet represented by an existing storage adapter**. Options to evaluate in the next engineering-design phase, without prejudging the answer:
+
+- A: user-owned self-hosted instance of the whole web app + its durable storage;
+- B: Modu hosted frontend connecting to an explicitly configured **per-user self-hosted storage endpoint** (requires networking/authentication boundary even though the language app has no account UI);
+- C: browser-local-first with user-controlled exports/backups to self-hosted storage (not equivalent to always-on self-hosted database synchronization).
+
+Do **not** choose SQLite/D1/IndexedDB/OPFS or a server API prematurely. Decide single-instance deployment topology, offline requirements, backup semantics, connection security, transaction guarantees, and portability first. For now, keep domain logic storage-agnostic and preserve the user-owned durability requirement.
+
+**Existing adaptive Typing Practice is not language learning.** Reuse approach (pure calculations + controller + persistence adapter), not typing-specific mastery thresholds or retention structures.
+
+## 7. Unresolved decisions; do not silently convert into requirements
+
+| Topic | Decision needed before implementation |
+| --- | --- |
+| Hosting/storage topology | Does each user self-host the entire Modu instance, only a persistence service, or a backup target? |
+| Internet/offline scope | Must every practice interaction work with network disconnected, or only text/material already cached? |
+| Content seed | Which initial target/source languages and licensed starter corpus are shipped? No scraping copyrighted lesson corpus. |
+| Review scheduler | Assess `ts-fsrs` and its version/bundle/runtime fit vs a simpler explicitly versioned scheduler; HyperLingua's internal algorithm is **unknown**. |
+| Evaluation | Active Recall default self-rating; what exact challenge types need deterministic validation? |
+| External integrations | Are AI/TTS providers BYOK, local models, or optionally hosted user endpoints? Privacy, retention and failure policies vary. |
+| Audio assets | Built-in licensed/reference audio, browser speech synthesis, TTS generation/caching or combination? |
+| Data model/versioning | Content identity and revision strategy, review unit granularity, backup format and migration strategy. |
+| UI naming/navigation | Module name, route and compact surfaces; keep consistent with Modu's existing shell/design. |
+| Deployment security | No app login is allowed; if remotely reachable, define VPN/reverse-proxy/external access protection rather than exposing an open write API. |
+
+## 8. Future per-domain `$design-thinking` planning contract — NOT executed yet
+
+When asked to plan a domain, load the **saved custom** `$design-thinking` skill and inspect latest repo code. Supply the product contract plus an engineering-design decision for ownership before specifying code. For each domain use:
+
+1. **Domain ownership and aggregate state** (records/IDs/variants, invariants, commands/events).
+2. **A: success graph** (inputs, outputs, state changes, and exact cross-domain handoffs).
+3. **Execution semantics** (one vs many, ordering, concurrency, idempotency, cancellation).
+4. **E/failure graph** (validation, storage failure, provider errors, defects, interruption, recovery owner).
+5. **R/contextual capabilities** (clock, scheduler, persistence, audio/media, optional provider adapters).
+6. **Ingress/egress boundary** (import/provider validation, serialization and schema evolution).
+7. **Runtime policies** (retry/timeout/cache/resource bounds and cleanup lifetimes).
+8. **Smallest faithful proof** (unit/property/real-storage concurrency/restore/end-to-end as applicable).
+9. **Proposed actual Modu file owners and dependencies** (not one folder per domain).
+10. **Implementation milestone acceptance** (observable learner result).
+
+Recommended order for future engineering design:
+`Storage topology decision + Content/Profile → Practice + Attempt durability → Evaluation → Memory/SRS + planner → Audio → Authoring/import → Progress/backup/recovery → Optional challenge/assessment.`
+
+This order is not an implementation authorization. Do not generate scaffolds/registry tiles/routes until the user says to implement.
+
+## 9. Critical acceptance traces
+
+- Fresh install, no account/no API key → choose language, open starter content, practice with text.
+- Active Recall → reveal → `Again/Hard/Good/Easy` (or approved equivalent) → only one durable attempt and one scheduler update.
+- Listening ten times → zero successful recall updates unless a distinct eligible recall attempt occurs.
+- Skip five items → no manufactured failure ratings.
+- Crash after seven completed items → seven committed attempts survive; session can resume.
+- Two tabs retry same attempt → one committed evaluation, with recoverable conflict handling.
+- Switch two target languages → independent due items, progress and preferences.
+- Edit a practiced sentence → stable historical meaning and explicit revision semantics.
+- TTS/AI unavailable → manual authoring and text practice still work.
+- Import with partial media errors → valid materials remain usable; failed items retriable.
+- Storage unavailable → never display falsely saved progress.
+- Backup/restore/restart → preserves consistent content/attempt/memory links.
+
+## 10. State checkpoint / continuation guide
+
+**Completed in this request:** public learning-method reconfirmation; inspected actual Modu `master` repository constraints, registry, layout, existing persistence and architecture tests; captured compatible product/domain state.
+
+**Not completed:** no application files, UI, routes, registry changes, schema, adapters, migrations, tests, CI runs, or releases. No detailed implementation plan committed yet.
+
+**Next user-triggered phase:** first settle the self-hosted persistence topology (product/engineering contract), then produce a detailed **per-domain** implementation graph using `$design-thinking`; implement only explicitly requested milestone(s). Keep this file current when a confirmed material product decision changes.
