@@ -1,3 +1,4 @@
+import { isValidRecallAssessment } from './evaluation.ts';
 import {
   abandonSession, commitPracticeAttempt, createPracticeSession, pauseSession,
   resumeSession, revealAnswer, type CommitAttemptCommand, type LanguageIsland,
@@ -70,6 +71,10 @@ export function decodeStoredPractice(value: unknown): StoredPractice {
     if (e.kind === 'recall' ? (s.mode !== 'recall' || !rating(e.rating)) :
       e.kind === 'exposure' ? (e.medium !== s.mode || s.mode === 'recall') :
       e.kind !== 'skip') return invalid('Invalid practice evidence.');
+    if (e.kind === 'recall' && e.assessment !== undefined &&
+      !isValidRecallAssessment(e.assessment, e.rating as RecallRating)) {
+      return invalid('Recall assessment does not match its rating.');
+    }
   }
   return value as unknown as StoredPractice;
 }
