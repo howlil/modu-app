@@ -51,10 +51,26 @@
         <p class="text-ui text-destructive" role="alert">{controller.error}</p>
         <button class="mt-4 rounded-full bg-primary px-5 py-2 text-ui text-primary-foreground" onclick={controller.load}>Retry connection</button>
       </div>
-    {:else if !controller.session}
-      <div class="flex flex-wrap gap-2">
-        <button class="rounded-full bg-primary px-5 py-3 text-ui font-medium text-primary-foreground" onclick={() => controller.start('recall')}>Try recall</button>
-      </div>
+    {:else if !controller.session || controller.session.status === 'completed' || controller.session.status === 'abandoned'}
+      {#if controller.plan}
+        <section class="rounded-xl border border-border bg-card p-4" aria-label="Recommended practice">
+          <h2 class="text-title font-semibold">Recommended practice</h2>
+          <p class="mt-2 text-ui text-muted-foreground">
+            {controller.plan.dueCount} due reviews · {controller.plan.newCount} unseen sentences
+          </p>
+          {#if controller.plan.tasks.length}
+            <button type="button" class="mt-4 rounded-full bg-primary px-5 py-3 text-ui font-medium text-primary-foreground disabled:opacity-50"
+              disabled={controller.pending || controller.canRetry} onclick={controller.startRecommended}>Start recommended recall</button>
+          {:else}
+            <p class="mt-3 text-ui text-muted-foreground" role="status">All caught up with current material.</p>
+          {/if}
+        </section>
+      {/if}
+      {#if controller.planError}
+        <p class="mt-3 text-ui text-destructive" role="alert">{controller.planError}</p>
+        <button type="button" class="mt-2 rounded-full border border-border px-4 py-2 text-ui"
+          disabled={controller.pending} onclick={controller.refreshPlan}>Retry recommendations</button>
+      {/if}
     {/if}
     <div class="mt-6">
       <PracticeView {controller} />
