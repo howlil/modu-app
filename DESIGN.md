@@ -17,14 +17,14 @@ The current modules are:
 ```text
 Module
 ├── Pomodoro
-└── Daily Execution
+└── Habit Tracker
 ```
 
 Do not add JSON, UUID, image tools, category pages, PWA layers, storage abstractions, OPFS wrappers, or generic worker frameworks until a current module actually needs them.
 
 ## 3. Navigation now
 
-Home directly exposes the two modules.
+Home directly exposes the available modules.
 
 Homepage typography:
 
@@ -407,25 +407,10 @@ What current user-visible requirement needs this?
 If there is no concrete answer, do not add it yet.
 
 
-## Daily Execution × Pomodoro contract
-
-Daily is an agnostic, local-first execution workspace. Quick capture requires only a title; the user explicitly selects activities into a dated Today list, can choose the next task, and can complete it without a mandatory outcome. Goal, context, time estimates, and old capacity budgets are optional/legacy detail rather than onboarding gates. Today uses an adaptive two-column layout (chosen tasks + existing activity shelf) and collapses into a single column on mobile. Review shows a short summary by default and keeps existing evidence, source and intelligence functionality behind progressive disclosure. Pomodoro remains the exclusive focus timer, break controller, and focus-protection owner. Completed focus sessions are persisted once in the existing `module-pomodoro-activity` database by the shared session repository. A focus session may optionally refer to a task ID. A task does not become Done merely because a focus session completes. Daily Execution estimates/work budgets are not automatically actual hours worked: Review labels recorded Pomodoro focus time explicitly. Legacy unassigned sessions must remain valid. Focus time remains available in Pomodoro Activity; no duplicate activity heatmap or timer is allowed in Daily Execution.
-
-
-### Daily scope guard — local execution
-
-- Daily owns local tasks, dated Today selection, optional context/reference URL, completion and checkpoints. Pomodoro owns the focus timer, session accounting and session history; the floating extension is only a presentation companion.
-- Quick Capture asks only for a title. No external account, source picker, sync indicator, OAuth setup, duplicate tracker, cloud database or provider adapter is a prerequisite.
-- A task may include an optional HTTPS reference link in its details. This is passive metadata; it never establishes provider access or changes an external task.
-- Old M3 provider-linked tasks are loaded as ordinary local tasks. Keep IDs, Today membership, completion status, checkpoints and work history; preserve a valid old source URL as a passive reference. Loading never overwrites the original snapshot.
-- Existing Review → Evidence → Sources manages optional evidence imports, *not* task connections. Keep those two concepts separate.
-- New integrations require an independently verified user need, explicit scope decision, and a privacy/security review. Do not add them merely to satisfy a milestone name.
-- The Daily E2E and unit suite must include legacy-data migration, keyboard/touch UX, Pomodoro one-shot handoff and storage conflict/error recovery.
-
 ### Floating Focus Companion (Chromium extension)
 
-- The opt-in floating widget is a presentation surface, not a second Pomodoro timer or a Daily task manager.
-- Daily owns tasks and next actions; Pomodoro owns timer state, session completion and activity recording.
+- The opt-in floating widget is a presentation surface, not a second Pomodoro timer or a task manager.
+- Pomodoro owns timer state, session completion and activity recording. Legacy task labels remain optional focus context.
 - The extension receives a versioned read-only snapshot through the existing trusted bridge and never counts a session as completed merely because the deadline passed.
 - Floating visibility is independent of website blocking. Disabled is the initial setting. Users may hide task text and exclude website hostnames.
 - Quiet Dock floating design: collapsed width 216px, with a status dot, readable countdown, one-line task and 3px progress; no repeated logo in mini. Expanded width 276px: shallow logo/title header, minimize/hide controls, focus context, large countdown and status, progress with elapsed/total labels and a secondary Open timer link. The surface is draggable and its normalized position persists across tabs; default placement is bottom-right with 24px gutter where possible. Respect narrow viewports and reduced motion.

@@ -5,7 +5,7 @@ Local-first browser utilities built with SvelteKit, Tailwind CSS, shadcn-svelte,
 ## Current scope
 
 - Pomodoro
-- Daily Execution (linked to Pomodoro focus sessions)
+- Habit Tracker
 
 New modules require an end-to-end user workflow and must reuse existing capabilities rather than duplicate them.
 
@@ -15,8 +15,8 @@ New modules require an end-to-end user workflow and must reuse existing capabili
 src/routes/                   route composition and API entry points
 src/lib/components/ui/        shared shadcn-svelte primitives
 src/lib/modules/pomodoro/     timer rules, activity, preferences, feature views
-src/lib/modules/daily-execution/ planning, priorities, outcomes, reviews
-src/lib/shared/focus-sessions/ shared session repository and task handoff
+src/lib/modules/habit-tracker/ habit management, scheduling and check-ins
+src/lib/shared/focus-sessions/ Pomodoro session repository and legacy task handoff
 src/lib/platform/registry/    tool metadata and availability
 extension/                    independent Chromium permission/enforcement boundary
 test/unit/                    deterministic behavior and storage regression tests
@@ -125,26 +125,3 @@ If either rate limiting binding is unavailable, the endpoint returns 503 without
 After deployment, check that requests with missing/foreign Origin return 403; invalid JSON returns 400 (within the rate limits); and excess requests return 429. A test using a valid payload creates a real GitHub issue, so avoid it unless intentional.
 
 
-## Daily: local activities only
-
-Daily is a local-first execution workspace. Capture an activity by title, select it for
-Today, choose Next, start the existing Pomodoro timer and complete the activity locally.
-No account connection, external task synchronisation, D1 database or OAuth configuration
-is necessary.
-
-Optional HTTPS references can be added from **Activity details → More details**. A
-reference URL is plain task metadata, not a connection to an external provider.
-
-**Legacy compatibility:** a previously selected Google/GitHub-linked activity is read
-back as a regular local task with its original local ID, date selections, completion
-status, checkpoint and recorded work intact. A safe HTTPS link from the old reference is
-preserved as an optional task reference. Obsolete source connections and unselected
-source candidates are not imported into the new UI. The original localStorage snapshot
-is not overwritten just by viewing it; changes persist when the user next edits.
-
-The separate Review → Evidence → Sources workflow is for importing learning evidence
-and is not an external task-management connection.
-
-Verification: `bun run check`, `bun run test`, `bun run build` and the
-`Daily Browser E2E` workflow. The optional manual `Daily Production Smoke`
-workflow exercises isolated disposable browser storage against the deployed site.

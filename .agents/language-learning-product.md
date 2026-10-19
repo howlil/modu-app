@@ -23,11 +23,11 @@ If current repository code contradicts a proposal below, inspect and resolve the
 
 - Stack: Svelte 5, SvelteKit 3, TypeScript, Bun, Tailwind CSS v4, shadcn-svelte, Cloudflare Workers Builds/adapter.
 - Modu is presently **local-first browser utilities**. There is **no existing self-hosted server persistence architecture** for learning data.
-- Existing implemented modules: `daily-execution` and `pomodoro`. Typing Practice, Image Compress and Merge PDF were removed on 2026-10-20.
+- Existing implemented modules include `pomodoro` and `habit-tracker`. Typing Practice, Image Compress and Merge PDF were removed on 2026-10-20.
 - Actual registry: `src/lib/platform/registry/modules.ts` with `file-transform | focus` layouts; do not add a language-learning tile yet.
 - Mandatory implemented module layout: one `<Feature>Workspace.svelte` at module root, with `core/` (pure behavior), `adapters/` (browser/provider/storage integration), `controller/` (per-mounted Svelte 5 state factory), and `components/` (feature UI).
 - Routes must remain thin; do not import other modules' private code. No app-wide plugin framework or speculative abstraction.
-- Daily Execution uses a guarded localStorage snapshot; Pomodoro activity history uses an IndexedDB-backed shared focus-session repository. Existing persistence demonstrates local-first patterns but **does not provide an appropriate durable multi-record transaction design for this new learning domain**.
+- Pomodoro activity history uses an IndexedDB-backed focus-session repository; Habit Tracker has its own local persistence. Existing persistence demonstrates local-first patterns but **does not provide an appropriate durable multi-record transaction design for this new learning domain**.
 - Tests include `test/unit/architecture-boundaries.test.ts`, which enforces the canonical folder layout/import rules on future modules.
 - Existing `AGENTS.md` says work on `master` unless the user specifically requests a branch; this state file alone must not create a route/module.
 
@@ -127,7 +127,7 @@ src/lib/platform/registry/modules.ts                       # add only when app i
 test/unit/<feature>/                                       # deterministic and boundary tests
 ```
 
-Use the current `focus` layout **only if** it proves appropriate for this app; do not invent new registry layouts just for naming. Reuse generic shadcn-svelte primitives and existing typography/spacing tokens. No private imports from Typing, Pomodoro or Daily Execution; if a future actual cross-feature capability is needed, agree on an explicit shared ownership boundary. Existing modules must keep behavior/storage backward compatible.
+Use the current `focus` layout **only if** it proves appropriate for this app; do not invent new registry layouts just for naming. Reuse generic shadcn-svelte primitives and existing typography/spacing tokens. No private imports from other feature modules; if a future actual cross-feature capability is needed, agree on an explicit shared ownership boundary. Existing modules must keep behavior/storage backward compatible.
 
 **Deployment tension:** Modu currently runs as a Cloudflare-hosted, browser-local-first utility suite. “Persistent state handled by self-hosted user” is **not yet represented by an existing storage adapter**. Options to evaluate in the next engineering-design phase, without prejudging the answer:
 

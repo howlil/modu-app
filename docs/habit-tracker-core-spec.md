@@ -21,14 +21,11 @@ Repo inspected:
 - https://github.com/howlil/modu-app/blob/master/.agents/architecture.md
 - https://github.com/howlil/modu-app/blob/master/DESIGN.md
 - https://github.com/howlil/modu-app/blob/master/src/lib/platform/registry/modules.ts
-- https://github.com/howlil/modu-app/blob/master/src/lib/modules/daily-execution/core/consistency.ts
-- https://github.com/howlil/modu-app/blob/master/src/lib/modules/daily-execution/core/planning.ts
-- https://github.com/howlil/modu-app/blob/master/src/lib/modules/daily-execution/adapters/persistence.ts
 
 ## 1. Product contract
 
 ### Problem
-The user needs to define recurring personal behaviors, log progress with minimal friction, correct history, and understand consistency. Modu-app already provides Daily Execution for activities and Pomodoro for focus time, but not a generic habit tracker. Daily's existing `HabitDefinition` describes a single workstream-based focus-session consistency goal, not arbitrary habits; it remains unchanged.
+The user needs to define recurring personal behaviors, log progress with minimal friction, correct history, and understand consistency. Modu-app provides Pomodoro for focus time; Habit Tracker is an independent domain for recurring personal behaviors.
 
 ### Actor
 Single local browser user on one origin and one browser profile; no account concept, remote identity or collaboration.
@@ -43,7 +40,7 @@ Single local browser user on one origin and one browser profile; no account conc
 - Behaves deterministically across reload, tab changes and local calendar boundaries.
 
 ### Non-goals (exclude entirely)
-Authentication, profiles, multi-tenant, subscription, purchase, push/local reminders, custom notification sounds, Apple Health/fitness API, calendar API, cloud sync, provider login, group, leaderboard, friends, focus timer, AI coaching, wallpapers/quotes, mood/HRV, broad diary module, generic rules engine, microservices, CRDT, event broker. Habit log note is allowed because it is part of a check-in, not a diary domain. No cross-module Pomodoro or Daily integration in this phase.
+Authentication, profiles, multi-tenant, subscription, purchase, push/local reminders, custom notification sounds, Apple Health/fitness API, calendar API, cloud sync, provider login, group, leaderboard, friends, focus timer, AI coaching, wallpapers/quotes, mood/HRV, broad diary module, generic rules engine, microservices, CRDT, event broker. Habit log note is allowed because it is part of a check-in, not a diary domain. No cross-module Pomodoro integration in this phase.
 
 ### Success criteria (acceptance, not invented business KPIs)
 - First habit can be created without registration or setup wizard.
@@ -190,7 +187,7 @@ Preferences are technical configuration; not a separate product profile domain.
 - Multiple records and per-habit/date queries.
 - Atomic read-modify-write transaction for counter increments (protects against lost writes across tabs in same origin).
 - Potentially years of small per-date records.
-- Existing repo already demonstrates IndexedDB in Daily Evidence, but private module code should not be directly imported.
+- Existing repo already demonstrates IndexedDB in Pomodoro Activity, but private module code should not be directly imported.
 - Browser data can still be deleted or evicted; this is local storage, NOT a backup or cloud persistence guarantee.
 
 Reference MDN: https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API/Basic_Terminology
@@ -264,7 +261,7 @@ I10 Historical policy revisions are immutable and effective-date-specific.
 I11 Transaction failure cannot show success nor drop the previous committed state.
 I12 Archive does not destroy history; delete explicitly does.
 I13 All streak/report surfaces use the same evaluator.
-I14 Existing Daily/Pomodoro storage and session history are untouched.
+I14 Pomodoro storage and session history are untouched.
 
 ## 10. Fault model
 
@@ -340,7 +337,7 @@ T15 Storage abort/quota: UI reports failure, does not show success.
 T16 Midnight/background resume: UI re-evaluates date on visibility.
 T17 DST transitions: schedule eligibility calculated by calendar day, not fixed ms duration.
 T18 Null denominator: completion-rate displays `—` instead of NaN/0%.
-T19 App never accesses Daily/Pomodoro private records.
+T19 Habit Tracker never accesses Pomodoro private records.
 T20 Existing tests and build continue passing after module is registered.
 
 ## 14. Milestones and implementation dependency
@@ -357,11 +354,11 @@ Per milestone verify relevant unit cases plus `bun run check`, `bun run test`, `
 ## 15. Decisions and open questions
 
 D01 (recommended): one module/one bounded context with four internal capabilities; no extra domain microservices.
-D02 (recommended): IndexedDB as authoritative local store for Habit Tracker, no new backend and no reuse of Daily `localStorage` key.
+D02 (recommended): IndexedDB as authoritative local store for Habit Tracker, no new backend and no reuse of other modules' storage keys.
 D03 (recommended): one date-aggregate checkin per habit/date; no append-only event sourcing in this scope.
 D04 (recommended): immutable/effective-dated goal and schedule revisions.
 D05 (recommended): explicit QUIT attestation; do not infer success from silence.
-D06 (recommended): no cross-feature integration with Daily or Pomodoro in initial release.
+D06 (recommended): no cross-feature integration with Pomodoro in initial release.
 D07 (recommended): period-based streak and scheduling semantics, consistent across UI.
 
 Before coding, product owner should lock only these material choices:

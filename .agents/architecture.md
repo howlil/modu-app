@@ -48,20 +48,9 @@ Presentation triggers controller actions; controllers call pure functions and ad
 - `src/lib/server/**`: server-only security, secrets, and service integrations. No client-side imports.
 - `extension/**`: separate Chromium runtime. Its messaging contract must be compatible with the web bridge.
 
-## M2 adaptive execution rules
+## Focus-session compatibility
 
-- Pomodoro remains the only timer. Focus interval accounting lives in `pomodoro/core/focus-accounting.ts` and is persisted in the existing timer snapshot. Completed and partial focus sessions share the original activity store and stable session IDs; partial sessions use optional `completionKind` metadata for backward compatibility.
-- Daily Execution owns task checkpoints, deterministic replan suggestions, user-approved plan revisions and explicitly entered manual work intervals. Its existing local-storage record is extended backward-compatibly with `manualEntries`.
-- Manual work is never generated from inactive browser tabs. Overlap validation uses the latest completed focus records and manual intervals; the recorded total is the sum of explicit entries, not an estimate of an entire workday.
-- Replanning is a proposal, not a mutation until accepted. Previously recorded focus, outcomes and manual intervals must remain unchanged when capacity is changed.
-- A task remains incomplete after a focus session. Session completion and task evidence are independent.
-- Do not duplicate the timer, calendar, heatmap or shared focus-session repository.
-
-## Daily Execution integration boundary
-
-`src/lib/modules/daily-execution/` follows the canonical workspace/core/adapters/controller/components layout. It owns the goal, tasks, capacity plan, completion evidence and review. It does not own focus timers.
-
-`src/lib/shared/focus-sessions/` owns the existing `module-pomodoro-activity` session storage contract, optional task IDs, and one-shot same-tab task handoff. Pomodoro retains the exclusive timer state machine and exposes its legacy activity-storage import as a compatibility facade. Daily Execution imports the shared session repository, never Pomodoro's private controllers/components or timer adapters. Do not add another focus-session collection, timer implementation, or heatmap to Daily Execution.
+Pomodoro owns its timer, accounting and activity history. The `src/lib/shared/focus-sessions/` repository retains the existing `module-pomodoro-activity` storage contract, optional task IDs, and legacy one-shot task handoff. Removing Daily Execution must not erase saved sessions or alter Pomodoro persistence.
 
 ## Pomodoro dependency map
 
@@ -107,4 +96,4 @@ bun run build
 
 Verify the latest GitHub Actions result before reporting success.
 
-Current boundary contract: Pomodoro and Daily Execution follow the same mandatory structure. Every new implemented module follows it immediately, with no later refactor phase. CI enforces layout and import direction for all modules, not just named legacy features.
+Current boundary contract: Pomodoro, Habit Tracker and other implemented modules follow the same mandatory structure. Every new implemented module follows it immediately, with no later refactor phase. CI enforces layout and import direction for all modules, not just named legacy features.
