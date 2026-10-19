@@ -3,6 +3,10 @@ import {
   type PracticeCommand, type StoredPractice
 } from '../core/persistence.ts';
 import { LearningRuleError, type PracticeAttempt } from '../core/learning.ts';
+import {
+  MemoryRuleError, memoryKey, scheduleRatedAttempt, rebuildMemoryStates,
+  decodeMemoryState, type MemoryState
+} from '../core/memory.ts';
 
 /** Browser-local, single-learner storage. All authoritative writes use one IDB transaction. */
 export class LearningPersistenceError extends Error {
@@ -14,10 +18,11 @@ export class LearningPersistenceError extends Error {
   }
 }
 const DB_NAME = 'modu-language-learning';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const SESSIONS = 'sessions';
 const ATTEMPTS = 'attempts';
 const META = 'meta';
+const REVIEWS = 'reviews';
 const BACKUP_FORMAT = 'modu-language-learning';
 const MAX_BACKUP_LENGTH = 256 * 1024 * 1024;
 
@@ -29,10 +34,11 @@ interface SessionRow {
 type BrowserPractice = StoredPractice & {storageEpoch: string | null};
 export interface LearningBackup {
   format: typeof BACKUP_FORMAT;
-  version: 1;
+  version: 1 | 2;
   exportedAt: string;
   sessions: StoredPractice[];
   latestSessionId?: string | null;
+  reviews?: MemoryState[];
 }
 function translateError(cause: unknown): LearningPersistenceError {
   if (cause instanceof LearningPersistenceError) return cause;
@@ -43,6 +49,7 @@ function translateError(cause: unknown): LearningPersistenceError {
     );
   }
   if (cause instanceof LearningRuleError) return new LearningPersistenceError('invalid', cause.message);
+  if (cause instanceof MemoryRuleError) return new LearningPersistenceError(cause.code === 'invalid_state' ? 'corrupt' : 'invalid', cause.message);
   if (cause instanceof DOMException && cause.name === 'QuotaExceededError') {
     return new LearningPersistenceError('quota', 'Browser storage quota is full. Export data and free space.');
   }
@@ -86,6 +93,10 @@ function openDatabase(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(META)) {
         db.createObjectStore(META, {keyPath: 'key'});
+      }
+      if (!db.objectStoreNames.contains(REVIEWS)) {
+        const store = db.createObjectStore(REVIEWS, {keyPath: 'key'});
+        store.createIndex('profileDue', ['profileId', 'dueAt'], {unique: false});
       }
     };
     request.onblocked = () => {
@@ -143,7 +154,7 @@ async function transaction<T>(
     catch (cause) { fail(cause); }
   });
 }
-function asBackup(text: string): {records: StoredPractice[]; attempts: PracticeAttempt[]; latestSessionId: string | null} {
+function asBackup(text: string): {records: StoredPractice[]; attempts: PracticeAttempt[]; reviews: MemoryState[]; latestSessionId: string | null} {
   if (!text || new Blob([text]).size > MAX_BACKUP_LENGTH) {
     throw new LearningPersistenceError('invalid', 'Backup is empty or exceeds the 256 MiB import limit.');
   }
@@ -154,7 +165,7 @@ function asBackup(text: string): {records: StoredPractice[]; attempts: PracticeA
     throw new LearningPersistenceError('invalid', 'Invalid backup document.');
   }
   const doc = raw as Partial<LearningBackup>;
-  if (doc.format !== BACKUP_FORMAT || doc.version !== 1 || !Array.isArray(doc.sessions)) {
+  if (doc.format !== BACKUP_FORMAT || (doc.version !== 1 && doc.version !== 2) || !Array.isArray(doc.sessions)) {
     throw new LearningPersistenceError('invalid', 'Unsupported backup format or version.');
   }
   const sessionIds = new Set<string>(), attemptIds = new Set<string>();
@@ -182,8 +193,77 @@ function asBackup(text: string): {records: StoredPractice[]; attempts: PracticeA
     (typeof latestSessionId !== 'string' || !sessionIds.has(latestSessionId))) {
     throw new LearningPersistenceError('invalid', 'Backup refers to a missing latest session.');
   }
-  return {records, attempts, latestSessionId};
+  // Older M1 backups have no review journal. Replay rated attempts into the
+  // initial SRS state; v2 backups preserve the actual journal's last state.
+  const events = records.flatMap(record => record.session.attempts.map(attempt => ({
+    attempt, islandId: record.session.islandId
+  })));
+  let reviews: MemoryState[];
+  if (doc.version === 1) {
+    reviews = rebuildMemoryStates(events);
+  } else {
+    if (!Array.isArray(doc.reviews)) {
+      throw new LearningPersistenceError('invalid', 'Version 2 backups require review states.');
+    }
+    const validAttempts = new Map(events.filter(e => e.attempt.evidence.kind === 'recall')
+      .map(e => [e.attempt.id, e]));
+    const allReviewKeys = new Set(events.filter(e => e.attempt.evidence.kind === 'recall')
+      .map(e => memoryKey({profileId:e.attempt.profileId, islandId:e.islandId,
+        sentenceId:e.attempt.sentenceId, sentenceRevision:e.attempt.sentenceRevision})));
+    const keys = new Set<string>();
+    reviews = (doc.reviews as unknown[]).map(raw => {
+      let state: MemoryState;
+      try { state = decodeMemoryState(raw); }
+      catch { throw new LearningPersistenceError('corrupt', 'Backup contains invalid memory state.'); }
+      if (keys.has(state.key)) throw new LearningPersistenceError('invalid', 'Duplicate memory state key.');
+      keys.add(state.key);
+      const source = validAttempts.get(state.lastAttemptId);
+      if (!source || memoryKey({profileId:source.attempt.profileId,
+        islandId:source.islandId,sentenceId:source.attempt.sentenceId,
+        sentenceRevision:source.attempt.sentenceRevision}) !== state.key ||
+        state.lastReviewedAt < source.attempt.recordedAt) {
+        throw new LearningPersistenceError('corrupt', 'Memory state has no matching rated attempt.');
+      }
+      return state;
+    });
+    if (keys.size !== allReviewKeys.size ||
+      [...allReviewKeys].some(key => !keys.has(key))) {
+      throw new LearningPersistenceError('corrupt', 'Backup is missing memory states for rated attempts.');
+    }
+  }
+  return {records, attempts, reviews, latestSessionId};
 }
+/** Non-destructive v2→v3 migration of M1/M2 history. Readwrite scope serializes
+ * this projection against new commits and backup restore in every browser tab. */
+async function ensureMemoryInitialized(): Promise<void> {
+  await transaction<void>([SESSIONS, META, REVIEWS, ATTEMPTS], 'readwrite', (tx, complete, fail) => {
+    const marker = tx.objectStore(META).get('memoryBootstrapV1');
+    marker.onsuccess = () => {
+      try {
+        if (marker.result?.done === true) { complete(undefined); return; }
+        const request = tx.objectStore(SESSIONS).getAll();
+        request.onsuccess = () => {
+          try {
+            const events: {attempt: PracticeAttempt; islandId: string}[] = [];
+            for (const row of request.result as unknown[]) {
+              const record = decodeSessionRow(row);
+              if (!record) throw new LearningPersistenceError('corrupt', 'Missing historical practice.');
+              for (const attempt of record.session.attempts) {
+                events.push({attempt, islandId: record.session.islandId});
+              }
+            }
+            const reviews = rebuildMemoryStates(events);
+            const store = tx.objectStore(REVIEWS);
+            for (const state of reviews) store.put(state);
+            tx.objectStore(META).put({key:'memoryBootstrapV1', done:true});
+            complete(undefined);
+          } catch (cause) { fail(cause); }
+        };
+      } catch (cause) { fail(cause); }
+    };
+  });
+}
+
 /** No server endpoint. This browser origin owns the canonical practice history. */
 export const learningPersistence = {
   latest(): Promise<BrowserPractice | null> {
@@ -249,9 +329,10 @@ export const learningPersistence = {
       };
     });
   },
-  execute(command: PracticeCommand, expectedRevision: number | null,
+  async execute(command: PracticeCommand, expectedRevision: number | null,
     expectedEpoch?: string | null): Promise<BrowserPractice> {
-    return transaction<BrowserPractice>([SESSIONS, ATTEMPTS, META], 'readwrite', (tx, complete, fail) => {
+    await ensureMemoryInitialized();
+    return transaction<BrowserPractice>([SESSIONS, ATTEMPTS, META, REVIEWS], 'readwrite', (tx, complete, fail) => {
       const sessions = tx.objectStore(SESSIONS);
       const attempts = tx.objectStore(ATTEMPTS);
       const meta = tx.objectStore(META);
@@ -287,13 +368,29 @@ export const learningPersistence = {
               try {
                 const {next, attempt, changed} = applyPracticeCommand(current, command);
                 if (!changed) { complete({...next, storageEpoch: epoch}); return; }
-                const effectiveEpoch = epoch ?? crypto.randomUUID();
-                const row: SessionRow = {id: next.session.id, updatedAt: Date.now(), record: next};
-                sessions.put(row);
-                if (attempt) attempts.add(attempt);
-                if (epoch === null) meta.put({key: 'epoch', value: effectiveEpoch});
-                meta.put({key: 'latest', sessionId: next.session.id});
-                complete({...next, storageEpoch: effectiveEpoch});
+                const persist = (memory: MemoryState | null) => {
+                  const effectiveEpoch = epoch ?? crypto.randomUUID();
+                  const row: SessionRow = {id: next.session.id, updatedAt: Date.now(), record: next};
+                  sessions.put(row);
+                  if (attempt) attempts.add(attempt);
+                  if (memory) tx.objectStore(REVIEWS).put(memory);
+                  if (epoch === null) meta.put({key: 'epoch', value: effectiveEpoch});
+                  meta.put({key: 'latest', sessionId: next.session.id});
+                  complete({...next, storageEpoch: effectiveEpoch});
+                };
+                if (attempt?.evidence.kind === 'recall') {
+                  const key = memoryKey({
+                    profileId: attempt.profileId, islandId: next.session.islandId,
+                    sentenceId: attempt.sentenceId, sentenceRevision: attempt.sentenceRevision
+                  });
+                  const lookup = tx.objectStore(REVIEWS).get(key);
+                  lookup.onsuccess = () => {
+                    try {
+                      const before = lookup.result === undefined ? null : decodeMemoryState(lookup.result);
+                      persist(scheduleRatedAttempt(before, attempt, next.session.islandId));
+                    } catch (cause) { fail(cause); }
+                  };
+                } else persist(null);
               } catch (cause) { fail(cause); }
             };
             if (command.type === 'attempt') {
@@ -311,8 +408,9 @@ export const learningPersistence = {
     });
   },
   async exportBackup(): Promise<string> {
-    const backup = await transaction<{records: StoredPractice[]; latestSessionId: string | null}>(
-      [SESSIONS, META], 'readonly', (tx, complete, fail) => {
+    await ensureMemoryInitialized();
+    const backup = await transaction<{records: StoredPractice[]; latestSessionId: string | null; reviews: MemoryState[]}>(
+      [SESSIONS, META, REVIEWS], 'readonly', (tx, complete, fail) => {
         const request = tx.objectStore(SESSIONS).getAll();
         request.onsuccess = () => {
           try {
@@ -330,7 +428,12 @@ export const learningPersistence = {
                   !records.some(r => r.session.id === latestSessionId))) {
                   throw new LearningPersistenceError('corrupt', 'Latest session pointer is invalid.');
                 }
-                complete({records, latestSessionId});
+                const reviewRequest = tx.objectStore(REVIEWS).getAll();
+                reviewRequest.onsuccess = () => {
+                  try { complete({records, latestSessionId, reviews:
+                    (reviewRequest.result as unknown[]).map(decodeMemoryState)}); }
+                  catch (cause) { fail(cause); }
+                };
               } catch (cause) { fail(cause); }
             };
           } catch (cause) { fail(cause); }
@@ -338,8 +441,9 @@ export const learningPersistence = {
       }
     );
     const encoded = JSON.stringify({
-      format: BACKUP_FORMAT, version: 1, exportedAt: new Date().toISOString(),
-      sessions: backup.records, latestSessionId: backup.latestSessionId
+      format: BACKUP_FORMAT, version: 2, exportedAt: new Date().toISOString(),
+      sessions: backup.records, latestSessionId: backup.latestSessionId,
+      reviews: backup.reviews
     } satisfies LearningBackup);
     if (new Blob([encoded]).size > MAX_BACKUP_LENGTH) {
       throw new LearningPersistenceError('quota', 'Learning history exceeds the backup size limit.');
@@ -348,23 +452,64 @@ export const learningPersistence = {
   },
   async importBackup(text: string): Promise<void> {
     // Validate the entire source before opening the destructive transaction.
-    const {records, attempts, latestSessionId} = asBackup(text);
-    await transaction<void>([SESSIONS, ATTEMPTS, META], 'readwrite', (tx, complete) => {
+    const {records, attempts, reviews, latestSessionId} = asBackup(text);
+    await transaction<void>([SESSIONS, ATTEMPTS, META, REVIEWS], 'readwrite', (tx, complete) => {
       const sessions = tx.objectStore(SESSIONS);
       const journal = tx.objectStore(ATTEMPTS);
       const meta = tx.objectStore(META);
       sessions.clear();
       journal.clear();
       meta.clear();
+      const reviewStore = tx.objectStore(REVIEWS);
+      reviewStore.clear();
       const now = Date.now();
       for (let i = 0; i < records.length; i++) {
         const record = records[i];
         sessions.add({id: record.session.id, record, updatedAt: now + i} satisfies SessionRow);
       }
       for (const attempt of attempts) journal.add(attempt);
+      for (const state of reviews) reviewStore.add(state);
+      meta.put({key:'memoryBootstrapV1', done:true});
       if (latestSessionId !== null) meta.put({key: 'latest', sessionId: latestSessionId});
       meta.put({key: 'epoch', value: crypto.randomUUID()});
       complete(undefined);
+    });
+  },
+  async getMemory(profileId: string, islandId: string,
+    sentenceId: string, sentenceRevision: number): Promise<MemoryState | null> {
+    await ensureMemoryInitialized();
+    const key = memoryKey({profileId,islandId,sentenceId,sentenceRevision});
+    return transaction<MemoryState | null>([REVIEWS], 'readonly', (tx, complete, fail) => {
+      const request = tx.objectStore(REVIEWS).get(key);
+      request.onsuccess = () => {
+        try { complete(request.result === undefined ? null : decodeMemoryState(request.result)); }
+        catch (cause) { fail(cause); }
+      };
+    });
+  },
+  async due(profileId: string, now: number, limit = 50): Promise<MemoryState[]> {
+    if (!profileId.trim() || !Number.isSafeInteger(now) || now < 0 ||
+      now > 8_640_000_000_000_000 || !Number.isSafeInteger(limit) || limit < 1 || limit > 500) {
+      throw new LearningPersistenceError('invalid', 'Invalid review profile, clock or limit.');
+    }
+    await ensureMemoryInitialized();
+    return transaction<MemoryState[]>([REVIEWS], 'readonly', (tx, complete, fail) => {
+      const range = IDBKeyRange.bound([profileId, 0], [profileId, now]);
+      const request = tx.objectStore(REVIEWS).index('profileDue').openCursor(range);
+      const found: MemoryState[] = [];
+      request.onsuccess = () => {
+        try {
+          const cursor = request.result;
+          if (!cursor || found.length >= limit) { complete(found); return; }
+          const state = decodeMemoryState(cursor.value);
+          if (state.profileId !== profileId || state.dueAt > now) {
+            throw new LearningPersistenceError('corrupt', 'Review index does not match its data.');
+          }
+          found.push(state);
+          if (found.length >= limit) complete(found);
+          else cursor.continue();
+        } catch (cause) { fail(cause); }
+      };
     });
   },
   async persistenceStatus(): Promise<'granted' | 'not-granted' | 'unavailable'> {
