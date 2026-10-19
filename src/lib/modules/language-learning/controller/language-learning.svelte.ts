@@ -4,7 +4,7 @@ import {
 } from '../core/learning.ts';
 import type { PracticeCommand, StoredPractice } from '../core/persistence.ts';
 import { learningPersistence, LearningPersistenceError } from '../adapters/persistence.ts';
-import { checkRecallAnswer, recallFeedback, type AnswerCheck } from '../core/evaluation.ts';
+import { checkRecallAnswer, practiceAnswerScope, recallFeedback, type AnswerCheck } from '../core/evaluation.ts';
 import { STARTER_ISLAND } from '../adapters/starter-content.ts';
 
 /** No optimistic success: all state transitions are visible only after durable acknowledgement. */
@@ -15,13 +15,15 @@ export function createLanguageLearningController() {
   let ready = $state(false);
   let error = $state('');
   let answerDraft = $state('');
+  let answerDraftScope = $state<string | null>(null);
   let retryCommand: {command: PracticeCommand; expectedRevision: number | null} | null = null;
   const session = $derived<PracticeSession | null>(record?.session ?? null);
   const answerCheck = $derived.by((): AnswerCheck | null => {
     const s = session;
     const item = s ? currentSentence(s) : null;
+    const scopedDraft = answerDraftScope === practiceAnswerScope(s) ? answerDraft : '';
     return s?.mode === 'recall' && s.phase === 'revealed' && item
-      ? checkRecallAnswer({response: answerDraft, reference: item.answer})
+      ? checkRecallAnswer({response: scopedDraft, reference: item.answer})
       : null;
   });
   const lastRecallFeedback = $derived.by(() => {
@@ -31,7 +33,9 @@ export function createLanguageLearningController() {
       ? recallFeedback(previous.evidence.rating) : '';
   });
   function setAnswerDraft(value: string) {
-    if (session?.mode === 'recall' && session.phase === 'prompt' && !pending) {
+    const scope = practiceAnswerScope(session);
+    if (scope && session?.mode === 'recall' && session.phase === 'prompt' && !pending) {
+      answerDraftScope = scope;
       answerDraft = value.slice(0, 2000);
     }
   }
@@ -43,6 +47,7 @@ export function createLanguageLearningController() {
     try {
       record = await learningPersistence.latest();
       answerDraft = '';
+      answerDraftScope = practiceAnswerScope(record?.session ?? null);
       ready = true;
       retryCommand = null;
       error = '';
@@ -57,7 +62,11 @@ export function createLanguageLearningController() {
     error = '';
     try {
       const saved = await learningPersistence.execute(command, expectedRevision);
-      if (record?.session.cursor !== saved.session.cursor) answerDraft = '';
+      const nextScope = practiceAnswerScope(saved.session);
+      if (answerDraftScope !== nextScope) {
+        answerDraft = '';
+        answerDraftScope = nextScope;
+      }
       record = saved;
       retryCommand = null;
     } catch (cause) {
@@ -109,7 +118,7 @@ export function createLanguageLearningController() {
     get ready() { return ready; },
     get error() { return error; },
     get canRetry() { return !!retryCommand; },
-    get answerDraft() { return answerDraft; },
+    get answerDraft() { return answerDraftScope === practiceAnswerScope(session) ? answerDraft : ''; },
     get answerCheck() { return answerCheck; },
     get lastRecallFeedback() { return lastRecallFeedback; },
     setAnswerDraft,
