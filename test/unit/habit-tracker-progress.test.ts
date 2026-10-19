@@ -56,6 +56,11 @@ describe('M2 measurement contracts', () => {
     expect(evaluateDailyOutcome(habit, policy, corrected ?? undefined, day, day)).toBe('PARTIAL');
   });
 
+  it('rejects precision beyond six decimals rather than silently rounding to zero', () => {
+    const { habit, policy } = build('QUANTITY', 1, 'litre');
+    expect(() => applyCheckinCommand(habit, policy, undefined, day, { type: 'set', value: 0.0000001 })).toThrow(RangeError);
+  });
+
   it('manually records duration in whole minutes', () => {
     const { habit, policy, record } = progress('DURATION', 20, 'min', [5, 10, 5]);
     expect(record?.value).toBe(20);

@@ -1,5 +1,6 @@
 <script lang="ts">
   import ProgressRow from './ProgressRow.svelte';
+  import { isHabitActiveOn } from '../core/scheduling.ts';
   import type { HabitTrackerController } from '../controller/habit-tracker.svelte.ts';
 
   let { controller }: { controller: HabitTrackerController } = $props();
@@ -29,6 +30,7 @@
     {#if records.length}
       {#each records as item (item.habit.id)}
         <ProgressRow {item} busy={controller.busy}
+          readOnly={!isHabitActiveOn(item.habit, controller.selectedDate)}
           onCommand={(command) => { void controller.recordProgress(item.habit.id, controller.selectedDate, command); }}
           onCorrect={() => controller.openCorrection(item.habit.id, controller.selectedDate)}/>
       {/each}

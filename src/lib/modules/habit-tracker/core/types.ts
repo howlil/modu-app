@@ -42,6 +42,7 @@ export interface HabitCheckin {
   attestation?: 'CLEAN' | 'LAPSE';
   skipped?: boolean;
   note?: string;
+  recordedAt?: string; // UTC ISO timestamp of the most recent persisted correction.
 }
 
 export type DailyOutcome = 'NOT_SCHEDULED' | 'PENDING' | 'PARTIAL' | 'MET' | 'MISSED' | 'SKIPPED';

@@ -75,6 +75,9 @@ export function applyCheckinCommand(
   }
   // Resolve binary floating point drift while retaining up to 6 decimal places.
   const normalized = Math.round(nextValue * 1_000_000) / 1_000_000;
+  if (Math.abs(nextValue - normalized) > 1e-9) {
+    throw new RangeError('Progress supports at most six decimal places.');
+  }
   const next: HabitCheckin = { habitId: habit.id, localDate: date, value: normalized };
   assertValid(validateCheckin(next, policy));
   return next;

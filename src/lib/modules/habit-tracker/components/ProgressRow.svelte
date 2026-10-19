@@ -5,10 +5,11 @@
   import type { CheckinCommand } from '../core/progress.ts';
 
   let {
-    item, busy, onCommand, onCorrect
+    item, busy, readOnly = false, onCommand, onCorrect
   }: {
     item: PeriodHabit;
     busy: boolean;
+    readOnly?: boolean;
     onCommand: (command: CheckinCommand) => void;
     onCorrect: () => void;
   } = $props();
@@ -31,30 +32,30 @@
   </div>
   <div class="flex items-center gap-1">
     {#if measurement === 'BOOLEAN'}
-      <Button size="sm" variant={done ? 'secondary' : 'outline'} class="rounded-full" disabled={busy}
+      <Button size="sm" variant={done ? 'secondary' : 'outline'} class="rounded-full" disabled={busy || readOnly}
         aria-pressed={done} onclick={() => onCommand(done ? { type: 'clear' } : { type: 'set', value: 1 })}>
         {#if done}<Check class="mr-1 size-4"/>{/if}{done ? 'Done' : 'Complete'}
       </Button>
     {:else if measurement === 'AVOIDANCE'}
       <Button size="sm" variant={item.checkin?.attestation === 'CLEAN' ? 'secondary' : 'outline'} class="rounded-full"
-        aria-pressed={item.checkin?.attestation === 'CLEAN'} disabled={busy}
+        aria-pressed={item.checkin?.attestation === 'CLEAN'} disabled={busy || readOnly}
         onclick={() => onCommand({ type: 'attest', attestation: 'CLEAN' })}>Clean</Button>
       <Button size="sm" variant={item.checkin?.attestation === 'LAPSE' ? 'secondary' : 'outline'} class="rounded-full"
-        aria-pressed={item.checkin?.attestation === 'LAPSE'} disabled={busy}
+        aria-pressed={item.checkin?.attestation === 'LAPSE'} disabled={busy || readOnly}
         onclick={() => onCommand({ type: 'attest', attestation: 'LAPSE' })}>Lapse</Button>
     {:else}
       <Button size="icon-sm" variant="outline" class="rounded-lg" aria-label={'Decrease ' + item.habit.title}
-        disabled={busy || current <= 0} onclick={() => onCommand({ type: 'adjust', delta: -Math.min(step, current) })}>
+        disabled={busy || readOnly || current <= 0} onclick={() => onCommand({ type: 'adjust', delta: -Math.min(step, current) })}>
         <Minus class="size-4"/>
       </Button>
       <span class="min-w-9 text-center text-ui tabular-nums">{current}</span>
       <Button size="icon-sm" variant="outline" class="rounded-lg" aria-label={'Increase ' + item.habit.title}
-        disabled={busy} onclick={() => onCommand({ type: 'adjust', delta: step })}>
+        disabled={busy || readOnly} onclick={() => onCommand({ type: 'adjust', delta: step })}>
         <Plus class="size-4"/>
       </Button>
     {/if}
     <Button size="icon-sm" variant="ghost" class="ml-1 rounded-lg" title="Correct check-in"
-      aria-label={'Correct ' + item.habit.title} disabled={busy} onclick={onCorrect}>
+      aria-label={'Correct ' + item.habit.title} disabled={busy || readOnly} onclick={onCorrect}>
       <Pencil class="size-4"/>
     </Button>
   </div>

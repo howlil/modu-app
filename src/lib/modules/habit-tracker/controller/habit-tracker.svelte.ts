@@ -54,7 +54,15 @@ export function createHabitTrackerController() {
   function project(date: LocalDate, activeOnly: boolean): PeriodHabit[] {
     if (!date || !today || date > today) return [];
     return habits
-      .filter(h => isHabitActiveOn(h, date) && (!activeOnly || h.status === 'ACTIVE'))
+      .filter(h => {
+        const active = isHabitActiveOn(h, date);
+        // Legacy M1 archives marked their first inactive day as the archive
+        // day itself. Explicit completed records on that day remain visible.
+        const legacyArchiveCheckin = !activeOnly && (h.inactiveRanges ?? [])
+          .some(range => range.fromDate === date) &&
+          checkins.some(c => c.habitId === h.id && c.localDate === date);
+        return (active || legacyArchiveCheckin) && (!activeOnly || h.status === 'ACTIVE');
+      })
       .map(h => {
         const policy = resolveEffectivePolicy(h.id, date, policies);
         const checkin = checkins.find(c => c.habitId === h.id && c.localDate === date);
@@ -160,7 +168,7 @@ export function createHabitTrackerController() {
   function openCorrection(id: string, date: LocalDate): void {
     if (busy || date > today) return;
     const item = project(date, false).find(x => x.habit.id === id);
-    if (!item) return;
+    if (!item || !isHabitActiveOn(item.habit, date)) return;
     error = '';
     correction = { id, date };
   }

@@ -268,7 +268,7 @@ export async function mutateHabitCheckin(
                 const current = currentRequest.result as HabitCheckin | undefined;
                 if (current) enforceValid(validateCheckin(current, policy));
                 const next = applyCheckinCommand(habit, policy, current, date, command);
-                if (next) store.put({ ...next, id: id + ':' + date });
+                if (next) store.put({ ...next, recordedAt: new Date().toISOString(), id: id + ':' + date });
                 else store.delete(id + ':' + date);
               } catch (error) { fail(error as Error); }
             };
