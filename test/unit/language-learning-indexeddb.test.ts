@@ -134,6 +134,7 @@ describe('Language Learning — IndexedDB M1 repository', () => {
     await learningPersistence.execute(makeStart('japanese','ja'),null);
     const backup=await learningPersistence.exportBackup();
     expect(JSON.parse(backup).format).toBe('modu-language-learning');
+    expect(JSON.parse(backup).version).toBe(2);
     expect(backup).toContain('お茶をください');
     await learningPersistence.execute(makeStart('discard-this'),null);
     await learningPersistence.importBackup(backup);
@@ -143,6 +144,131 @@ describe('Language Learning — IndexedDB M1 repository', () => {
       .toBe('お茶をください');
     await expect(learningPersistence.execute(attempt('s1','a1','easy'),revealed.revision))
       .rejects.toMatchObject({code:'invalid'});
+  });
+  it('schedules a rated recall atomically with session and attempt', async () => {
+    const initial=await learningPersistence.execute(makeStart('s1'),null);
+    expect(await learningPersistence.getMemory('en','cafe','coffee',1)).toBe(null);
+    const revealed=await learningPersistence.execute(reveal('s1'),initial.revision);
+    const saved=await learningPersistence.execute(attempt('s1','a1','good'),revealed.revision);
+    const state=await learningPersistence.getMemory('en','cafe','coffee',1);
+    expect(state).toMatchObject({
+      intervalMs: 3*24*60*60*1000,stage:'review',repetitions:1,lapses:0,lastAttemptId:'a1'
+    });
+    expect(await learningPersistence.due('en',state!.dueAt-1)).toEqual([]);
+    expect((await learningPersistence.due('en',state!.dueAt)).map(s=>s.key)).toEqual([state!.key]);
+    expect(await learningPersistence.due('ja',state!.dueAt)).toEqual([]);
+    const again=await learningPersistence.execute(attempt('s1','a1','good'),revealed.revision);
+    expect(again).toEqual(saved);
+    expect(await learningPersistence.getMemory('en','cafe','coffee',1)).toEqual(state);
+  });
+  it('does not change review state for exposure, skip or a rejected attempt', async () => {
+    const listen:PracticeCommand={...makeStart('listening'),mode:'listening'};
+    const initial=await learningPersistence.execute(listen,null);
+    const exposure:PracticeCommand={type:'attempt',sessionId:'listening',attempt:{
+      attemptId:'listen-a1',sentenceId:'coffee',sentenceRevision:1,
+      recordedAt:1000,evidence:{kind:'exposure',medium:'listening'}
+    }};
+    await learningPersistence.execute(exposure,initial.revision);
+    expect(await learningPersistence.getMemory('en','cafe','coffee',1)).toBe(null);
+    const next=await learningPersistence.execute(makeStart('skip'),null);
+    await learningPersistence.execute({type:'attempt',sessionId:'skip',attempt:{
+      attemptId:'skip-1',sentenceId:'coffee',sentenceRevision:1,
+      recordedAt:1000,evidence:{kind:'skip'}
+    }},next.revision);
+    expect(await learningPersistence.getMemory('en','cafe','coffee',1)).toBe(null);
+    const third=await learningPersistence.execute(makeStart('reject'),null);
+    await expect(learningPersistence.execute(attempt('reject','bad','good'),third.revision))
+      .rejects.toMatchObject({code:'invalid'});
+    expect((await learningPersistence.get('reject'))?.session.attempts).toHaveLength(0);
+    expect(await learningPersistence.getMemory('en','cafe','coffee',1)).toBe(null);
+  });
+  it('combines different sessions for one memory key, but separates languages and revisions', async () => {
+    async function finish(sessionId:string, attemptId:string, profile='en', revision=1) {
+      const cmd=makeStart(sessionId,profile);
+      if(cmd.type!=='start')throw Error('expected start');
+      const updated={...cmd,island:{...cmd.island,sentences:cmd.island.sentences.map(s=>({...s,revision}))}};
+      const one=await learningPersistence.execute(updated,null);
+      const two=await learningPersistence.execute(reveal(sessionId),one.revision);
+      const rated=attempt(sessionId,attemptId);
+      if(rated.type!=='attempt')throw Error('expected attempt');
+      await learningPersistence.execute({...rated,attempt:{
+        ...rated.attempt,sentenceRevision:revision
+      }},two.revision);
+    }
+    await finish('en1','a1');
+    await finish('en2','a2');
+    await finish('jp','a3','ja');
+    await finish('edited','a4','en',2);
+    expect((await learningPersistence.getMemory('en','cafe','coffee',1))?.repetitions).toBe(2);
+    expect((await learningPersistence.getMemory('ja','cafe','coffee',1))?.repetitions).toBe(1);
+    expect((await learningPersistence.getMemory('en','cafe','coffee',2))?.repetitions).toBe(1);
+  });
+  it('restores historical M1 backup review state without losing attempts', async () => {
+    const one=await learningPersistence.execute(makeStart('s1'),null);
+    const two=await learningPersistence.execute(reveal('s1'),one.revision);
+    await learningPersistence.execute(attempt('s1','rated1'),two.revision);
+    const backup=JSON.parse(await learningPersistence.exportBackup());
+    expect(backup.version).toBe(2);
+    expect(backup.reviews).toHaveLength(1);
+    const old={...backup,version:1};
+    delete old.reviews;
+    await learningPersistence.importBackup(JSON.stringify(old));
+    expect((await learningPersistence.get('s1'))?.session.attempts).toHaveLength(1);
+    expect((await learningPersistence.getMemory('en','cafe','coffee',1))?.lastAttemptId).toBe('rated1');
+  });
+  it('preserves an actual schedule across v2 export/restore', async () => {
+    const one=await learningPersistence.execute(makeStart('s1'),null);
+    const two=await learningPersistence.execute(reveal('s1'),one.revision);
+    await learningPersistence.execute(attempt('s1','rated1','hard'),two.revision);
+    const state=await learningPersistence.getMemory('en','cafe','coffee',1);
+    const backup=await learningPersistence.exportBackup();
+    await learningPersistence.importBackup(backup);
+    expect(await learningPersistence.getMemory('en','cafe','coffee',1)).toEqual(state);
+    const forged=JSON.parse(backup);
+    forged.reviews[0].lastAttemptId='nonexistent';
+    await expect(learningPersistence.importBackup(JSON.stringify(forged)))
+      .rejects.toMatchObject({code:'corrupt'});
+    expect(await learningPersistence.getMemory('en','cafe','coffee',1)).toEqual(state);
+  });
+  it('upgrades v2 with older rated attempt history and builds review records once', async () => {
+    const one=await learningPersistence.execute(makeStart('s1'),null);
+    const two=await learningPersistence.execute(reveal('s1'),one.revision);
+    await learningPersistence.execute(attempt('s1','rated1','good'),two.revision);
+    // A new browser installation's legacy v2 store needs projection; reproduce
+    // the pre-M3 database shape by removing the schema-v3 database.
+    await deleteDatabase();
+    const history=await new Promise<void>((resolve,reject) => {
+      const open=indexedDB.open('modu-language-learning',2);
+      open.onupgradeneeded=()=>{
+        const db=open.result;
+        const ss=db.createObjectStore('sessions',{keyPath:'id'});
+        ss.createIndex('updatedAt','updatedAt',{unique:false});
+        db.createObjectStore('attempts',{keyPath:'id'});
+        db.createObjectStore('meta',{keyPath:'key'});
+      };
+      open.onerror=()=>reject(open.error);
+      open.onsuccess=()=>{
+        const db=open.result;
+        const tx=db.transaction(['sessions','attempts'],'readwrite');
+        const record={schemaVersion:1,revision:3,
+          session:{id:'old',profileId:'en',islandId:'cafe',mode:'recall',
+            status:'completed',phase:'prompt',cursor:1,
+            items:[{id:'coffee',revision:1,prompt:'Kopi',answer:'Coffee',
+              islandId:'cafe',sourceLanguage:'id',targetLanguage:'en'}],
+            attempts:[{id:'historical',sessionId:'old',profileId:'en',
+              sentenceId:'coffee',sentenceRevision:1,recordedAt:1000,
+              evidence:{kind:'recall',rating:'easy'}}]}};
+        tx.objectStore('sessions').put({id:'old',updatedAt:1000,record});
+        tx.objectStore('attempts').put(record.session.attempts[0]);
+        tx.oncomplete=()=>{db.close();resolve()};
+        tx.onabort=()=>{db.close();reject(tx.error)};
+      };
+    });
+    void history;
+    const state=await learningPersistence.getMemory('en','cafe','coffee',1);
+    expect(state?.lastAttemptId).toBe('historical');
+    expect((await learningPersistence.get('old'))?.session.attempts).toHaveLength(1);
+    expect((await learningPersistence.getMemory('en','cafe','coffee',1))?.lastAttemptId).toBe('historical');
   });
   it('never clears existing data for invalid backup or duplicate attempts', async () => {
     const start=await learningPersistence.execute(makeStart('s1'),null);
