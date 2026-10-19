@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-labelledby="title">
+  <title id="title">Modu soft-dimensional app icon</title>
+  <defs>
+    <linearGradient id="tile" x1="7%" y1="0%" x2="93%" y2="100%">
+      <stop offset="0%" stop-color="#76ADFF"/>
+      <stop offset="42%" stop-color="#347DF8"/>
+      <stop offset="100%" stop-color="#164ABF"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="15%" cy="6%" r="92%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity=".26"/>
+      <stop offset="55%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="arm1" x1="3%" y1="2%" x2="90%" y2="98%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="40%" stop-color="#F8FCFF"/>
+      <stop offset="100%" stop-color="#BDD5FF"/>
+    </linearGradient>
+    <linearGradient id="arm2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="50%" stop-color="#F1F8FF"/>
+      <stop offset="100%" stop-color="#C6D9FF"/>
+    </linearGradient>
+    <filter id="pieceShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx=".2" dy="1.4" stdDeviation="1" flood-color="#0A328A" flood-opacity=".27"/>
+    </filter>
+  </defs>
+  <rect width="120" height="120" rx="29" fill="url(#tile)"/>
+  <rect width="120" height="120" rx="29" fill="url(#glow)"/>
+  <g filter="url(#pieceShadow)">
+    <path d="M35 17H71C78 17 83 22 83 29V39C83 40.2 82 41 80.8 41H49C45 41 43 43 43 47V76.8C43 78 42 79 40.8 79H19.2C18 79 17 78 17 76.8V35C17 24 24 17 35 17Z" fill="url(#arm1)"/>
+    <path d="M85 103H49C42 103 37 98 37 91V81.2C37 80 38 79 39.2 79H71C75 79 77 77 77 73V43.2C77 42 78 41 79.2 41H100.8C102 41 103 42 103 43.2V85C103 96 96 103 85 103Z" fill="url(#arm2)"/>
+  </g>
+  <rect x=".6" y=".6" width="118.8" height="118.8" rx="28.7" fill="none" stroke="#FFFFFF" stroke-opacity=".2" stroke-width="1.2"/>
+</svg>
