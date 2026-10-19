@@ -87,6 +87,22 @@ describe('M4 period insights and streak boundaries', () => {
     expect(snapshot.longestStreak).toBe(1);
   });
 
+  it('attributes an open week crossing month-end to the current reporting month', () => {
+    const quota = makeConfiguredDailyHabit('cross', {
+      title: 'Weekly review', direction: 'BUILD', measurement: 'BOOLEAN',
+      schedule: { type: 'WEEKLY_QUOTA', daysPerWeek: 1 }
+    }, '2026-10-26');
+    const progress = createInsightSnapshot([quota.habit], [quota.policy],
+      [done('cross', '2026-10-30')], '2026-10-31');
+    expect(progress.periods).toHaveLength(1);
+    expect(progress.periods[0]).toMatchObject({
+      date: '2026-10-31', kind: 'WEEKLY', outcome: 'MET'
+    });
+    const finalized = createInsightSnapshot([quota.habit], [quota.policy],
+      [done('cross', '2026-10-30')], '2026-11-02');
+    expect(finalized.periods[0].date).toBe('2026-11-01');
+  });
+
   it('does not mark an unfinished weekly quota as missed before Sunday closes', () => {
     const { habit, policy } = makeConfiguredDailyHabit('q', {
       title: 'Exercise', direction: 'BUILD', measurement: 'COUNT', target: 10,

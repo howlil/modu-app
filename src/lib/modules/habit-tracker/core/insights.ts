@@ -142,7 +142,11 @@ export function deriveInsightPeriods(
     const { outcome } = evaluateWeeklyQuotaByRevisions(
       habit, policy, policies, checkins, date, throughDate
     );
-    periods.push({ habitId: habit.id, kind: 'WEEKLY', date: addCalendarDays(mondayOf(date), 6), outcome });
+    const endOfWeek = addCalendarDays(mondayOf(date), 6);
+    // Open weeks are provisionally dated today; finalized weeks stay on
+    // Sunday. This prevents current-month success moving into a future month.
+    periods.push({ habitId: habit.id, kind: 'WEEKLY',
+      date: endOfWeek > throughDate ? throughDate : endOfWeek, outcome });
   }
   return periods.sort((a, b) => a.date.localeCompare(b.date) ||
     a.habitId.localeCompare(b.habitId) || a.kind.localeCompare(b.kind));
