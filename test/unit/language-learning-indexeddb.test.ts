@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { learningPersistence, LearningPersistenceError } from '../../src/lib/modules/language-learning/adapters/persistence.ts';
-import type { PracticeCommand } from '../../src/lib/modules/language-learning/core/persistence.ts';
+import { applyPracticeCommand, type PracticeCommand } from '../../src/lib/modules/language-learning/core/persistence.ts';
 
 const makeStart = (sessionId: string, profileId = 'en'): PracticeCommand => ({
   type: 'start', sessionId, profileId, mode: 'recall',
@@ -23,6 +23,30 @@ const deleteDatabase = () => new Promise<void>((resolve,reject)=>{
 });
 beforeEach(deleteDatabase);
 describe('Language Learning — IndexedDB M1 repository', () => {
+  it('upgrades a pre-existing IndexedDB v1 without losing session history', async () => {
+    const record = applyPracticeCommand(null, makeStart('legacy')).next;
+    await new Promise<void>((resolve, reject) => {
+      const open = indexedDB.open('modu-language-learning', 1);
+      open.onupgradeneeded = () => {
+        const db = open.result;
+        const sessions = db.createObjectStore('sessions', {keyPath:'id'});
+        sessions.createIndex('updatedAt','updatedAt',{unique:false});
+        db.createObjectStore('attempts',{keyPath:'id'});
+      };
+      open.onerror = () => reject(open.error);
+      open.onsuccess = () => {
+        const db = open.result;
+        const tx = db.transaction(['sessions','attempts'],'readwrite');
+        tx.objectStore('sessions').add({id:'legacy',updatedAt:123,record});
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onabort = () => { db.close(); reject(tx.error); };
+      };
+    });
+    expect((await learningPersistence.latest())?.session.id).toBe('legacy');
+    const updated = await learningPersistence.execute(reveal('legacy'),1);
+    expect(updated.revision).toBe(2);
+    expect((await learningPersistence.latest())?.revision).toBe(2);
+  });
   it('restores after reopening the database and preserves versioned evidence', async () => {
     const initial = await learningPersistence.execute(makeStart('s1'),null);
     const seen = await learningPersistence.execute(reveal('s1'),initial.revision);
