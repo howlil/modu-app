@@ -15,6 +15,7 @@ export function createLanguageLearningController() {
   let ready = $state(false);
   let error = $state('');
   let answerDraft = $state('');
+  let persistenceStatus = $state<'granted' | 'not-granted' | 'unavailable'>('unavailable');
   let answerDraftScope = $state<string | null>(null);
   let retryCommand: {command: PracticeCommand; expectedRevision: number | null} | null = null;
   const session = $derived<PracticeSession | null>(record?.session ?? null);
@@ -46,6 +47,7 @@ export function createLanguageLearningController() {
     pending = true;
     try {
       record = await learningPersistence.latest();
+      persistenceStatus = await learningPersistence.persistenceStatus();
       answerDraft = '';
       answerDraftScope = practiceAnswerScope(record?.session ?? null);
       ready = true;
@@ -106,6 +108,36 @@ export function createLanguageLearningController() {
   function nextExposure() {
     if (session && session.mode !== 'recall') attempt({kind:'exposure',medium:session.mode});
   }
+  async function exportBackup(): Promise<string | null> {
+    if (pending || !ready) return null;
+    pending = true;
+    try {
+      const backup = await learningPersistence.exportBackup();
+      error = '';
+      return backup;
+    } catch (cause) {
+      error = cause instanceof Error ? cause.message : 'Unable to export learning history.';
+      return null;
+    } finally { pending = false; }
+  }
+  async function importBackup(text: string): Promise<void> {
+    if (pending || !ready) return;
+    pending = true;
+    try {
+      await learningPersistence.importBackup(text);
+      record = await learningPersistence.latest();
+      answerDraft = '';
+      answerDraftScope = practiceAnswerScope(record?.session ?? null);
+      retryCommand = null;
+      error = '';
+    } catch (cause) {
+      error = cause instanceof Error ? cause.message : 'Unable to restore learning history.';
+    } finally { pending = false; }
+  }
+  async function requestStoragePersistence(): Promise<void> {
+    if (pending || !ready) return;
+    persistenceStatus = await learningPersistence.requestPersistence();
+  }
   function retry() {
     if (pending || !ready || !retryCommand) return;
     const { command, expectedRevision } = retryCommand;
@@ -118,6 +150,8 @@ export function createLanguageLearningController() {
     get ready() { return ready; },
     get error() { return error; },
     get canRetry() { return !!retryCommand; },
+    get persistenceStatus() { return persistenceStatus; },
+    exportBackup, importBackup, requestStoragePersistence,
     get answerDraft() { return answerDraftScope === practiceAnswerScope(session) ? answerDraft : ''; },
     get answerCheck() { return answerCheck; },
     get lastRecallFeedback() { return lastRecallFeedback; },
