@@ -126,7 +126,7 @@ export function rebuildMemoryStates(
 ): MemoryState[] {
   const ordered = [...events].filter(e => e.attempt.evidence.kind === 'recall')
     .sort((a,b) => a.attempt.recordedAt - b.attempt.recordedAt ||
-      a.attempt.id.localeCompare(b.attempt.id));
+      (a.attempt.id < b.attempt.id ? -1 : a.attempt.id > b.attempt.id ? 1 : 0));
   const states = new Map<string, MemoryState>();
   const ids = new Set<string>();
   for (const event of ordered) {
@@ -142,5 +142,6 @@ export function rebuildMemoryStates(
     const updated = scheduleRatedAttempt(states.get(key) ?? null, event.attempt, event.islandId);
     if (updated) states.set(key, updated);
   }
-  return [...states.values()].sort((a,b) => a.dueAt - b.dueAt || a.key.localeCompare(b.key));
+  return [...states.values()].sort((a,b) => a.dueAt - b.dueAt ||
+    (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
 }
