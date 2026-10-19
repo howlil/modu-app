@@ -5,19 +5,13 @@
   let preview = $derived(module.status === 'coming-soon');
 
   let tileStyle = $derived({
-    'pdf-merge': 'background: linear-gradient(145deg, #F8C7D3 0%, #F1AEC0 56%, #E99CB2 100%);',
     'daily-execution': 'background: linear-gradient(145deg, #BDD4FF 0%, #9ABAF7 54%, #81A6EE 100%);',
     pomodoro: 'background: linear-gradient(145deg, #9BC2F7 0%, #80AEEF 54%, #709DE5 100%);',
-    typing: 'background: linear-gradient(145deg, #B9A5F5 0%, #A088EC 54%, #9075DF 100%);',
-    'image-compress': 'background: linear-gradient(145deg, #C8E8CD 0%, #AEDCB8 54%, #98CFA7 100%);'
   }[module.id]);
 
   let tileClass = $derived({
-    'pdf-merge': 'text-[#552433] border-[#DF94AA]',
     'daily-execution': 'text-[#17437A] border-[#86A9EA]',
     pomodoro: 'text-[#163A6B] border-[#6F9FE8]',
-    typing: 'text-[#352568] border-[#8E74DC]',
-    'image-compress': 'text-[#234B30] border-[#8DC49A]'
   }[module.id] ?? 'text-foreground border-border');
 </script>
 
@@ -46,29 +40,7 @@
   </div>
 
 
-  {#if module.id === 'pdf-merge'}
-    <div class="tool-art tool-art--pdf" aria-hidden="true">
-      <svg class="size-full" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <g transform="rotate(-16 85 136)">
-          <rect x="32" y="49" width="116" height="155" rx="19" fill="#F7DBE4" stroke="#E4A8BA" stroke-width="2" />
-          <rect x="50" y="69" width="46" height="35" rx="9" fill="#ECC0CE" />
-          <path d="M60 86h25M60 94h16" stroke="#B06A81" stroke-width="3" stroke-linecap="round" />
-          <path d="M52 127h68M52 143h53M52 159h59M52 175h38" stroke="#BD8295" stroke-width="5" stroke-linecap="round" opacity=".6" />
-        </g>
-        <g transform="rotate(10 155 132)">
-          <path d="M116 48h63l24 24v114c0 13-10 23-23 23h-64c-13 0-23-10-23-23V71c0-13 10-23 23-23Z" fill="#FFF0F4" stroke="#DB9DB2" stroke-width="2" />
-          <path d="M179 48v18c0 4 3 7 7 7h17" stroke="#C88199" stroke-width="3" />
-          <rect x="118" y="95" width="60" height="40" rx="10" fill="#F4CFDA" />
-          <path d="M129 109h37M129 120h25" stroke="#AB647C" stroke-width="4" stroke-linecap="round" />
-          <path d="M118 151h59M118 168h43M118 184h51" stroke="#C3879B" stroke-width="5" stroke-linecap="round" />
-        </g>
-        <circle cx="121" cy="194" r="24" fill="#B85C7B" />
-        <path d="M108 194h26m-9-9 9 9-9 9" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-        <path d="m53 35 4 8 8 4-8 4-4 8-4-8-8-4 8-4Z" fill="#FFF0F4" />
-      </svg>
-    </div>
-
-  {:else if module.id === 'daily-execution'}
+  {#if module.id === 'daily-execution'}
     <div class="tool-art tool-art--daily" aria-hidden="true">
       <svg class="size-full" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
         <g transform="rotate(-9 120 130)">
@@ -103,55 +75,6 @@
       </svg>
     </div>
 
-  {:else if module.id === 'typing'}
-    <div class="tool-art tool-art--typing" aria-hidden="true">
-      <svg class="size-full" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <g transform="rotate(-6 121 141)">
-          <rect x="29" y="79" width="188" height="132" rx="24" fill="#5F469D" />
-          <rect x="34" y="71" width="188" height="128" rx="22" fill="#EEE6FF" />
-          <g fill="#CBB8F4">
-            <rect x="51" y="91" width="24" height="21" rx="6" />
-            <rect x="81" y="91" width="24" height="21" rx="6" />
-            <rect x="111" y="91" width="24" height="21" rx="6" />
-            <rect x="141" y="91" width="24" height="21" rx="6" />
-            <rect x="171" y="91" width="28" height="21" rx="6" />
-            <rect x="57" y="119" width="24" height="21" rx="6" />
-            <rect x="87" y="119" width="24" height="21" rx="6" />
-            <rect x="117" y="119" width="24" height="21" rx="6" />
-            <rect x="147" y="119" width="24" height="21" rx="6" />
-            <rect x="177" y="119" width="22" height="21" rx="6" />
-            <rect x="63" y="147" width="24" height="21" rx="6" />
-            <rect x="93" y="147" width="24" height="21" rx="6" />
-            <rect x="123" y="147" width="24" height="21" rx="6" />
-            <rect x="153" y="147" width="37" height="21" rx="6" />
-          </g>
-          <rect x="87" y="119" width="24" height="21" rx="6" fill="#7452C0" />
-          <text x="99" y="134" text-anchor="middle" fill="white" font-family="system-ui, sans-serif" font-size="12" font-weight="600">S</text>
-          <rect x="81" y="176" width="89" height="12" rx="6" fill="#B8A2E7" />
-        </g>
-        <path d="m60 47 5 11 11 5-11 5-5 11-5-11-11-5 11-5Z" fill="#FFF3FF" />
-        <rect x="160" y="31" width="50" height="43" rx="13" fill="#F0EAFF" />
-        <path d="M173 48h23m-11-9v19" stroke="#7855BC" stroke-width="4" stroke-linecap="round" />
-      </svg>
-    </div>
-
-  {:else if module.id === 'image-compress'}
-    <div class="tool-art tool-art--image" aria-hidden="true">
-      <svg class="size-full" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <g transform="rotate(-9 127 141)">
-          <rect x="32" y="65" width="177" height="158" rx="25" fill="#5B9E6D" />
-          <rect x="32" y="53" width="177" height="158" rx="25" fill="#F2FBF2" stroke="#85BA90" stroke-width="2" />
-          <rect x="50" y="73" width="141" height="105" rx="16" fill="#CCEBD2" />
-          <circle cx="92" cy="106" r="13" fill="#85C799" />
-          <path d="m59 160 40-42 32 31 26-28 25 39Z" fill="#6FB783" />
-          <path d="m91 160 44-47 47 47Z" fill="#4D9768" />
-          <path d="M70 191h99" stroke="#8BBCA0" stroke-width="6" stroke-linecap="round" />
-        </g>
-        <circle cx="185" cy="186" r="29" fill="#E8F8EC" stroke="#5E9D71" stroke-width="2" />
-        <path d="M171 181h15v-15m0 15-15-15M199 191h-15v15m0-15 15 15" stroke="#4F8B60" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round" />
-        <path d="m60 39 4 9 9 4-9 4-4 9-4-9-9-4 9-4Z" fill="#F1FFF2" />
-      </svg>
-    </div>
   {/if}
 </a>
 
@@ -168,11 +91,6 @@
     pointer-events: none;
   }
 
-  .tool-art--pdf {
-    --art-rotation: 10deg;
-    --art-duration: 6.8s;
-    --art-delay: 0s;
-  }
 
   .tool-art--daily { --art-rotation: -8deg; --art-duration: 7s; --art-delay: -1s; }
 
@@ -182,17 +100,7 @@
     --art-delay: -2s;
   }
 
-  .tool-art--typing {
-    --art-rotation: 8deg;
-    --art-duration: 6.5s;
-    --art-delay: -4s;
-  }
 
-  .tool-art--image {
-    --art-rotation: -10deg;
-    --art-duration: 7.8s;
-    --art-delay: -3s;
-  }
 
   @keyframes artwork-drift {
     from { translate: 0 -3px; }
