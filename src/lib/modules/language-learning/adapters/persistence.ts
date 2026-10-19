@@ -144,7 +144,7 @@ async function transaction<T>(
   });
 }
 function asBackup(text: string): {records: StoredPractice[]; attempts: PracticeAttempt[]; latestSessionId: string | null} {
-  if (!text || text.length > MAX_BACKUP_LENGTH) {
+  if (!text || new Blob([text]).size > MAX_BACKUP_LENGTH) {
     throw new LearningPersistenceError('invalid', 'Backup is empty or exceeds the 256 MiB import limit.');
   }
   let raw: unknown;
@@ -341,7 +341,7 @@ export const learningPersistence = {
       format: BACKUP_FORMAT, version: 1, exportedAt: new Date().toISOString(),
       sessions: backup.records, latestSessionId: backup.latestSessionId
     } satisfies LearningBackup);
-    if (encoded.length > MAX_BACKUP_LENGTH) {
+    if (new Blob([encoded]).size > MAX_BACKUP_LENGTH) {
       throw new LearningPersistenceError('quota', 'Learning history exceeds the backup size limit.');
     }
     return encoded;
