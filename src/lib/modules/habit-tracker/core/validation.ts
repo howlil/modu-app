@@ -22,7 +22,8 @@ export function validateHabit(habit: HabitDefinition): ValidationResult {
     if (range.fromDate < habit.createdDate || (range.throughDate && range.throughDate < range.fromDate)) {
       issues.push('Invalid inactive range boundaries.');
     }
-    if (i > 0 && (!ranges[i - 1].throughDate || ranges[i - 1].throughDate >= range.fromDate)) {
+    const previous = ranges[i - 1];
+    if (previous && (!previous.throughDate || previous.throughDate >= range.fromDate)) {
       issues.push('Inactive ranges overlap.');
     }
   }
