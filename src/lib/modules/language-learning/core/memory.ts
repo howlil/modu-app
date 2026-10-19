@@ -111,7 +111,10 @@ export function scheduleRatedAttempt(
     stage: forgot ? (previous ? 'relearning' : 'learning') : 'review',
     dueAt: when + intervalMs, lastReviewedAt: when, intervalMs,
     repetitions: forgot ? 0 : (previous?.repetitions ?? 0) + 1,
-    lapses: (previous?.lapses ?? 0) + (forgot ? 1 : 0),
+    // A failed *first* learning attempt is not a lapse of learned knowledge.
+    // Repeated Again while already relearning does not count another lapse.
+    lapses: (previous?.lapses ?? 0) +
+      (forgot && previous?.stage === 'review' && previous.repetitions > 0 ? 1 : 0),
     lastAttemptId: attempt.id
   };
 }
