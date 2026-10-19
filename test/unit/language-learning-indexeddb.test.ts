@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { learningPersistence, LearningPersistenceError } from '../../src/lib/modules/language-learning/adapters/persistence.ts';
 import { applyPracticeCommand, type PracticeCommand } from '../../src/lib/modules/language-learning/core/persistence.ts';
 
-const makeStart = (sessionId: string, profileId = 'en'): PracticeCommand => ({
+const makeStart = (sessionId: string, profileId = 'en'): Extract<PracticeCommand, {type: 'start'}> => ({
   type: 'start', sessionId, profileId, mode: 'recall',
   island: {id:'cafe',revision:1,title:'Café',sourceLanguage:'id',targetLanguage:profileId,
     sentences:[{id:'coffee',revision:1,prompt: profileId === 'ja' ? 'お茶をください' : 'Kopi',answer:'Coffee'}]}
