@@ -166,7 +166,8 @@ describe('M4 period insights and streak boundaries', () => {
       records, '2026-10-20', 'a');
     expect(filtered.periods).toHaveLength(2);
     expect(filtered.met).toBe(1);
-    expect(filtered.missed).toBe(1);
+    expect(filtered.missed).toBe(0);
+    expect(filtered.periods[1].outcome).toBe('PENDING');
     expect(records).toHaveLength(1);
   });
 

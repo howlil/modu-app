@@ -114,7 +114,7 @@ export function deriveInsightPeriods(
   const last = calendarDayOrdinal(throughDate);
   if (last < first) return [];
   if (last - first > MAX_INSIGHT_DAYS) {
-    throw new RangeError('Insight range exceeds the supported history window.');
+    throw new RangeError('Insight range exceeds the supported history span.');
   }
   const periods: InsightPeriod[] = [];
   const entryLookup = new Map(checkins.map(c => [c.habitId + '\0' + c.localDate, c]));
