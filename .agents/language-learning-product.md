@@ -1,6 +1,6 @@
 # Language Learning — Product Research State (Modu)
 
-> Status: **research baseline only — not implemented**  
+> Status: **M0 pure practice kernel staged; not launchable, not durable**  
 > Saved: **2026-10-20**  
 > Product: new independent app/module inside `howlil/modu-app`  
 > Reference: HyperLingua learning methodology, **not** its codebase or commercial tier model  
@@ -197,3 +197,11 @@ This order is not an implementation authorization. Do not generate scaffolds/reg
 **Not completed:** no application files, UI, routes, registry changes, schema, adapters, migrations, tests, CI runs, or releases. No detailed implementation plan committed yet.
 
 **Next user-triggered phase:** first settle the self-hosted persistence topology (product/engineering contract), then produce a detailed **per-domain** implementation graph using `$design-thinking`; implement only explicitly requested milestone(s). Keep this file current when a confirmed material product decision changes.
+
+## Implementation checkpoint — 2026-10-20
+
+- **M0 committed on master:** `src/lib/modules/language-learning/core/learning.ts` provides validated Island/sentence snapshots; typed recall/exposure/skip evidence; pure practice session transitions (start, reveal, pause, resume, commit, abandon); duplicate attempt-id protection within a session; and summary selectors. Unit tests: `test/unit/language-learning-kernel.test.ts`.
+- Workspace/controller/component are **unrouted pre-launch harnesses** to satisfy Modu's mandatory feature layout. No registry tile, production screen, server persistence, SRS, actual audio or custom-content pipeline is active.
+- **Durability not implemented:** controller demo is ephemeral. Never treat completion as persisted. Self-hosted deployment/storage topology and atomic attempt/review commit remain a blocking architectural decision before releasing this module.
+- **Next vertical slice:** choose a secure per-instance self-hosted persistence topology and implement a durable repository/transaction contract, then attach real practice UI; only then add review scheduling and content authoring. Keep core independent of I/O and rating/exposure semantics unchanged.
+- **Verification:** new unit tests committed, but check/build/test results must be confirmed from GitHub Actions; a queued run is not a passing run.
