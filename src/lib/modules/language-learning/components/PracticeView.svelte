@@ -13,31 +13,31 @@
       <p class="mt-2 text-ui text-muted-foreground">
         {controller.summary.ratedRecalls} rated recalls · {controller.summary.exposures} exposures · {controller.summary.skips} skips
       </p>
-      <p class="mt-3 text-meta text-muted-foreground">Preview results are not stored.</p>
-      <button class="mt-5 rounded-full bg-primary px-5 py-2 text-ui font-medium text-primary-foreground" onclick={() => controller.start(session.mode)}>Restart demo</button>
+      <p class="mt-3 text-meta text-muted-foreground">Practice results were confirmed by your self-hosted storage.</p>
+      <button class="mt-5 rounded-full bg-primary px-5 py-2 text-ui font-medium text-primary-foreground" disabled={controller.pending || controller.canRetry} onclick={() => controller.start(session.mode)}>Restart demo</button>
     </section>
   {:else if session.status === 'paused'}
     <section class="rounded-xl border border-border bg-card p-6">
       <h2 class="text-title font-semibold">Paused</h2>
-      <button class="mt-5 rounded-full bg-primary px-5 py-2 text-ui text-primary-foreground" onclick={controller.resume}>Resume</button>
+      <button class="mt-5 rounded-full bg-primary px-5 py-2 text-ui text-primary-foreground" disabled={controller.pending || controller.canRetry} onclick={controller.resume}>Resume</button>
     </section>
   {:else if item}
     <section class="rounded-xl border border-border bg-card p-6">
       <div class="flex items-center justify-between">
         <span class="text-meta text-muted-foreground">{session.cursor + 1} / {session.items.length}</span>
-        <button class="rounded-full px-3 py-2 text-meta text-muted-foreground hover:bg-muted" onclick={controller.pause}>Pause</button>
+        <button class="rounded-full px-3 py-2 text-meta text-muted-foreground hover:bg-muted" disabled={controller.pending || controller.canRetry} onclick={controller.pause}>Pause</button>
       </div>
       <p class="mt-8 text-center text-title-lg font-medium">{session.mode === 'recall' ? item.prompt : item.answer}</p>
       {#if session.mode === 'recall'}
         {#if session.phase === 'prompt'}
           <div class="mt-8 flex justify-center">
-            <button class="rounded-full bg-primary px-5 py-3 text-ui font-medium text-primary-foreground" onclick={controller.reveal}>Reveal answer</button>
+            <button class="rounded-full bg-primary px-5 py-3 text-ui font-medium text-primary-foreground" disabled={controller.pending || controller.canRetry} onclick={controller.reveal}>Reveal answer</button>
           </div>
         {:else}
           <p class="mt-6 rounded-lg bg-secondary p-4 text-center text-body text-secondary-foreground">{item.answer}</p>
           <div class="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {#each ['again', 'hard', 'good', 'easy'] as rating}
-              <button class="rounded-full border border-border px-3 py-3 text-ui capitalize hover:bg-muted" onclick={() => controller.rate(rating as 'again'|'hard'|'good'|'easy')}>{rating}</button>
+              <button class="rounded-full border border-border px-3 py-3 text-ui capitalize hover:bg-muted" disabled={controller.pending || controller.canRetry} onclick={() => controller.rate(rating as 'again'|'hard'|'good'|'easy')}>{rating}</button>
             {/each}
           </div>
         {/if}
@@ -45,16 +45,27 @@
         <p class="mt-3 text-center text-ui text-muted-foreground">{item.prompt}</p>
         <p class="mt-2 text-center text-meta text-muted-foreground">Media playback is not part of this milestone.</p>
         <div class="mt-6 flex justify-center">
-          <button class="rounded-full bg-primary px-5 py-3 text-ui text-primary-foreground" onclick={controller.nextExposure}>Continue</button>
+          <button class="rounded-full bg-primary px-5 py-3 text-ui text-primary-foreground" disabled={controller.pending || controller.canRetry} onclick={controller.nextExposure}>Continue</button>
         </div>
       {/if}
       <div class="mt-5 flex justify-between">
-        <button class="rounded-full px-3 py-2 text-meta text-muted-foreground hover:bg-muted" onclick={controller.abandon}>End session</button>
-        <button class="rounded-full px-3 py-2 text-meta text-muted-foreground hover:bg-muted" onclick={controller.skip}>Skip</button>
+        <button class="rounded-full px-3 py-2 text-meta text-muted-foreground hover:bg-muted" disabled={controller.pending || controller.canRetry} onclick={controller.abandon}>End session</button>
+        <button class="rounded-full px-3 py-2 text-meta text-muted-foreground hover:bg-muted" disabled={controller.pending || controller.canRetry} onclick={controller.skip}>Skip</button>
       </div>
     </section>
   {/if}
 {/if}
+{#if controller.pending}
+  <p role="status" class="mt-3 text-ui text-muted-foreground">Saving practice…</p>
+{/if}
 {#if controller.error}
-  <p role="alert" class="mt-3 text-ui text-destructive">{controller.error}</p>
+  <div class="mt-3" role="alert">
+    <p class="text-ui text-destructive">{controller.error}</p>
+    <div class="mt-3 flex gap-2">
+      {#if controller.canRetry}
+        <button class="rounded-full border border-border px-4 py-2 text-ui" disabled={controller.pending} onclick={controller.retry}>Retry the same action</button>
+      {/if}
+      <button class="rounded-full border border-border px-4 py-2 text-ui" disabled={controller.pending} onclick={controller.load}>Reload saved session</button>
+    </div>
+  </div>
 {/if}
