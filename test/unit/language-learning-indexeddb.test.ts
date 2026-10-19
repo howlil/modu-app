@@ -6,7 +6,7 @@ import { applyPracticeCommand, type PracticeCommand } from '../../src/lib/module
 const makeStart = (sessionId: string, profileId = 'en'): PracticeCommand => ({
   type: 'start', sessionId, profileId, mode: 'recall',
   island: {id:'cafe',revision:1,title:'Café',sourceLanguage:'id',targetLanguage:profileId,
-    sentences:[{id:'coffee',revision:1,prompt:'Kopi',answer:'Coffee'}]}
+    sentences:[{id:'coffee',revision:1,prompt: profileId === 'ja' ? 'お茶をください' : 'Kopi',answer:'Coffee'}]}
 });
 const attempt = (sessionId: string, id: string, rating: 'again'|'hard'|'good'|'easy' = 'good'): PracticeCommand => ({
   type:'attempt', sessionId, attempt:{
@@ -65,6 +65,8 @@ describe('Language Learning — IndexedDB M1 repository', () => {
     const three=await learningPersistence.execute(command,two.revision);
     expect(await learningPersistence.execute(command,two.revision)).toEqual(three);
     expect((await learningPersistence.get('s1'))?.session.attempts).toHaveLength(1);
+    expect((await learningPersistence.get('japanese'))?.session.items[0].prompt)
+      .toBe('お茶をください');
     await expect(learningPersistence.execute(attempt('s1','a1','easy'),two.revision))
       .rejects.toMatchObject({code:'invalid'});
   });
@@ -131,8 +133,10 @@ describe('Language Learning — IndexedDB M1 repository', () => {
     const s=await learningPersistence.execute(makeStart('s1'),null);
     const revealed=await learningPersistence.execute(reveal('s1'),s.revision);
     await learningPersistence.execute(attempt('s1','a1'),revealed.revision);
+    await learningPersistence.execute(makeStart('japanese','ja'),null);
     const backup=await learningPersistence.exportBackup();
     expect(JSON.parse(backup).format).toBe('modu-language-learning');
+    expect(backup).toContain('お茶をください');
     await learningPersistence.execute(makeStart('discard-this'),null);
     await learningPersistence.importBackup(backup);
     expect(await learningPersistence.get('discard-this')).toBe(null);
