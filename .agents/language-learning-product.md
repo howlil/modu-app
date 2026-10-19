@@ -259,3 +259,23 @@ This order is not an implementation authorization. Do not generate scaffolds/reg
 - UI written answers are **not stored** in SQLite. Literal comparisons are not correctness certificates: valid paraphrases/dialects may yield `needs_review`. No automatic FSRS grade derives from text matching.
 - M1 deployment limitation persists: hosted Cloudflare UI does not connect to an owner-managed loopback database by default; the language app remains unrouted.
 - **Next milestone M3:** Memory/SRS: versioned review-state model, exactly-once consumption of committed eligible recall attempts, due ordering, deterministic scheduler clock and transaction coupling in the self-hosted persistence owner.
+
+## M2 remediation and persistence re-evaluation — 2026-10-20
+
+### Code review remediation
+
+- M2 evaluator now returns an advisory `needs_review` result instead of throwing during reactive rendering for oversized legacy sentence text. Historical M0/M1 Islands remain readable.
+- Reveal view retains a read-only copy of the learner's written answer alongside the reference, so the user can compare before self-rating. The draft is not uploaded to the database.
+- Draft lifetime is keyed by session ID, cursor, sentence ID and revision; reveal/pause/resume preserves the matching draft; new session, different question or ended session clears it.
+- Unit regression coverage: `test/unit/language-learning-evaluation.test.ts`. Review remediation CI: https://github.com/howlil/modu-app/actions/runs/39337992205 (all steps passed).
+
+### IndexedDB versus SQLite: architecture decision remains open
+
+- **Product contract:** single learner per self-hosted installation; no account or multi-tenancy, languages isolated; user controls the persistence environment.
+- **Current implementation:** M1 uses a loopback Bun + SQLite storage process reached through a secure same-origin reverse proxy; this is suitable when **the installation/server** must own the canonical database, multiple browsers need one history, or server-managed backups matter. The currently deployed Cloudflare Worker does **not** connect to this storage process.
+- **Recommended default for a browser-local Modu module:** IndexedDB accessed directly by the browser, transactionally storing sessions and immutable attempts; this follows Modu local-first patterns and needs no server or CORS/proxy. It is **not** equivalent to a server-instance-owned canonical database: each browser profile and origin has its own data; browsers can erase site storage; private-mode data is ephemeral; no automatic cross-device sync.
+- IndexedDB supports readwrite transactions spanning multiple object stores. Reproduce existing M1 CAS revision checks, stable attempt-id uniqueness, transaction-complete acknowledgement, old record decode, migration/recovery tests and language isolation before replacing the SQLite adapter. Avoid network/await operations inside an open IndexedDB transaction that could auto-close.
+- Protection for a browser-local MVP: optionally request `navigator.storage.persist()` (grant is not guaranteed), show persistence/quota status, provide an explicit versioned export/import and automatic or user-initiated backup workflow, handle quota errors, blocked upgrades and multi-tab conflict. Never claim that IndexedDB alone provides permanent or instance-wide backups.
+- **No persistence adapter migration has been performed by this research step**. Do not remove SQLite, introduce dual synchronization, or change the Cloudflare deployment as if the choice were finalized. Decide whether authoritative storage is per browser or per self-hosted installation before M3, because scheduling needs one clear canonical journal and transaction owner.
+
+References: https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API/Using_IndexedDB ; https://developer.mozilla.org/en-US/docs/Web/API/StorageManager/persist ; https://developer.mozilla.org/en-US/docs/Web/API/IDBDatabase/transaction ; https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API/Basic_Terminology .
