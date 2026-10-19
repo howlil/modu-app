@@ -1,3 +1,5 @@
+import { assessRecallRating, type RecallAssessment } from './evaluation.ts';
+
 /** Pure, single-learner language learning kernel. No storage, provider, or UI dependencies. */
 export type PracticeMode = 'recall' | 'listening' | 'shadowing';
 export type RecallRating = 'again' | 'hard' | 'good' | 'easy';
@@ -24,7 +26,7 @@ export interface SentenceSnapshot extends Sentence {
   readonly targetLanguage: string;
 }
 export type PracticeEvidence =
-  | { readonly kind: 'recall'; readonly rating: RecallRating }
+  | { readonly kind: 'recall'; readonly rating: RecallRating; readonly assessment?: RecallAssessment }
   | { readonly kind: 'exposure'; readonly medium: 'listening' | 'shadowing' }
   | { readonly kind: 'skip' };
 export interface PracticeAttempt {
@@ -148,7 +150,7 @@ export function isMemoryEligible(attempt: PracticeAttempt): boolean {
   return attempt.evidence.kind === 'recall';
 }
 export function isSuccessfulRecall(attempt: PracticeAttempt): boolean {
-  return attempt.evidence.kind === 'recall' && attempt.evidence.rating !== 'again';
+  return attempt.evidence.kind === 'recall' && assessRecallRating(attempt.evidence.rating).outcome === 'recalled';
 }
 export interface CommitAttemptCommand {
   attemptId: string;
@@ -193,7 +195,10 @@ export function commitPracticeAttempt(
     profileId: session.profileId,
     sentenceId: item.id,
     sentenceRevision: item.revision,
-    evidence: evidence.kind === 'recall' ? { kind: 'recall', rating: evidence.rating }
+    evidence: evidence.kind === 'recall' ? {
+      kind: 'recall', rating: evidence.rating,
+      assessment: assessRecallRating(evidence.rating)
+    }
       : evidence.kind === 'exposure' ? { kind: 'exposure', medium: evidence.medium }
       : { kind: 'skip' },
     recordedAt: command.recordedAt
