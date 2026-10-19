@@ -41,9 +41,7 @@ STOP
 
 ## Current scope
 
-- Merge PDF
 - Pomodoro
-- Typing Practice
 
 Do not add speculative modules, platform directories, persistence layers, PWA infrastructure, generic worker frameworks, categories, or search until a current requirement needs them.
 
@@ -94,7 +92,6 @@ Feature development checklist:
 3. Put feature-specific views in `modules/<feature>/components`; per-instance Svelte 5 orchestration belongs in `controller/*.svelte.ts`.
 4. Keep pure logic deterministic and independent of UI/browser/server adapters. Never import another feature's private code.
    - Pomodoro uses `core/` (timer/activity), `adapters/` (persistence/storage/protection/audio/wake-lock), `controller/` and `components/`.
-   - Typing uses `core/` (trainer/session), `adapters/` (persistence/sounds), `controller/` and `components/`.
    - Do not restore former root-level feature files, move adapters into `core/`, or move workflow logic into `+page.svelte`.
 5. Centralize state types, maintain local-first storage/protocol compatibility, and test regressions before changing contracts.
 6. Add/update boundary tests for architectural changes; don't silence tests.
