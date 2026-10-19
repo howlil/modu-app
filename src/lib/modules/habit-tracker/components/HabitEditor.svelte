@@ -96,7 +96,7 @@
             <div class="mt-5 grid grid-cols-2 gap-3">
               <div>
                 <label for="habit-target" class="mb-2 block text-ui font-medium">Daily target</label>
-                <Input id="habit-target" type="number" min="0.000001" max="1000000000" step={measurement === 'QUANTITY' ? 'any' : '1'} bind:value={target} required/>
+                <Input id="habit-target" type="number" min={measurement === 'QUANTITY' ? '0.000001' : '1'} max="1000000000" step={measurement === 'QUANTITY' ? 'any' : '1'} bind:value={target} required/>
               </div>
               <div>
                 <label for="habit-unit" class="mb-2 block text-ui font-medium">Unit</label>
