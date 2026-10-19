@@ -161,6 +161,21 @@ describe('Language Learning — IndexedDB M1 repository', () => {
     expect(again).toEqual(saved);
     expect(await learningPersistence.getMemory('en','cafe','coffee',1)).toEqual(state);
   });
+  it('serializes simultaneous rated attempts from separate sessions into one memory state', async () => {
+    const a=await learningPersistence.execute(makeStart('parallel-a'),null);
+    const b=await learningPersistence.execute(makeStart('parallel-b'),null);
+    const revealedA=await learningPersistence.execute(reveal('parallel-a'),a.revision);
+    const revealedB=await learningPersistence.execute(reveal('parallel-b'),b.revision);
+    const results=await Promise.all([
+      learningPersistence.execute(attempt('parallel-a','one','hard'),revealedA.revision),
+      learningPersistence.execute(attempt('parallel-b','two','good'),revealedB.revision)
+    ]);
+    expect(results.every(r=>r.session.status==='completed')).toBe(true);
+    const memory=await learningPersistence.getMemory('en','cafe','coffee',1);
+    expect(memory?.repetitions).toBe(2);
+    expect(memory?.lastAttemptId).toBe('two');
+    expect((await learningPersistence.exportBackup())).toContain('"reviews"');
+  });
   it('does not change review state for exposure, skip or a rejected attempt', async () => {
     const listen:PracticeCommand={...makeStart('listening'),mode:'listening'};
     const initial=await learningPersistence.execute(listen,null);
