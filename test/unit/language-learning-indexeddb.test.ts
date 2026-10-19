@@ -111,6 +111,22 @@ describe('Language Learning — IndexedDB M1 repository', () => {
       expect((await learningPersistence.latest())?.session.id).toBe('a-actually-latest');
     } finally { clock.mockRestore(); }
   });
+  it('blocks a stale tab after backup restore even when session revision is unchanged', async () => {
+    const before = await learningPersistence.execute(makeStart('same-session'), null);
+    const backup = await learningPersistence.exportBackup();
+    await learningPersistence.importBackup(backup);
+    const restored = await learningPersistence.latest();
+    expect(restored?.revision).toBe(before.revision);
+    expect(restored?.storageEpoch).not.toBe(before.storageEpoch);
+    await expect(learningPersistence.execute(
+      {type:'pause', sessionId:'same-session'}, before.revision, before.storageEpoch
+    )).rejects.toMatchObject({code:'conflict'});
+    expect((await learningPersistence.get('same-session'))?.session.status).toBe('active');
+    const resumed = await learningPersistence.execute(
+      {type:'pause', sessionId:'same-session'}, restored!.revision, restored!.storageEpoch
+    );
+    expect(resumed.session.status).toBe('paused');
+  });
   it('round-trips a versioned backup after replacing the database', async () => {
     const s=await learningPersistence.execute(makeStart('s1'),null);
     const revealed=await learningPersistence.execute(reveal('s1'),s.revision);
