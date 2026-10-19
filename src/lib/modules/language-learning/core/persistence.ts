@@ -1,7 +1,7 @@
 import {
   abandonSession, commitPracticeAttempt, createPracticeSession, pauseSession,
   resumeSession, revealAnswer, type CommitAttemptCommand, type LanguageIsland,
-  type PracticeMode, type PracticeSession, type PracticeAttempt, LearningRuleError
+  type PracticeMode, type PracticeSession, type PracticeAttempt
 } from './learning.ts';
 
 /** Per-session durable record. No tenant/account key: one self-hosted instance = one learner. */
@@ -93,7 +93,7 @@ export function decodePracticeCommand(raw: unknown): PracticeCommand {
     }
     const e = raw.attempt.evidence;
     const evidence = e.kind === 'recall' && rating(e.rating)
-      ? { kind: 'recall' as const, rating: e.rating as CommitAttemptCommand['evidence'] & never }
+      ? { kind: 'recall' as const, rating: e.rating }
       : e.kind === 'exposure' && (e.medium === 'listening' || e.medium === 'shadowing')
         ? { kind: 'exposure' as const, medium: e.medium }
         : e.kind === 'skip' ? { kind: 'skip' as const } : null;
@@ -122,13 +122,17 @@ export function applyPracticeCommand(
 ): { next: StoredPractice; attempt: PracticeAttempt | null; changed: boolean } {
   if (command.type === 'start') {
     if (current) {
-      if (current.session.id === command.sessionId &&
-        current.session.profileId === command.profileId &&
-        current.session.mode === command.mode &&
-        current.session.islandId === command.island.id) {
+      const expected = createPracticeSession({
+        sessionId: command.sessionId, profileId: command.profileId,
+        mode: command.mode, island: command.island
+      });
+      if (current.session.profileId === expected.profileId &&
+        current.session.mode === expected.mode &&
+        current.session.islandId === expected.islandId &&
+        JSON.stringify(current.session.items) === JSON.stringify(expected.items)) {
         return { next: current, attempt: null, changed: false };
       }
-      throw new PracticeStorageRuleError('conflict', 'Session ID already exists.');
+      throw new PracticeStorageRuleError('conflict', 'Session ID already exists with different content.');
     }
     return { next: {schemaVersion: 1, revision: 1,
       session: createPracticeSession({
