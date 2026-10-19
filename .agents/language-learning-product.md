@@ -23,11 +23,10 @@ If current repository code contradicts a proposal below, inspect and resolve the
 
 - Stack: Svelte 5, SvelteKit 3, TypeScript, Bun, Tailwind CSS v4, shadcn-svelte, Cloudflare Workers Builds/adapter.
 - Modu is presently **local-first browser utilities**. There is **no existing self-hosted server persistence architecture** for learning data.
-- Existing implemented modules: `daily-execution`, `pomodoro`, `typing`, `image-compress`. Merge PDF is coming soon.
+- Existing implemented modules: `daily-execution` and `pomodoro`. Typing Practice, Image Compress and Merge PDF were removed on 2026-10-20.
 - Actual registry: `src/lib/platform/registry/modules.ts` with `file-transform | focus` layouts; do not add a language-learning tile yet.
 - Mandatory implemented module layout: one `<Feature>Workspace.svelte` at module root, with `core/` (pure behavior), `adapters/` (browser/provider/storage integration), `controller/` (per-mounted Svelte 5 state factory), and `components/` (feature UI).
 - Routes must remain thin; do not import other modules' private code. No app-wide plugin framework or speculative abstraction.
-- Typing Practice has a keyboard-specific adaptive trainer and localStorage persistence. **Do not reuse keyboard trainer logic as a language SRS**.
 - Daily Execution uses a guarded localStorage snapshot; Pomodoro activity history uses an IndexedDB-backed shared focus-session repository. Existing persistence demonstrates local-first patterns but **does not provide an appropriate durable multi-record transaction design for this new learning domain**.
 - Tests include `test/unit/architecture-boundaries.test.ts`, which enforces the canonical folder layout/import rules on future modules.
 - Existing `AGENTS.md` says work on `master` unless the user specifically requests a branch; this state file alone must not create a route/module.
