@@ -12,21 +12,19 @@ Optimize for time-to-result, correctness, privacy, low cognitive load, and low r
 
 ## 2. Current scope
 
-The current validation modules are:
+The current modules are:
 
 ```text
 Module
-├── Merge PDF
 ├── Pomodoro
-├── Daily Execution
-└── Typing Practice
+└── Daily Execution
 ```
 
 Do not add JSON, UUID, image tools, category pages, PWA layers, storage abstractions, OPFS wrappers, or generic worker frameworks until a current module actually needs them.
 
 ## 3. Navigation now
 
-Home directly exposes the three modules.
+Home directly exposes the two modules.
 
 Homepage typography:
 
@@ -49,15 +47,13 @@ Homepage atmosphere:
 
 Home tool presentation:
 
-- Merge PDF remains unavailable until a tested local PDF merge engine is implemented. Its launcher tile must be visibly noninteractive with a Coming soon status, and the route must not expose dead file controls.
-
 - tools render as compact square app tiles
 - each tile is 1:1 with a clear icon and short name
 - tiles may use distinct solid pastel surfaces to make each tool feel like an app
 - each tile should have a distinct illustration/composition tied to the tool; do not reuse the same icon-box layout with only a different glyph
 - use restrained light-to-dark color shifts, inset highlights, and soft shadows to create depth without glossy effects
 - do not add descriptions inside the launcher grid
-- tool grid should stay visually balanced for the current count: with four launcher cards, use 4 columns on wide screens and 2 columns below tablet width; avoid a single orphan card on a new row
+- tool grid should stay visually balanced for the current count: use 2 columns for the current two tools; avoid an orphan card
 - the tile itself is the interaction target; avoid extra arrows, badges, or metadata
 
 Global navigation:
@@ -165,7 +161,7 @@ Semantic text tokens are registered in `src/app.css` via Tailwind v4 `@theme inl
 - `src/app.css` explicitly registers `--font-weight-normal: 400`, `--font-weight-medium: 500`, and `--font-weight-semibold: 600` in Tailwind `@theme`; these are the only supported application font weights.
 - Default page text is Body. Control labels generally use UI, secondary metadata uses Meta, view titles use Title or Title LG, module headings use Page Title, and hero heading uses Display.
 - Never introduce arbitrary 9/10/11/13/15px text or 450/520/750 font weights as new application typography.
-- Exceptions are functional visualization/data glyphs such as the oversized Pomodoro countdown, typing drill glyphs, and extremely dense keyboard diagram legends—not new general type styles.
+- Exceptions are functional visualization/data glyphs such as the oversized Pomodoro countdown, dense activity visualizations—not new general type styles.
 - Use `font-sans` / `font-mono`; do not introduce font downloads or CSS font-face definitions.
 
 Spacing derives from a 4px Tailwind base (`--spacing: 4px`). Approved application layout intervals:
@@ -309,7 +305,7 @@ Pomodoro module contract:
 - The 52-week heatmap stays dense: 12px color squares centered in 16px interactive cells (4px visible separation); do not enlarge invisible button padding or grid gaps until the cells look far apart
 - history stays local and intentionally lightweight rather than becoming a productivity-score dashboard
 - progressive disclosure is mandatory: the Timer bento shows one dominant countdown card (8/12 columns) and only Today / Current Cycle support cards (4/12 columns); on narrow viewports these stack beneath the timer
-- Pomodoro uses the same top hierarchy as Typing: ToolHeader title, then one compact fully rounded navigation bar
+- Pomodoro uses ToolHeader title, then one compact fully rounded navigation bar
 - Timer / Activity are pill tabs on the left of that bar; Settings stays aligned on the right and opens as a sibling in-page view, not a popup
 - Activity and Settings content may widen for their needs without pulling the title/navigation axis off-center
 - distinguish page-level navigation from timer-mode controls: Timer / Activity is the module navigation bar, while Focus / Short / Long remains a compact mode selector
@@ -346,60 +342,7 @@ Pomodoro module contract:
 - Do not add a footer beneath the Timer cards repeating the focus/rest cycle or today's total (such as `Focus → Rest → Repeat · 2h 15m recorded today`)
 - keep the interface light-weight and free of task-management or heavy analytics scope
 
-### Typing implementation boundaries
-
-- `src/routes/typing/+page.svelte` is a thin route entrypoint delegating to `TypingWorkspace.svelte`.
-- `src/lib/modules/typing/TypingWorkspace.svelte` owns tab composition and typing/drill presentation, reusing `components/ProgressView.svelte` and `components/SettingsView.svelte`.
-- `controller/typing.svelte.ts` creates state per workspace and orchestrates keyboard input, training transitions, persistence, sound and cleanup. No global mutable Svelte 5 controller instance.
-- `core/trainer.ts` and `core/session.ts` own pure learning algorithms, evaluation and metrics; `adapters/persistence.ts` and `adapters/sounds.ts` own browser side effects. Never have core import adapter or presentation code.
-- Preserve persisted v1 keys, drill generation and strict-correction semantics when changing boundaries. The Pomodoro/Typing separation is enforced by architecture tests and `.agents/architecture.md`.
-
-## 7. Typing module contract
-
-Typing is an adaptive muscle-memory trainer, not only a WPM test.
-
-Core training loop:
-
-```text
-warm-up / retention
-→ weak keys
-→ weak transitions
-→ mixed transfer
-→ benchmark
-→ learner model
-→ next session adapts
-```
-
-Typing module contract:
-
-- Train is the default surface; Lessons teaches movements and Test measures performance separately
-- adaptive sessions use five compact blocks: 2m retention, 3m weak keys, 3m weak transitions, 3m mixed transfer, 1m benchmark
-- training prioritizes accuracy before speed; WPM is supportive rather than the dominant live metric
-- wrong keys do not advance by default so the practiced movement must be corrected before continuing
-- the learner model stores aggregate per-key and per-transition attempts, accuracy, recent performance, and latency; do not persist raw keystroke event streams
-- weak-key selection uses both error rate and latency rather than error count alone
-- transition/bigram statistics identify slow sequences even when their individual keys are already stable
-- mastery requires repeated evidence: default 98% accuracy, 20 samples, and ≤420ms average correct-key latency
-- mastered keys enter a local retention queue with increasing review intervals; failed review returns the item to a near-term interval
-- keyboard/finger guidance fades as practiced keys stabilize and can be manually reduced or hidden
-- keyboard sound is optional, local, and procedural through Web Audio; no remote audio asset or license dependency is required
-- the typing sound engine reuses one AudioContext instead of creating a new context for every keystroke
-- typing sound favors a crisp, dry clacky keyboard profile: fast high-frequency contact tick, short keycap bottom-out snap, restrained low body, and quieter top-out release; Space stays lower/heavier and wrong keys retain a subtly brighter impact
-- key sounds must resume suspended browser AudioContexts from a real user gesture, play the pending first strike only after resume succeeds, and avoid unhandled resume rejections or delayed bursts
-- Typing Settings includes a small Preview action to verify sound output without starting a training run
-- Test mode records performance history but must not update key mastery or adaptive weakness
-- custom/test text must never influence the adaptive learner model
-- Progress shows only actionable signals: recent performance, weak keys/transitions, and due review
-- all learning state and preferences stay local to the browser; no account is required
-- keep the primary training surface focused: current block, text, accuracy, target, restrained WPM, keyboard guide, and session progress
-- Typing uses the approved Focus Canvas composition: centered typing text is the primary focal point; inline completion, live accuracy and secondary WPM appear below it rather than beside it in competing cards
-- Train, Lesson drills and Test share the same responsive typing canvas; Lessons, Progress and Settings remain sibling in-page views with consistent module navigation
-- The keyboard guide pairs a physical-key highlight with independently animated two-hand SVG finger silhouettes; a ghost outline indicates the resting position and opposite-hand Shift is highlighted when enabled
-- Visual guide levels remain 0 full keyboard and hands, 1 hands only, and 2 hidden; the demo animation must never mutate typing attempts, mastery, WPM, or session history
-- Preserve reduced-motion handling, mobile keyboard text input without duplicate desktop keystrokes, and the existing local-first v1 persistence keys
-- do not turn Typing into an XP, streak, achievement, or analytics dashboard
-
-## 8. Local-first contract
+## 7. Local-first contract
 
 ```text
 user input/file
@@ -413,7 +356,7 @@ Do not send user content to APIs, analytics, logs, or third parties unless the p
 
 Do not claim offline support until it is implemented and tested.
 
-## 9. Engineering boundary
+## 8. Engineering boundary
 
 ```text
 routes/UI
@@ -427,7 +370,7 @@ Do not create platform abstractions before a concrete requirement needs them.
 
 The small Module Registry remains because Home already consumes shared metadata.
 
-## 10. Deployment
+## 9. Deployment
 
 ```text
 GitHub
@@ -449,13 +392,13 @@ Cloudflare runs `bun run build`, then `npx wrangler deploy`. `wrangler.jsonc` po
 
 Workers Builds is the intended deployment model for this repository.
 
-## 11. Definition of done
+## 10. Definition of done
 
 A module is done when its core job works, privacy copy matches reality, errors are recoverable, mobile/keyboard basics work, relevant deterministic logic is tested, and build/check passes.
 
 UI work is complete only when generic controls use shadcn-svelte instead of unnecessary bespoke primitives.
 
-## 12. Decision rule
+## 11. Decision rule
 
 ```text
 What current user-visible requirement needs this?
