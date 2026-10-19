@@ -307,3 +307,28 @@ References: https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API/Using
 - Next M3 SRS must use this **single** IDB repository as canonical transaction owner, adding review state to the same readwrite transaction as the rated attempt. Exposure and skip do not update memory.
 
 Latest verified M1 refactor CI: https://github.com/howlil/modu-app/actions/runs/39340683207 (frozen install, typecheck, unit tests, build passed). No production browser E2E or live module activation is implied.
+
+## M3 checkpoint — Memory & SRS Engine (2026-10-20)
+
+**Implemented on master; module remains unrouted/unpublished.** M3 is a deterministic, versioned SRS heuristic, NOT FSRS. An FSRS model/library would require a separate explicit algorithm migration. Reference: https://github.com/open-spaced-repetition/ts-fsrs
+
+### `$design-thinking` graph (Shapes / A / E / R / Execution / Recovery)
+
+- **Shapes:** MemoryState v1 (key, profileId, islandId, sentenceId, sentenceRevision, stage, dueAt, lastReviewedAt, intervalMs, repetitions, lapses, lastAttemptId, algorithmVersion). Profile + Island + sentence ID + revision form the review identity.
+- **A:** validated rated PracticeAttempt -> pure M2 commitPracticeAttempt -> load existing memory -> scheduleRatedAttempt -> write session + globally unique attempt + memory + latest-session pointer + storage generation -> IndexedDB transaction completion -> UI confirmation. Replayed attempt ID returns existing state with no second scheduling update.
+- **E:** stale revision/generation, globally duplicated attempt ID, corrupt saved memory, invalid scheduling input, blocked schema upgrade, quota, or transaction abort fail atomically and retain prior history. Corrupt historical states are never reset silently.
+- **R:** native IndexedDB v3 reviews object store with compound index [profileId,dueAt]; existing per-mounted controller; clock as function argument. No separate server, account, new SRS dependency, Effect library or background scheduler.
+- **Execution:** overlapping writers serialize in one readwrite transaction; callbacks enqueue all IndexedDB requests without awaits. Due list includes eligible scheduled states for exactly one language profile, sorted by dueAt, capped by supplied limit.
+- **Historical bootstrap:** non-destructive IndexedDB v2->v3 schema upgrade; first run replays prior rated attempts from all stored sessions under an atomic, idempotent migration marker. Listening/Shadowing/Skip never create memory state.
+- **Backup:** old backup JSON version 1 accepted by rebuilding rated-memory state; new backup JSON version 2 exports exact memory state alongside sessions and restores atomically. Import validates each memory record, unique keys, and matching eligible source attempt. Restore rotates storage generation so stale tabs cannot write into the restored database.
+- **SRS v1 intervals:** Again 10 minutes (first learning, later relearning), Hard 1 day, Good 3 days, Easy 7 days initially. Subsequent Hard/Good/Easy use at least their initial interval and scale prior interval by 1.2/2.5/3.5, capped at 365 days. Again resets successful repetitions and increments lapses. Ratings are not inferred from literal text comparison.
+- **Clock policy:** lastReviewedAt is nondecreasing if the browser clock moves backwards. Deterministic chronological legacy replay uses code-point ID ordering for tied timestamps (not locale-specific collation).
+- **Content revision:** editing a sentence with a new revision generates independent memory. M4/M5 must exclude old revisions from presented due queues when authoritative current content is known.
+
+### Code and verification
+
+- Core: src/lib/modules/language-learning/core/memory.ts
+- IndexedDB transaction, bootstrap, due query and backup: src/lib/modules/language-learning/adapters/persistence.ts
+- Tests: test/unit/language-learning-memory.test.ts and test/unit/language-learning-indexeddb.test.ts (fake-indexeddb).
+- Browser-native E2E and product UI registration remain pending. No FSRS parameter optimization or cross-device synchronization is implemented.
+- Next M4: Learning Orchestration combining due queue with current content/new sentences; do not schedule until user says next.
