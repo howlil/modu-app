@@ -4,6 +4,7 @@ import {
 } from '../core/learning.ts';
 import type { PracticeCommand, StoredPractice } from '../core/persistence.ts';
 import { learningPersistence, LearningPersistenceError } from '../adapters/persistence.ts';
+import { checkRecallAnswer, recallFeedback, type AnswerCheck } from '../core/evaluation.ts';
 import { STARTER_ISLAND } from '../adapters/starter-content.ts';
 
 /** No optimistic success: all state transitions are visible only after durable acknowledgement. */
@@ -13,8 +14,27 @@ export function createLanguageLearningController() {
   let pending = $state(false);
   let ready = $state(false);
   let error = $state('');
+  let answerDraft = $state('');
   let retryCommand: {command: PracticeCommand; expectedRevision: number | null} | null = null;
   const session = $derived<PracticeSession | null>(record?.session ?? null);
+  const answerCheck = $derived.by((): AnswerCheck | null => {
+    const s = session;
+    const item = s ? currentSentence(s) : null;
+    return s?.mode === 'recall' && s.phase === 'revealed' && item
+      ? checkRecallAnswer({response: answerDraft, reference: item.answer})
+      : null;
+  });
+  const lastRecallFeedback = $derived.by(() => {
+    const s = session;
+    const previous = s?.attempts[s.attempts.length - 1];
+    return previous?.evidence.kind === 'recall'
+      ? recallFeedback(previous.evidence.rating) : '';
+  });
+  function setAnswerDraft(value: string) {
+    if (session?.mode === 'recall' && session.phase === 'prompt' && !pending) {
+      answerDraft = value.slice(0, 2000);
+    }
+  }
 
   async function load() {
     if (pending) return;
@@ -22,6 +42,7 @@ export function createLanguageLearningController() {
     pending = true;
     try {
       record = await learningPersistence.latest();
+      answerDraft = '';
       ready = true;
       retryCommand = null;
       error = '';
@@ -36,6 +57,7 @@ export function createLanguageLearningController() {
     error = '';
     try {
       const saved = await learningPersistence.execute(command, expectedRevision);
+      if (record?.session.cursor !== saved.session.cursor) answerDraft = '';
       record = saved;
       retryCommand = null;
     } catch (cause) {
@@ -87,6 +109,10 @@ export function createLanguageLearningController() {
     get ready() { return ready; },
     get error() { return error; },
     get canRetry() { return !!retryCommand; },
+    get answerDraft() { return answerDraft; },
+    get answerCheck() { return answerCheck; },
+    get lastRecallFeedback() { return lastRecallFeedback; },
+    setAnswerDraft,
     get summary() { return summarizePractice(session?.attempts ?? []); },
     load, retry, start, reveal: () => act('reveal'), pause: () => act('pause'),
     resume: () => act('resume'), abandon: () => act('abandon'),
