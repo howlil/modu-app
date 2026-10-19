@@ -13,7 +13,7 @@ function rated(id: string, rating: RecallRating, recordedAt: number, profileId='
 }
 describe('Language Learning M3 — pure review scheduling', () => {
   it.each([
-    ['again',10*MIN,'learning',0,1],
+    ['again',10*MIN,'learning',0,0],
     ['hard',DAY,'review',1,0],
     ['good',3*DAY,'review',1,0],
     ['easy',7*DAY,'review',1,0]
@@ -44,6 +44,17 @@ describe('Language Learning M3 — pure review scheduling', () => {
     for(let i=0;i<30;i++) current=scheduleRatedAttempt(
       current,rated('growth-'+i,'easy',4*DAY+i*DAY),'island')!;
     expect(current.intervalMs).toBe(365*DAY);
+  });
+  it('does not count initial learning failures as lapses or double-count relearning failures', () => {
+    const first=scheduleRatedAttempt(null,rated('start','again',1000),'island')!;
+    expect(first.lapses).toBe(0);
+    const again=scheduleRatedAttempt(first,rated('again2','again',2000),'island')!;
+    expect(again.lapses).toBe(0);
+    const recovered=scheduleRatedAttempt(again,rated('success','good',3000),'island')!;
+    const relapsed=scheduleRatedAttempt(recovered,rated('relapse','again',4000),'island')!;
+    expect(relapsed.lapses).toBe(1);
+    const repeated=scheduleRatedAttempt(relapsed,rated('again3','again',5000),'island')!;
+    expect(repeated.lapses).toBe(1);
   });
   it('is repeat-safe, ignores exposure/skip, and isolates language and revision identity', () => {
     const attempt=rated('a1','good',1000);
