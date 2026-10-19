@@ -332,3 +332,31 @@ Latest verified M1 refactor CI: https://github.com/howlil/modu-app/actions/runs/
 - Tests: test/unit/language-learning-memory.test.ts and test/unit/language-learning-indexeddb.test.ts (fake-indexeddb).
 - Browser-native E2E and product UI registration remain pending. No FSRS parameter optimization or cross-device synchronization is implemented.
 - Next M4: Learning Orchestration combining due queue with current content/new sentences; do not schedule until user says next.
+
+## M4 checkpoint — Learning Orchestration (2026-10-20)
+
+**Implemented on master as a prelaunch vertical slice; Language Learning is still not registered/routed in the Modu launcher.** This milestone consumes M3 review state and the current, explicitly provided Island catalog; it does not add a content persistence engine, notification scheduler, AI provider or user account.
+
+### `$design-thinking` implementation graph
+
+- **Shapes:** `LearningProfile` (opaque `id` + `targetLanguage`), current `LanguageIsland[]`, validated `MemoryState[]`, explicit clock + limits (`maxItems`, `maxNew`), `LearningPlan` v1, and `LearningTask` (`relearning | review | new` with current sentence revision). No new persisted business state.
+- **A (success):** validate one profile/canonical current catalog -> read consistent IndexedDB `reviews` snapshot scoped to profile -> join memory by `profileId + islandId + sentenceId + revision` -> classify: due relearning first, due review second, not-yet-recalled content third -> bound the recommendation -> select a contiguous same-Island prefix -> create M0 practice session with only selected sentences -> rated attempts flow back through existing M1/M2/M3 transaction -> refresh plan after a confirmed write.
+- **Policy:** never review future-due items early; max 50 recommendation items, default UI 10, default 3 not-yet-recalled sentence slots. Due items are not crowded out by new content. Sort due items by priority then due date then stable ID tie-break; new content follows catalog order. A skip/exposure does not become memory evidence, so 'new' means *not yet recalled*, not necessarily never displayed.
+- **Single-Island invariant:** M0 sessions belong to exactly one Island. The first recommended item chooses the Island; only the **contiguous** leading tasks from that Island are batched. A later new item from that Island cannot jump ahead of an earlier due item from another Island. A new current content revision is distinct from retired review evidence.
+- **E (failures):** reject invalid profile, mixed target languages, duplicate Island/sentence IDs, invalid clock/limits, corrupt or duplicated memory, and plan referencing missing/edited content. Failed read/validation produces plan error; it never advances SRS or falsely persists a practice attempt.
+- **R / execution:** existing IndexedDB `reviews` store and indexed `[profileId,dueAt]` read-only snapshot; controller uses an explicit `Date.now()` argument to the pure planner and no background timer or external provider. Recommendations are advisory (not a transactionally reserved queue); starting a session refreshes the plan from current IndexedDB before issuing the M1 start command.
+- **Scope:** one current starter Island in the prelaunch UI; core supports many Islands and target-language profiles. M5 content authoring will own durable material catalogs and profile selection; M4 does not fabricate missing courses or migrate historical content.
+
+### Concrete code and verification
+
+- `src/lib/modules/language-learning/core/orchestration.ts`: validation, classification, ordering, bounded recommendation, and same-Island batch projection.
+- `src/lib/modules/language-learning/adapters/persistence.ts`: `learningPersistence.plan()` loads a single profile-wide IndexedDB read snapshot; retired memory revisions are filtered against current Island content in the pure core.
+- `src/lib/modules/language-learning/controller/language-learning.svelte.ts`: `refreshPlan()` and `startRecommended()`; automatic refresh after durable practice writes. Existing practice commands keep their attempt/revision/epoch semantics.
+- `src/lib/modules/language-learning/LanguageLearningWorkspace.svelte` and `components/PracticeView.svelte`: minimal prelaunch recommendation surface and accurate browser-storage wording.
+- `test/unit/language-learning-orchestration.test.ts` and `test/unit/language-learning-orchestration-indexeddb.test.ts`: priority, stale revision exclusion, due cutoff, profile isolation, deterministic limits, mixed catalog failure, no mutation on plan reads, and single-Island batch projection.
+
+### Review and launch boundaries
+
+- `$code-review` remedied a recommendation-order bug: a noncontiguous batch previously could pull a new same-Island sentence ahead of due items from another Island; contiguous-prefix batching preserves global due-first policy.
+- A manual refresh is available when caught up; open tabs do not run background due timers. True browser-native E2E, production launch, persistent content authoring, and multi-language profile selection remain separate acceptance/milestone work.
+- Next M5: Vocabulary & Content (current catalog source-of-truth, authoring/import, revision and reference integrity), without reimplementing M0–M4 business logic.
