@@ -1,4 +1,4 @@
-import type { PracticeAttempt, RecallRating } from './learning.ts';
+import type { PracticeAttempt, PracticeSession, RecallRating } from './learning.ts';
 
 /** A rating is a learner's self-report, not an externally graded translation. */
 export interface RecallAssessment {
@@ -44,6 +44,14 @@ export function isValidRecallAssessment(value: unknown, rating: RecallRating): b
     v.outcome === expected.outcome && v.effort === expected.effort;
 }
 
+/** Stable identity for an unanswered sentence, preserved through reveal and pause/resume.
+ * A new session at the same cursor must never inherit a prior answer draft. */
+export function practiceAnswerScope(session: PracticeSession | null): string | null {
+  if (!session || session.status === 'completed' || session.status === 'abandoned') return null;
+  const item = session.items[session.cursor];
+  return item ? JSON.stringify([session.id, session.cursor, item.id, item.revision]) : null;
+}
+
 export type AnswerCheckStatus = 'empty' | 'reference_match' | 'variant_match' | 'needs_review';
 export interface AnswerCheck {
   readonly version: 1;
@@ -59,16 +67,21 @@ export function checkRecallAnswer(input: {
   reference: string;
   acceptedVariants?: readonly string[];
 }): AnswerCheck {
+  // Historical M0/M1 content has no text-length limit. Comparison must not throw
+  // during reactive rendering even when a valid stored sentence is very long.
+  if (!input.reference.trim() || input.reference.length > 2000 ||
+    input.response.length > 2000 ||
+    (input.acceptedVariants?.length ?? 0) > 30 ||
+    input.acceptedVariants?.some(v => !v.trim() || v.length > 2000)) {
+    return {
+      version: 1, method: 'literal_comparison', status: 'needs_review',
+      feedback: 'Automatic comparison is unavailable for this sentence. Compare it manually before rating.'
+    };
+  }
   const normalize = (text: string) => text.normalize('NFC').trim()
     .replace(/\s+/gu, ' ').replace(/[.。]+$/gu, '').trim();
   const answer = normalize(input.response);
   const reference = normalize(input.reference);
-  if (!reference || input.reference.length > 2000 ||
-    input.response.length > 2000 ||
-    (input.acceptedVariants?.length ?? 0) > 30 ||
-    input.acceptedVariants?.some(v => !v.trim() || v.length > 2000)) {
-    throw new RangeError('Invalid or oversized recall comparison input.');
-  }
   if (!answer) return {
     version: 1, method: 'literal_comparison', status: 'empty',
     feedback: 'No written answer. Compare the reference and rate your recall yourself.'
