@@ -69,6 +69,17 @@ describe('Language Learning M3 — pure review scheduling', () => {
     expect(states[0].repetitions).toBe(2);
     expect(() => rebuildMemoryStates([...events,events[0]])).toThrow();
   });
+  it('replays tied historical timestamps in stable code-point attempt ID order', () => {
+    const events=[
+      {attempt:rated('z-later','easy',1000),islandId:'island'},
+      {attempt:rated('a-first','hard',1000),islandId:'island'}
+    ];
+    const first=rebuildMemoryStates(events)[0];
+    const second=rebuildMemoryStates([...events].reverse())[0];
+    expect(first).toEqual(second);
+    expect(first.lastAttemptId).toBe('z-later');
+    expect(first.repetitions).toBe(2);
+  });
   it('clamps system clock rollback without moving due time backwards', () => {
     const first=scheduleRatedAttempt(null,rated('a1','hard',DAY),'island')!;
     const second=scheduleRatedAttempt(first,rated('a2','good',0),'island')!;
