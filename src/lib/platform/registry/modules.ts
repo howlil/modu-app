@@ -9,6 +9,13 @@ export const modules: ModuleDefinition[] = [
     status: 'available'
   },
   {
+    id: 'habit-tracker',
+    name: 'Habit Tracker',
+    route: '/habit',
+    layout: 'focus',
+    status: 'available'
+  },
+  {
     id: 'pomodoro',
     name: 'Pomodoro',
     route: '/pomodoro',

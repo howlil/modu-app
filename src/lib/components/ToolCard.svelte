@@ -7,11 +7,13 @@
   let tileStyle = $derived({
     'daily-execution': 'background: linear-gradient(145deg, #BDD4FF 0%, #9ABAF7 54%, #81A6EE 100%);',
     pomodoro: 'background: linear-gradient(145deg, #9BC2F7 0%, #80AEEF 54%, #709DE5 100%);',
+    'habit-tracker': 'background: linear-gradient(145deg, #D4E3FF 0%, #BED4FD 55%, #9CBCFA 100%);',
   }[module.id]);
 
   let tileClass = $derived({
     'daily-execution': 'text-[#17437A] border-[#86A9EA]',
     pomodoro: 'text-[#163A6B] border-[#6F9FE8]',
+    'habit-tracker': 'text-[#17437A] border-[#86A9EA]',
   }[module.id] ?? 'text-foreground border-border');
 </script>
 
@@ -60,6 +62,28 @@
         <path d="m163 187 8 8 15-18" stroke="white" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
     </div>
+  {:else if module.id === 'habit-tracker'}
+    <div class="tool-art tool-art--habit" aria-hidden="true">
+      <svg class="size-full" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <g transform="rotate(-8 120 120)">
+          <rect x="48" y="35" width="151" height="170" rx="23" fill="#F8FBFF" stroke="#7FA4E8" stroke-width="3"/>
+          <path d="M48 88H199" stroke="#B6D0FA" stroke-width="3"/>
+          <path d="M79 30v20M168 30v20" stroke="#5C87D1" stroke-width="9" stroke-linecap="round"/>
+          <g fill="#DAE8FF">
+            <rect x="65" y="105" width="31" height="31" rx="8"/>
+            <rect x="107" y="105" width="31" height="31" rx="8"/>
+            <rect x="149" y="105" width="31" height="31" rx="8"/>
+            <rect x="65" y="149" width="31" height="31" rx="8"/>
+            <rect x="107" y="149" width="31" height="31" rx="8"/>
+            <rect x="149" y="149" width="31" height="31" rx="8"/>
+          </g>
+          <rect x="65" y="105" width="31" height="31" rx="8" fill="#2468F2"/>
+          <rect x="107" y="105" width="31" height="31" rx="8" fill="#2468F2"/>
+          <rect x="65" y="149" width="31" height="31" rx="8" fill="#2468F2"/>
+          <path d="m71 120 6 6 12-13M113 120l6 6 12-13M71 164l6 6 12-13" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        </g>
+      </svg>
+    </div>
   {:else if module.id === 'pomodoro'}
     <div class="tool-art tool-art--pomodoro" aria-hidden="true">
       <svg class="size-full" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -93,6 +117,8 @@
 
 
   .tool-art--daily { --art-rotation: -8deg; --art-duration: 7s; --art-delay: -1s; }
+
+  .tool-art--habit { --art-rotation: -8deg; --art-duration: 8s; --art-delay: -1.5s; }
 
   .tool-art--pomodoro {
     --art-rotation: -9deg;
