@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { learningPersistence, LearningPersistenceError } from '../../src/lib/modules/language-learning/adapters/persistence.ts';
 import type { PracticeCommand } from '../../src/lib/modules/language-learning/core/persistence.ts';
 
@@ -74,6 +74,18 @@ describe('Language Learning — IndexedDB M1 repository', () => {
     expect((await learningPersistence.latest())?.session.id).toBe(saved.session.id);
     expect((await learningPersistence.get('en-session'))?.session.profileId).toBe('en');
     expect((await learningPersistence.get('jp-session'))?.session.profileId).toBe('ja');
+  });
+  it('preserves latest-session identity even when writes share the same timestamp', async () => {
+    const clock=vi.spyOn(Date,'now').mockReturnValue(1000);
+    try {
+      await learningPersistence.execute(makeStart('z-last-alphabetically'),null);
+      await learningPersistence.execute(makeStart('a-actually-latest'),null);
+      expect((await learningPersistence.latest())?.session.id).toBe('a-actually-latest');
+      const backup=await learningPersistence.exportBackup();
+      expect(JSON.parse(backup).latestSessionId).toBe('a-actually-latest');
+      await learningPersistence.importBackup(backup);
+      expect((await learningPersistence.latest())?.session.id).toBe('a-actually-latest');
+    } finally { clock.mockRestore(); }
   });
   it('round-trips a versioned backup after replacing the database', async () => {
     const s=await learningPersistence.execute(makeStart('s1'),null);
