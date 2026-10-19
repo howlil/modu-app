@@ -9,7 +9,7 @@
   <div class="mx-auto w-full max-w-[860px]">
     <ToolHeader title="Language Learning" />
     <p class="mb-6 text-ui text-muted-foreground">
-      Kernel preview only. No persistence, review scheduling or audio generation is connected yet.
+      Explore sentence recall with a short practice session.
     </p>
     {#if !controller.session}
       <div class="flex flex-wrap gap-2">
