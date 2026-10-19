@@ -14,9 +14,10 @@ export class LearningPersistenceError extends Error {
   }
 }
 const DB_NAME = 'modu-language-learning';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const SESSIONS = 'sessions';
 const ATTEMPTS = 'attempts';
+const META = 'meta';
 const BACKUP_FORMAT = 'modu-language-learning';
 const MAX_BACKUP_LENGTH = 20 * 1024 * 1024;
 
@@ -30,6 +31,7 @@ export interface LearningBackup {
   version: 1;
   exportedAt: string;
   sessions: StoredPractice[];
+  latestSessionId?: string | null;
 }
 function translateError(cause: unknown): LearningPersistenceError {
   if (cause instanceof LearningPersistenceError) return cause;
@@ -80,6 +82,9 @@ function openDatabase(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(ATTEMPTS)) {
         db.createObjectStore(ATTEMPTS, {keyPath: 'id'});
+      }
+      if (!db.objectStoreNames.contains(META)) {
+        db.createObjectStore(META, {keyPath: 'key'});
       }
     };
     request.onblocked = () => {
@@ -137,7 +142,7 @@ async function transaction<T>(
     catch (cause) { fail(cause); }
   });
 }
-function asBackup(text: string): {records: StoredPractice[]; attempts: PracticeAttempt[]} {
+function asBackup(text: string): {records: StoredPractice[]; attempts: PracticeAttempt[]; latestSessionId: string | null} {
   if (!text || text.length > MAX_BACKUP_LENGTH) {
     throw new LearningPersistenceError('invalid', 'Backup is empty or exceeds the 20 MiB import limit.');
   }
@@ -171,16 +176,43 @@ function asBackup(text: string): {records: StoredPractice[]; attempts: PracticeA
       attempts.push(attempt);
     }
   }
-  return {records, attempts};
+  const latestSessionId = doc.latestSessionId ?? (records.at(-1)?.session.id ?? null);
+  if (latestSessionId !== null &&
+    (typeof latestSessionId !== 'string' || !sessionIds.has(latestSessionId))) {
+    throw new LearningPersistenceError('invalid', 'Backup refers to a missing latest session.');
+  }
+  return {records, attempts, latestSessionId};
 }
 /** No server endpoint. This browser origin owns the canonical practice history. */
 export const learningPersistence = {
   latest(): Promise<StoredPractice | null> {
-    return transaction([SESSIONS], 'readonly', (tx, complete, fail) => {
-      const cursor = tx.objectStore(SESSIONS).index('updatedAt').openCursor(null, 'prev');
-      cursor.onsuccess = () => {
-        try { complete(decodeSessionRow(cursor.result?.value)); }
-        catch (cause) { fail(cause); }
+    return transaction([SESSIONS, META], 'readonly', (tx, complete, fail) => {
+      const store = tx.objectStore(SESSIONS);
+      const pointer = tx.objectStore(META).get('latest');
+      pointer.onsuccess = () => {
+        try {
+          const latest = pointer.result as {sessionId?: unknown} | undefined;
+          if (latest) {
+            if (typeof latest.sessionId !== 'string') {
+              throw new LearningPersistenceError('corrupt', 'Invalid latest session pointer.');
+            }
+            const request = store.get(latest.sessionId);
+            request.onsuccess = () => {
+              try {
+                const record = decodeSessionRow(request.result);
+                if (!record) throw new LearningPersistenceError('corrupt', 'Latest session record is missing.');
+                complete(record);
+              } catch (cause) { fail(cause); }
+            };
+            return;
+          }
+          // Upgrade from legacy schema v1 with no pointer.
+          const cursor = store.index('updatedAt').openCursor(null, 'prev');
+          cursor.onsuccess = () => {
+            try { complete(decodeSessionRow(cursor.result?.value)); }
+            catch (cause) { fail(cause); }
+          };
+        } catch (cause) { fail(cause); }
       };
     });
   },
@@ -194,7 +226,7 @@ export const learningPersistence = {
     });
   },
   execute(command: PracticeCommand, expectedRevision: number | null): Promise<StoredPractice> {
-    return transaction([SESSIONS, ATTEMPTS], 'readwrite', (tx, complete, fail) => {
+    return transaction([SESSIONS, ATTEMPTS, META], 'readwrite', (tx, complete, fail) => {
       const sessions = tx.objectStore(SESSIONS);
       const attempts = tx.objectStore(ATTEMPTS);
       const request = sessions.get(command.sessionId);
@@ -220,6 +252,7 @@ export const learningPersistence = {
               const row: SessionRow = {id: next.session.id, updatedAt: Date.now(), record: next};
               sessions.put(row);
               if (attempt) attempts.add(attempt);
+              tx.objectStore(META).put({key: 'latest', sessionId: next.session.id});
               complete(next);
             } catch (cause) { fail(cause); }
           };
@@ -237,37 +270,54 @@ export const learningPersistence = {
     });
   },
   async exportBackup(): Promise<string> {
-    const records = await transaction<StoredPractice[]>([SESSIONS], 'readonly', (tx, complete, fail) => {
-      const request = tx.objectStore(SESSIONS).getAll();
-      request.onsuccess = () => {
-        try {
-          complete((request.result as unknown[]).map(raw => {
-            const record = decodeSessionRow(raw);
-            if (!record) throw new LearningPersistenceError('corrupt', 'Missing backup record.');
-            return record;
-          }));
-        } catch (cause) { fail(cause); }
-      };
-    });
+    const backup = await transaction<{records: StoredPractice[]; latestSessionId: string | null}>(
+      [SESSIONS, META], 'readonly', (tx, complete, fail) => {
+        const request = tx.objectStore(SESSIONS).getAll();
+        request.onsuccess = () => {
+          try {
+            const records = (request.result as unknown[]).map(raw => {
+              const record = decodeSessionRow(raw);
+              if (!record) throw new LearningPersistenceError('corrupt', 'Missing backup record.');
+              return record;
+            });
+            const pointer = tx.objectStore(META).get('latest');
+            pointer.onsuccess = () => {
+              try {
+                const latestSessionId = (pointer.result as {sessionId?: unknown} | undefined)?.sessionId
+                  ?? (records.at(-1)?.session.id ?? null);
+                if (latestSessionId !== null && (typeof latestSessionId !== 'string' ||
+                  !records.some(r => r.session.id === latestSessionId))) {
+                  throw new LearningPersistenceError('corrupt', 'Latest session pointer is invalid.');
+                }
+                complete({records, latestSessionId});
+              } catch (cause) { fail(cause); }
+            };
+          } catch (cause) { fail(cause); }
+        };
+      }
+    );
     return JSON.stringify({
       format: BACKUP_FORMAT, version: 1, exportedAt: new Date().toISOString(),
-      sessions: records
+      sessions: backup.records, latestSessionId: backup.latestSessionId
     } satisfies LearningBackup, null, 2);
   },
   async importBackup(text: string): Promise<void> {
     // Validate the entire source before opening the destructive transaction.
-    const {records, attempts} = asBackup(text);
-    await transaction<void>([SESSIONS, ATTEMPTS], 'readwrite', (tx, complete) => {
+    const {records, attempts, latestSessionId} = asBackup(text);
+    await transaction<void>([SESSIONS, ATTEMPTS, META], 'readwrite', (tx, complete) => {
       const sessions = tx.objectStore(SESSIONS);
       const journal = tx.objectStore(ATTEMPTS);
+      const meta = tx.objectStore(META);
       sessions.clear();
       journal.clear();
+      meta.clear();
       const now = Date.now();
       for (let i = 0; i < records.length; i++) {
         const record = records[i];
         sessions.add({id: record.session.id, record, updatedAt: now + i} satisfies SessionRow);
       }
       for (const attempt of attempts) journal.add(attempt);
+      if (latestSessionId !== null) meta.put({key: 'latest', sessionId: latestSessionId});
       complete(undefined);
     });
   },
