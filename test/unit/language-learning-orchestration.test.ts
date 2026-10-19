@@ -74,6 +74,16 @@ describe('M4 — deterministic learning orchestration',()=>{
     const changed=islands.map(i=>i.id==='travel'?{...i,sentences:i.sentences.filter(s=>s.id!=='train')}:i);
     expect(()=>recommendedIsland(result,changed)).toThrow();
   });
+  it('never pulls a later new Island item ahead of an intervening due review',()=>{
+    const travelFailed=state('travel','train','again',0);
+    const cafeReview=state('cafe','coffee','hard',0);
+    const result=plan([travelFailed,cafeReview],2*day,{maxItems:4,maxNew:2});
+    expect(result.tasks.map(t=>[t.kind,t.islandId])).toEqual([
+      ['relearning','travel'],['review','cafe'],['new','cafe'],['new','travel']
+    ]);
+    const batch=recommendedIsland(result,islands);
+    expect(batch?.sentences.map(s=>s.id)).toEqual(['train']);
+  });
   it('respects due capacity, new limits, and consistent ordering',()=>{
     const a=state('cafe','tea','hard',0);
     const b=state('cafe','coffee','hard',0);
