@@ -29,13 +29,13 @@
   <div class="mt-5"><HabitEmptyState onCreate={controller.openCreate}/></div>
 {:else}
   <section class="mt-5 rounded-[20px] border border-border bg-card p-5" aria-label="Today summary">
-    <p class="text-meta text-muted-foreground">Completed today</p>
+    <p class="text-meta text-muted-foreground">Goals met · daily or weekly as scheduled</p>
     <div class="mt-3 text-display font-normal tabular-nums">{completed} <span class="text-ui text-muted-foreground">/ {total}</span></div>
     <div class="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-muted" role="progressbar"
       aria-label="Today completion" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percentage}>
       <div class="h-full rounded-full bg-primary transition-[width] duration-200 motion-reduce:transition-none" style:width={percentage + '%'}></div>
     </div>
-    <p class="mt-2 text-meta text-muted-foreground">{percentage}% of today's scheduled habits</p>
+    <p class="mt-2 text-meta text-muted-foreground">{percentage}% of goals due today · flexible quotas count the week</p>
   </section>
 
   <div class="mt-6">
@@ -45,7 +45,13 @@
         {#each controller.todayHabits as item (item.habit.id)}
           <ProgressRow {item} busy={controller.busy}
             onCommand={(command) => { void controller.recordProgress(item.habit.id, controller.today, command); }}
-            onCorrect={() => controller.openCorrection(item.habit.id, controller.today)}/>
+            onCorrect={() => controller.openCorrection(item.habit.id, controller.today)}
+            onEdit={() => controller.openEdit(item.habit.id)}
+            onArchive={() => { void controller.setArchived(item.habit.id, true); }}
+            onDelete={() => controller.requestDelete(item.habit.id)}
+            confirming={controller.confirmDeleteId === item.habit.id}
+            onConfirmDelete={() => { void controller.confirmDelete(); }}
+            onCancelDelete={controller.cancelDelete}/>
         {/each}
       </div>
     {:else}

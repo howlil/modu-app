@@ -53,6 +53,9 @@
     <HabitEditor
       mode={controller.editor.mode}
       title={controller.editor.title}
+      today={controller.today}
+      policy={controller.editor.policy}
+      initialDirection={controller.editor.direction ?? 'BUILD'}
       busy={controller.busy}
       error={controller.error}
       onSave={controller.submitEditor}

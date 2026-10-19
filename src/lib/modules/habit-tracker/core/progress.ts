@@ -1,13 +1,14 @@
 import type {
-  GoalPolicy, HabitCheckin, HabitDefinition, HabitDirection, LocalDate, Measurement
+  GoalPolicy, HabitCheckin, HabitDefinition, LocalDate, ScheduleRule
 } from './types.ts';
 import { isDueOnDate, isHabitActiveOn, isLocalDate } from './scheduling.ts';
 import { validateCheckin, validateGoalPolicy, validateHabit } from './validation.ts';
 
-export type HabitSetup =
+export type HabitSetup = (
   | { title: string; direction: 'QUIT'; measurement: 'AVOIDANCE' }
   | { title: string; direction: 'BUILD'; measurement: 'BOOLEAN' }
-  | { title: string; direction: 'BUILD'; measurement: 'COUNT' | 'QUANTITY' | 'DURATION'; target: number; unit?: string };
+  | { title: string; direction: 'BUILD'; measurement: 'COUNT' | 'QUANTITY' | 'DURATION'; target: number; unit?: string }
+) & { schedule?: ScheduleRule };
 
 export type CheckinCommand =
   | { type: 'adjust'; delta: number }
@@ -19,7 +20,7 @@ function assertValid(result: ReturnType<typeof validateCheckin>): void {
   if (!result.ok) throw new RangeError(result.issues.join(' '));
 }
 
-/** M2 permits every measurement while keeping the only exposed schedule DAILY. */
+/** M3 exposes all supported schedules while preserving M2's default DAILY. */
 export function makeConfiguredDailyHabit(
   id: string, input: HabitSetup, date: LocalDate
 ): { habit: HabitDefinition; policy: GoalPolicy } {
@@ -33,7 +34,7 @@ export function makeConfiguredDailyHabit(
     ...(input.measurement === 'QUANTITY' || input.measurement === 'COUNT' || input.measurement === 'DURATION'
       ? { unit: input.measurement === 'DURATION' ? 'min' : input.measurement === 'COUNT' ? input.unit?.trim() || 'times' : input.unit?.trim() }
       : {}),
-    schedule: { type: 'DAILY' }
+    schedule: input.schedule ?? { type: 'DAILY' }
   };
   assertValid(validateHabit(habit));
   assertValid(validateGoalPolicy(policy, habit.direction));

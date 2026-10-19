@@ -1,24 +1,33 @@
 <script lang="ts">
-  import { Check, Minus, Plus, Pencil } from 'lucide-svelte';
+  import { Check, Minus, Plus, Pencil, Archive, Trash2 } from 'lucide-svelte';
   import { Button } from '#lib/components/ui/button/index.js';
   import type { PeriodHabit } from '../controller/habit-tracker.svelte.ts';
   import type { CheckinCommand } from '../core/progress.ts';
 
   let {
-    item, busy, readOnly = false, onCommand, onCorrect
+    item, busy, readOnly = false, confirming = false, onCommand, onCorrect,
+    onEdit, onArchive, onDelete, onConfirmDelete, onCancelDelete
   }: {
     item: PeriodHabit;
     busy: boolean;
     readOnly?: boolean;
+    confirming?: boolean;
+    onEdit?: () => void;
+    onArchive?: () => void;
+    onDelete?: () => void;
+    onConfirmDelete?: () => void;
+    onCancelDelete?: () => void;
     onCommand: (command: CheckinCommand) => void;
     onCorrect: () => void;
   } = $props();
 
   const measurement = $derived(item.policy.measurement);
   const current = $derived(item.checkin?.value ?? 0);
-  const done = $derived(item.outcome === 'MET');
+  const done = $derived(item.completed);
   const step = $derived(measurement === 'DURATION' ? 5 : measurement === 'QUANTITY' && item.policy.unit?.toLowerCase() === 'ml' ? 250 : 1);
-  const progressLabel = $derived(measurement === 'AVOIDANCE'
+  const progressLabel = $derived(item.weekly
+    ? item.weekly.completedDays + ' / ' + item.weekly.requiredDays + ' days this week'
+    : measurement === 'AVOIDANCE'
     ? item.checkin?.attestation === 'CLEAN' ? 'Clean day' : item.checkin?.attestation === 'LAPSE' ? 'Lapse recorded' : 'No attestation'
     : measurement === 'BOOLEAN' ? 'Daily check-off'
     : String(current) + ' / ' + String(item.policy.target) + ' ' + (item.policy.unit ?? ''));
@@ -28,13 +37,13 @@
   <div class="min-w-[110px] flex-1">
     <div class="truncate text-ui font-medium">{item.habit.title}</div>
     <p class="text-meta text-muted-foreground">{progressLabel}</p>
-    <p class={done ? 'text-meta text-primary' : 'text-meta text-muted-foreground'}>{item.outcome === 'MET' ? 'Completed' : item.outcome === 'PARTIAL' ? 'In progress' : item.outcome === 'MISSED' ? 'Missed' : item.outcome === 'SKIPPED' ? 'Skipped' : 'Pending'}</p>
+    <p class={done ? 'text-meta text-primary' : 'text-meta text-muted-foreground'}>{item.weekly ? item.weekly.outcome === 'MET' ? 'Weekly goal met' : item.weekly.outcome === 'MISSED' ? 'Weekly goal missed' : 'Weekly goal pending' : item.outcome === 'MET' ? 'Completed' : item.outcome === 'PARTIAL' ? 'In progress' : item.outcome === 'MISSED' ? 'Missed' : item.outcome === 'SKIPPED' ? 'Skipped' : 'Pending'}</p>
   </div>
   <div class="flex items-center gap-1">
     {#if measurement === 'BOOLEAN'}
       <Button size="sm" variant={done ? 'secondary' : 'outline'} class="rounded-full" disabled={busy || readOnly}
-        aria-pressed={done} onclick={() => onCommand(done ? { type: 'clear' } : { type: 'set', value: 1 })}>
-        {#if done}<Check class="mr-1 size-4"/>{/if}{done ? 'Done' : 'Complete'}
+        aria-pressed={item.outcome === 'MET'} onclick={() => onCommand(item.outcome === 'MET' ? { type: 'clear' } : { type: 'set', value: 1 })}>
+        {#if item.outcome === 'MET'}<Check class="mr-1 size-4"/>{/if}{item.outcome === 'MET' ? 'Done' : 'Complete'}
       </Button>
     {:else if measurement === 'AVOIDANCE'}
       <Button size="sm" variant={item.checkin?.attestation === 'CLEAN' ? 'secondary' : 'outline'} class="rounded-full"
@@ -58,5 +67,26 @@
       aria-label={'Correct ' + item.habit.title} disabled={busy || readOnly} onclick={onCorrect}>
       <Pencil class="size-4"/>
     </Button>
+    {#if onEdit}
+      <Button size="icon-sm" variant="ghost" class="rounded-lg" aria-label={'Edit ' + item.habit.title}
+        disabled={busy} onclick={onEdit}><Pencil class="size-4"/></Button>
+    {/if}
+    {#if onArchive}
+      <Button size="icon-sm" variant="ghost" class="rounded-lg" aria-label={'Archive ' + item.habit.title}
+        disabled={busy} onclick={onArchive}><Archive class="size-4"/></Button>
+    {/if}
+    {#if onDelete}
+      <Button size="icon-sm" variant="ghost" class="rounded-lg text-destructive" aria-label={'Delete ' + item.habit.title}
+        disabled={busy} onclick={onDelete}><Trash2 class="size-4"/></Button>
+    {/if}
   </div>
+  {#if confirming}
+    <div class="basis-full rounded-lg border border-destructive/20 bg-muted/50 p-3">
+      <p class="text-ui">Delete <strong>{item.habit.title}</strong> and all records permanently?</p>
+      <div class="mt-3 flex justify-end gap-2">
+        <Button size="sm" variant="outline" class="rounded-full" disabled={busy} onclick={onCancelDelete}>Cancel</Button>
+        <Button size="sm" variant="destructive" class="rounded-full" disabled={busy} onclick={onConfirmDelete}>Delete permanently</Button>
+      </div>
+    </div>
+  {/if}
 </div>

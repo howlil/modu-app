@@ -1,23 +1,24 @@
 import { onMount } from 'svelte';
 import type {
-  DailyOutcome, HabitCheckin, HabitDefinition, GoalPolicy, LocalDate
+  DailyOutcome, HabitCheckin, HabitDefinition, GoalPolicy, LocalDate, WeeklyOutcome
 } from '../core/types.ts';
 import type { HabitSetup, CheckinCommand } from '../core/progress.ts';
-import { evaluateDailyOutcome } from '../core/evaluation.ts';
-import { isHabitActiveOn, isLocalDate, resolveEffectivePolicy } from '../core/scheduling.ts';
+import { evaluateDailyOutcome, evaluateWeeklyQuotaByRevisions } from '../core/evaluation.ts';
+import { addCalendarDays, isHabitActiveOn, isLocalDate, resolveEffectivePolicy } from '../core/scheduling.ts';
 import {
-  changeHabitTitle, createConfiguredHabit, deleteHabit, loadHabitSnapshot,
+  createConfiguredHabit, deleteHabit, loadHabitSnapshot, updateHabitConfiguration,
   mutateHabitCheckin, setHabitArchived, subscribeHabitChanges
 } from '../adapters/persistence.ts';
 import { browserLocalDate } from '../adapters/browser-date.ts';
 
-type HabitEditorState = { mode: 'create' | 'edit'; id?: string; title: string };
+type HabitEditorState = { mode: 'create' | 'edit'; id?: string; title: string; policy?: GoalPolicy; direction?: HabitDefinition['direction'] };
 export type PeriodHabit = {
   habit: HabitDefinition;
   policy: GoalPolicy;
   checkin?: HabitCheckin;
   outcome: DailyOutcome;
   completed: boolean;
+  weekly?: { outcome: WeeklyOutcome; completedDays: number; requiredDays: number };
 };
 export type CommitRefreshResult = 'refreshed' | 'committed-refresh-failed';
 
@@ -67,7 +68,13 @@ export function createHabitTrackerController() {
         const policy = resolveEffectivePolicy(h.id, date, policies);
         const checkin = checkins.find(c => c.habitId === h.id && c.localDate === date);
         const outcome = evaluateDailyOutcome(h, policy, checkin, date, today);
-        return { habit: h, policy, checkin, outcome, completed: outcome === 'MET' };
+        const weekly = policy.schedule.type === 'WEEKLY_QUOTA'
+          ? evaluateWeeklyQuotaByRevisions(h, policy, policies, checkins, date, today)
+          : undefined;
+        return {
+          habit: h, policy, checkin, outcome, weekly,
+          completed: weekly ? weekly.outcome === 'MET' : outcome === 'MET'
+        };
       })
       .filter(item => item.outcome !== 'NOT_SCHEDULED');
   }
@@ -153,16 +160,21 @@ export function createHabitTrackerController() {
     if (!habit || busy) return;
     error = '';
     confirmDeleteId = null;
-    editor = { mode: 'edit', id, title: habit.title };
+    editor = { mode: 'edit', id, title: habit.title, direction: habit.direction,
+      policy: resolveEffectivePolicy(id, today, policies) };
   }
   function closeEditor(): void { if (!busy) editor = null; }
 
-  async function submitEditor(input: HabitSetup): Promise<void> {
+  async function submitEditor(input: HabitSetup & { effectiveFromDate?: LocalDate }): Promise<void> {
     const current = editor;
     if (!current || !today) return;
     const success = current.mode === 'create'
       ? await perform(() => createConfiguredHabit(input, today), 'Habit created.')
-      : await perform(() => changeHabitTitle(current.id!, input.title), 'Habit updated.');
+      : await perform(() => updateHabitConfiguration(current.id!, input.title, {
+          target: input.measurement === 'AVOIDANCE' || input.measurement === 'BOOLEAN' ? 1 : input.target,
+          schedule: input.schedule ?? { type: 'DAILY' },
+          effectiveFromDate: input.effectiveFromDate ?? addCalendarDays(today, 1)
+        }, today), 'Habit updated. New policy begins on its effective date.');
     if (success) editor = null;
   }
   function openCorrection(id: string, date: LocalDate): void {

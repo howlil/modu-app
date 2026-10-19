@@ -2,7 +2,7 @@ import type {
   DailyOutcome, GoalPolicy, HabitCheckin, HabitDefinition, LocalDate, WeeklyOutcome
 } from './types.ts';
 import {
-  addCalendarDays, calendarDayOrdinal, isDueOnDate, isHabitActiveOn, mondayOf
+  addCalendarDays, calendarDayOrdinal, isDueOnDate, isHabitActiveOn, mondayOf, resolveEffectivePolicy
 } from './scheduling.ts';
 
 export function isGoalMet(policy: GoalPolicy, checkin?: HabitCheckin): boolean {
@@ -95,4 +95,43 @@ export function calculateCompletionRate(
   const met = outcomes.filter(o => o === 'MET').length;
   const eligible = outcomes.filter(o => o === 'MET' || o === 'MISSED').length;
   return { met, eligible, rate: eligible === 0 ? null : met / eligible };
+}
+
+
+/**
+ * Evaluate a weekly quota using the policy effective on EACH recorded date.
+ * A fixed-weekday/daily record from before a quota revision does not count.
+ * A revised quota threshold applies to the week being displayed; earlier
+ * quota dates retain their own measurement/threshold when assessed.
+ */
+export function evaluateWeeklyQuotaByRevisions(
+  habit: HabitDefinition,
+  currentPolicy: GoalPolicy,
+  revisions: readonly GoalPolicy[],
+  checkins: readonly HabitCheckin[],
+  dateInWeek: LocalDate,
+  nowDate: LocalDate
+): { outcome: WeeklyOutcome; completedDays: number; requiredDays: number } {
+  if (currentPolicy.schedule.type !== 'WEEKLY_QUOTA') {
+    throw new RangeError('Expected WEEKLY_QUOTA policy.');
+  }
+  calendarDayOrdinal(nowDate);
+  const monday = mondayOf(dateInWeek);
+  const sunday = addCalendarDays(monday, 6);
+  const seen = new Set<LocalDate>();
+  for (const checkin of checkins) {
+    if (checkin.habitId !== habit.id || checkin.localDate < monday ||
+      checkin.localDate > sunday || checkin.localDate > nowDate ||
+      !isHabitActiveOn(habit, checkin.localDate)) continue;
+    const effective = resolveEffectivePolicy(habit.id, checkin.localDate, revisions);
+    if (effective.schedule.type === 'WEEKLY_QUOTA' && isGoalMet(effective, checkin)) {
+      seen.add(checkin.localDate);
+    }
+  }
+  const completedDays = seen.size;
+  const requiredDays = currentPolicy.schedule.daysPerWeek;
+  return {
+    completedDays, requiredDays,
+    outcome: completedDays >= requiredDays ? 'MET' : sunday < nowDate ? 'MISSED' : 'PENDING'
+  };
 }

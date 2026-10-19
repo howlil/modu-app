@@ -6,6 +6,7 @@ import {
 import { validateCheckin, validateGoalPolicy, validateHabit } from '../core/validation.ts';
 import { browserLocalDate } from './browser-date.ts';
 import { applyCheckinCommand, makeConfiguredDailyHabit, type CheckinCommand, type HabitSetup } from '../core/progress.ts';
+import { createPolicyRevision, type PolicyRevisionInput } from '../core/policy.ts';
 
 const DATABASE = 'modu-habit-tracker';
 const VERSION = 1;
@@ -198,6 +199,44 @@ export async function changeHabitTitle(id: string, title: string): Promise<void>
         if (!request.result) { fail(new HabitStorageError('Habit not found.')); return; }
         try { store.put(renameHabit(request.result as HabitDefinition, title)); }
         catch (error) { fail(error as Error); }
+      };
+    }
+  ));
+  broadcastChange();
+}
+
+/**
+ * Rename and append one immutable future policy revision atomically.
+ * Read the authoritative habit/policies inside this same readwrite transaction.
+ */
+export async function updateHabitConfiguration(
+  id: string,
+  title: string,
+  policyInput: PolicyRevisionInput,
+  today: LocalDate
+): Promise<void> {
+  if (!isLocalDate(today) || today !== browserLocalDate()) {
+    throw new RangeError('The local date changed. Reopen the editor before saving.');
+  }
+  await withDatabase(db => transaction<void>(
+    db, ['habits', 'policies'], 'readwrite', (tx, _set, fail) => {
+      const habitStore = tx.objectStore('habits');
+      const policyStore = tx.objectStore('policies');
+      const getHabit = habitStore.get(id);
+      getHabit.onsuccess = () => {
+        if (!getHabit.result) { fail(new HabitStorageError('Habit not found.')); return; }
+        const getPolicies = policyStore.index('habitId').getAll(id);
+        getPolicies.onsuccess = () => {
+          try {
+            const habit = getHabit.result as HabitDefinition;
+            const renamed = renameHabit(habit, title);
+            const revision = createPolicyRevision(
+              habit, getPolicies.result as GoalPolicy[], policyInput, today, crypto.randomUUID()
+            );
+            if (renamed.title !== habit.title) habitStore.put(renamed);
+            if (revision) policyStore.add(revision);
+          } catch (error) { fail(error as Error); }
+        };
       };
     }
   ));

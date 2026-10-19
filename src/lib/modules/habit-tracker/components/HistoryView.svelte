@@ -24,7 +24,7 @@
   <section class="mt-5 rounded-[20px] border border-border bg-card p-5">
     <p class="text-meta text-muted-foreground">Recorded goals completed</p>
     <p class="mt-2 text-title-lg font-medium tabular-nums">{completed} / {records.length}</p>
-    <p class="mt-1 text-meta text-muted-foreground">Past dates without an entry remain missed, not automatically completed.</p>
+    <p class="mt-1 text-meta text-muted-foreground">Daily obligations without a record may be missed. Flexible weekly quotas are evaluated across distinct dates in each week.</p>
   </section>
   <section class="mt-5 rounded-[20px] border border-border bg-card px-4">
     {#if records.length}
