@@ -3,6 +3,7 @@
   import HabitEditor from './components/HabitEditor.svelte';
   import CheckinEditor from './components/CheckinEditor.svelte';
   import HistoryView from './components/HistoryView.svelte';
+  import InsightsView from './components/InsightsView.svelte';
   import TodayView from './components/TodayView.svelte';
   import { createHabitTrackerController } from './controller/habit-tracker.svelte.ts';
 
@@ -19,6 +20,9 @@
       <button type="button" aria-current={controller.view === 'history' ? 'page' : undefined}
         class={controller.view === 'history' ? 'h-7 flex-1 rounded-full bg-background px-3 text-meta font-medium' : 'h-7 flex-1 rounded-full px-3 text-meta text-muted-foreground'}
         onclick={() => controller.selectView('history')}>History</button>
+      <button type="button" aria-current={controller.view === 'insights' ? 'page' : undefined}
+        class={controller.view === 'insights' ? 'h-7 flex-1 rounded-full bg-background px-3 text-meta font-medium' : 'h-7 flex-1 rounded-full px-3 text-meta text-muted-foreground'}
+        onclick={() => controller.selectView('insights')}>Insights</button>
     </nav>
     {#if controller.error}
       <div role="alert" class="mb-4 rounded-lg border border-destructive/30 bg-card p-4 text-ui text-destructive">
@@ -38,6 +42,8 @@
       </section>
     {:else if controller.view === 'history'}
       <HistoryView {controller}/>
+    {:else if controller.view === 'insights'}
+      <InsightsView {controller}/>
     {:else}
       <TodayView {controller}/>
     {/if}

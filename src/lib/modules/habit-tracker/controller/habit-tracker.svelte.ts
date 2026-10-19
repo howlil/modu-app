@@ -10,6 +10,7 @@ import {
   mutateHabitCheckin, setHabitArchived, subscribeHabitChanges
 } from '../adapters/persistence.ts';
 import { browserLocalDate } from '../adapters/browser-date.ts';
+import { createInsightSnapshot, summarizeCalendarDay } from '../core/insights.ts';
 
 type HabitEditorState = { mode: 'create' | 'edit'; id?: string; title: string; policy?: GoalPolicy; direction?: HabitDefinition['direction'] };
 export type PeriodHabit = {
@@ -37,7 +38,8 @@ export async function commitThenRefresh(
 export function createHabitTrackerController() {
   let today = $state<LocalDate>('');
   let selectedDate = $state<LocalDate>('');
-  let view = $state<'today' | 'history'>('today');
+  let view = $state<'today' | 'history' | 'insights'>('today');
+  let insightHabitId = $state('');
   let habits = $state<HabitDefinition[]>([]);
   let policies = $state<GoalPolicy[]>([]);
   let checkins = $state<HabitCheckin[]>([]);
@@ -83,6 +85,17 @@ export function createHabitTrackerController() {
   const historyHabits = $derived.by(() => project(selectedDate, false));
   const archivedHabits = $derived(habits.filter(h => h.status === 'ARCHIVED'));
   const completedCount = $derived(todayHabits.filter(item => item.completed).length);
+  const insights = $derived.by(() => today && storageReady
+    ? createInsightSnapshot(habits, policies, checkins, today, insightHabitId || undefined)
+    : null);
+  const insightHabits = $derived([...habits].sort((a, b) => a.title.localeCompare(b.title)));
+
+  function calendarDay(date: LocalDate, habitId?: string) {
+    return summarizeCalendarDay(habits, policies, checkins, date, today, habitId);
+  }
+  function selectInsightHabit(id: string): void {
+    insightHabitId = id;
+  }
 
   async function reload(showLoading = false): Promise<boolean> {
     const version = ++readVersion;
@@ -135,11 +148,19 @@ export function createHabitTrackerController() {
     }
   }
 
-  function selectView(next: 'today' | 'history'): void {
+  function selectView(next: 'today' | 'history' | 'insights'): void {
     view = next;
     editor = null;
     correction = null;
     if (next === 'history' && !selectedDate && today) selectedDate = today;
+  }
+  function openHistoryAt(date: LocalDate): void {
+    selectHistoryDate(date);
+    if (selectedDate === date) {
+      view = 'history';
+      correction = null;
+      editor = null;
+    }
   }
   function selectHistoryDate(date: LocalDate): void {
     if (!isLocalDate(date) || !today || date > today) {
@@ -243,6 +264,9 @@ export function createHabitTrackerController() {
 
   return {
     get today() { return today; },
+    get insights() { return insights; },
+    get insightHabits() { return insightHabits; },
+    get insightHabitId() { return insightHabitId; },
     get selectedDate() { return selectedDate; },
     get view() { return view; },
     get todayHabits() { return todayHabits; },
@@ -262,7 +286,8 @@ export function createHabitTrackerController() {
     },
     get confirmDeleteId() { return confirmDeleteId; },
     openCreate, openEdit, closeEditor, submitEditor, setCompleted, setArchived, confirmDelete,
-    selectView, selectHistoryDate, recordProgress, openCorrection, closeCorrection, submitCorrection,
+    selectView, selectHistoryDate, openHistoryAt, calendarDay, selectInsightHabit,
+    recordProgress, openCorrection, closeCorrection, submitCorrection,
     requestDelete(id: string) { if (!busy) { confirmDeleteId = id; editor = null; correction = null; } },
     cancelDelete() { confirmDeleteId = null; },
     retry() { void reload(true); }

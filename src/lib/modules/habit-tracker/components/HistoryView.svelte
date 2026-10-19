@@ -1,5 +1,6 @@
 <script lang="ts">
   import ProgressRow from './ProgressRow.svelte';
+  import CalendarMonth from './CalendarMonth.svelte';
   import { isHabitActiveOn } from '../core/scheduling.ts';
   import type { HabitTrackerController } from '../controller/habit-tracker.svelte.ts';
 
@@ -20,6 +21,11 @@
         onchange={(event) => controller.selectHistoryDate(event.currentTarget.value)}
         class="h-10 rounded-lg border border-input bg-card px-3 text-ui"/>
     </div>
+  </div>
+  <div class="mt-5">
+    <CalendarMonth selectedDate={controller.selectedDate} today={controller.today}
+      getDay={(date) => controller.calendarDay(date)}
+      onSelect={controller.selectHistoryDate}/>
   </div>
   <section class="mt-5 rounded-[20px] border border-border bg-card p-5">
     <p class="text-meta text-muted-foreground">Recorded goals completed</p>
