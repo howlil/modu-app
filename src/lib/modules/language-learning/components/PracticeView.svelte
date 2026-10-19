@@ -47,7 +47,16 @@
             <button class="rounded-full bg-primary px-5 py-3 text-ui font-medium text-primary-foreground" disabled={controller.pending || controller.canRetry} onclick={controller.reveal}>Reveal answer</button>
           </div>
         {:else}
-          <p class="mt-6 rounded-lg bg-secondary p-4 text-center text-body text-secondary-foreground">{item.answer}</p>
+          <div class="mt-6 grid gap-3 sm:grid-cols-2">
+            <div class="min-w-0 rounded-xl border border-border p-4">
+              <p class="mb-2 text-meta text-muted-foreground">Your response</p>
+              <p class="whitespace-pre-wrap break-words text-ui">{controller.answerDraft || 'No written response'}</p>
+            </div>
+            <div class="min-w-0 rounded-xl bg-secondary p-4">
+              <p class="mb-2 text-meta text-muted-foreground">Reference answer</p>
+              <p class="whitespace-pre-wrap break-words text-ui text-secondary-foreground">{item.answer}</p>
+            </div>
+          </div>
           {#if controller.answerCheck}
             <p role="status" class="mt-3 text-ui text-muted-foreground">{controller.answerCheck.feedback}</p>
           {/if}
