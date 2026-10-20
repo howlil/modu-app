@@ -31,13 +31,16 @@ describe('M5 — authored content and vocabulary rules',()=>{
     expect(renamed.island.revision).toBe(2);
     expect(renamed.island.sentences.map(s=>s.revision)).toEqual([1,1]);
     const rewritten=reviseIsland(renamed,profile,{
-      ...draft,sentences:[
+      ...draft,confirmRetainedVocabulary:true,sentences:[
         {...draft.sentences[0],answer:'A cup of coffee'},
         draft.sentences[1]
       ]
     });
     expect(rewritten.island.sentences.map(s=>s.revision)).toEqual([2,1]);
     expect(rewritten.vocabulary[0].sentenceRevision).toBe(2);
+    expect(()=>reviseIsland(renamed,profile,{...draft,sentences:[
+      {...draft.sentences[0],answer:'Different'},draft.sentences[1]
+    ]})).toThrow(/Review and confirm vocabulary/);
   });
   it('retains archived content while preserving its historical revisions',()=>{
     const original=reviseIsland(null,profile,draft);
