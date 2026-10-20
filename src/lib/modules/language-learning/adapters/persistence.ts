@@ -18,6 +18,10 @@ import {
 } from '../core/content.ts';
 import { STARTER_ISLAND } from './starter-content.ts';
 import {projectLearningProgress,type LearningProgress} from '../core/progress.ts';
+import {
+  OUTBOX_STORE, SYNC_META_STORE, ensureOutboxStores, queueLocalMutation,
+  resetCaptureAfterRestore, readOutbox, acknowledgeOutbox
+} from '#lib/platform/data/outbox.ts';
 
 /** Browser-local, single-learner storage. All authoritative writes use one IDB transaction. */
 export class LearningPersistenceError extends Error {
@@ -29,7 +33,7 @@ export class LearningPersistenceError extends Error {
   }
 }
 const DB_NAME = 'modu-language-learning';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 const SESSIONS = 'sessions';
 const ATTEMPTS = 'attempts';
 const META = 'meta';
@@ -125,6 +129,7 @@ function openDatabase(): Promise<IDBDatabase> {
         const catalog=db.createObjectStore(CATALOGS,{keyPath:'key'});
         catalog.createIndex('profileId','profileId',{unique:false});
       }
+      ensureOutboxStores(db);
     };
     request.onblocked = () => {
       cancelled = true;
@@ -399,6 +404,16 @@ async function ensureCatalogInitialized():Promise<void> {
 
 /** No server endpoint. This browser origin owns the canonical practice history. */
 export const learningPersistence = {
+  async readPendingSyncOperations(limit = 100) {
+    const db = await openDatabase();
+    try { return await readOutbox(db, 'language-learning', limit); }
+    finally { db.close(); }
+  },
+  async acknowledgeSyncOperations(operationIds: readonly string[]) {
+    const db = await openDatabase();
+    try { await acknowledgeOutbox(db, operationIds); }
+    finally { db.close(); }
+  },
   validateBackup(text: string) {
     const result = asBackup(text);
     return { records: result.records.length + result.reviews.length + result.profiles.length + result.catalogs.length };
@@ -418,13 +433,14 @@ export const learningPersistence = {
     try{checked=decodeLearningProfile(profile);}
     catch(cause){throw translateError(cause);}
     await ensureCatalogInitialized();
-    return transaction<LearningProfile>([PROFILES],'readwrite',(tx,complete,fail)=>{
+    return transaction<LearningProfile>([PROFILES,OUTBOX_STORE,SYNC_META_STORE],'readwrite',(tx,complete,fail)=>{
       const store=tx.objectStore(PROFILES);
       const req=store.get(checked.id);
       req.onsuccess=()=>{
         try{
           if(req.result!==undefined)throw new LearningPersistenceError('conflict','Language profile already exists.');
           store.add(checked);
+          queueLocalMutation(tx, 'language-learning', checked.id, 'upsert', { profile: checked });
           complete(checked);
         }catch(cause){fail(cause);}
       };
@@ -454,7 +470,7 @@ export const learningPersistence = {
     if(expectedRevision!==null && (!Number.isSafeInteger(expectedRevision)||expectedRevision<1))
       throw new LearningPersistenceError('invalid','Expected Island revision is invalid.');
     await ensureCatalogInitialized();
-    return transaction<ContentIsland>([PROFILES,CATALOGS],'readwrite',(tx,complete,fail)=>{
+    return transaction<ContentIsland>([PROFILES,CATALOGS,OUTBOX_STORE,SYNC_META_STORE],'readwrite',(tx,complete,fail)=>{
       const profiles=tx.objectStore(PROFILES);
       const catalogs=tx.objectStore(CATALOGS);
       const profileReq=profiles.get(profileId);
@@ -480,6 +496,7 @@ export const learningPersistence = {
                   catalog.push(updated);
                   catalogKeys(profile,catalog.filter(x=>!x.archived).map(x=>x.island));
                   catalogs.put({key,profileId:profile.id,content:updated} satisfies CatalogRow);
+                  queueLocalMutation(tx, 'language-learning', key, 'upsert', { content: updated }, expectedRevision === null ? null : String(expectedRevision));
                   complete(updated);
                 }catch(cause){fail(cause);}
               };
@@ -491,7 +508,7 @@ export const learningPersistence = {
   },
   async setArchived(profileId:string,islandId:string,expectedRevision:number,archived:boolean):Promise<ContentIsland> {
     await ensureCatalogInitialized();
-    return transaction<ContentIsland>([CATALOGS],'readwrite',(tx,complete,fail)=>{
+    return transaction<ContentIsland>([CATALOGS,OUTBOX_STORE,SYNC_META_STORE],'readwrite',(tx,complete,fail)=>{
       const store=tx.objectStore(CATALOGS);
       const key=catalogKey(profileId,islandId);
       const req=store.get(key);
@@ -510,7 +527,10 @@ export const learningPersistence = {
               current.push(next);
               catalogKeys({id:profileId,targetLanguage:next.island.targetLanguage},
                 current.filter(x=>!x.archived).map(x=>x.island));
-              if(next!==existing)store.put({key,profileId,content:next} satisfies CatalogRow);
+              if(next!==existing) {
+                store.put({key,profileId,content:next} satisfies CatalogRow);
+                queueLocalMutation(tx, 'language-learning', key, 'upsert', { content: next }, String(expectedRevision));
+              }
               complete(next);
             }catch(cause){fail(cause);}
           };
@@ -532,7 +552,7 @@ export const learningPersistence = {
       throw new LearningPersistenceError('invalid','Unsupported catalog document.');
     // Drafts are validated against the authoritative profile inside the transaction.
     await ensureCatalogInitialized();
-    return transaction<number>([PROFILES,CATALOGS],'readwrite',(tx,complete,fail)=>{
+    return transaction<number>([PROFILES,CATALOGS,OUTBOX_STORE,SYNC_META_STORE],'readwrite',(tx,complete,fail)=>{
       const req=tx.objectStore(PROFILES).get(profileId);
       req.onsuccess=()=>{
         try{
@@ -572,6 +592,7 @@ export const learningPersistence = {
                   if(check.result!==undefined)
                     throw new LearningPersistenceError('conflict','Imported Island already exists; nothing was imported.');
                   store.add({key,profileId,content:entry} satisfies CatalogRow);
+                  queueLocalMutation(tx, 'language-learning', key, 'upsert', { content: entry });
                   next();
                 }catch(cause){fail(cause);}
               };
@@ -661,7 +682,7 @@ export const learningPersistence = {
   async execute(command: PracticeCommand, expectedRevision: number | null,
     expectedEpoch?: string | null, expectedCatalogRevision?:number): Promise<BrowserPractice> {
     await ensureMemoryInitialized();
-    return transaction<BrowserPractice>([SESSIONS, ATTEMPTS, META, REVIEWS, CATALOGS], 'readwrite', (tx, complete, fail) => {
+    return transaction<BrowserPractice>([SESSIONS, ATTEMPTS, META, REVIEWS, CATALOGS, OUTBOX_STORE, SYNC_META_STORE], 'readwrite', (tx, complete, fail) => {
       const sessions = tx.objectStore(SESSIONS);
       const attempts = tx.objectStore(ATTEMPTS);
       const meta = tx.objectStore(META);
@@ -703,6 +724,9 @@ export const learningPersistence = {
                   sessions.put(row);
                   if (attempt) attempts.add(attempt);
                   if (memory) tx.objectStore(REVIEWS).put(memory);
+                  queueLocalMutation(tx, 'language-learning', next.session.id, 'command', {
+                    command, attempt, session: next.session
+                  }, expectedRevision === null ? null : String(expectedRevision));
                   if (epoch === null) meta.put({key: 'epoch', value: effectiveEpoch});
                   meta.put({key: 'latest', sessionId: next.session.id});
                   complete({...next, storageEpoch: effectiveEpoch});
@@ -823,7 +847,7 @@ export const learningPersistence = {
   async importBackup(text: string): Promise<void> {
     // Validate the entire source before opening the destructive transaction.
     const {records, attempts, reviews, latestSessionId,profiles,catalogs} = asBackup(text);
-    await transaction<void>([SESSIONS, ATTEMPTS, META, REVIEWS, PROFILES, CATALOGS], 'readwrite', (tx, complete) => {
+    await transaction<void>([SESSIONS, ATTEMPTS, META, REVIEWS, PROFILES, CATALOGS, OUTBOX_STORE, SYNC_META_STORE], 'readwrite', (tx, complete) => {
       const sessions = tx.objectStore(SESSIONS);
       const journal = tx.objectStore(ATTEMPTS);
       const meta = tx.objectStore(META);
@@ -851,6 +875,7 @@ export const learningPersistence = {
       meta.put({key:'memoryBootstrapV1', done:true});
       if (latestSessionId !== null) meta.put({key: 'latest', sessionId: latestSessionId});
       meta.put({key: 'epoch', value: crypto.randomUUID()});
+      resetCaptureAfterRestore(tx);
       complete(undefined);
     });
   },
