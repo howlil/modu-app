@@ -1,4 +1,8 @@
 import type { GoalPolicy, HabitCheckin, HabitDefinition, LocalDate } from '../core/types.ts';
+import {
+  OUTBOX_STORE, SYNC_META_STORE, ensureOutboxStores, queueLocalMutation,
+  resetCaptureAfterRestore, readOutbox, acknowledgeOutbox
+} from '#lib/platform/data/outbox.ts';
 import { isLocalDate, resolveEffectivePolicy } from '../core/scheduling.ts';
 import {
   archiveHabit, booleanCheckin, makeDailyBooleanHabit, renameHabit, restoreHabit
@@ -9,10 +13,10 @@ import { applyCheckinCommand, makeConfiguredDailyHabit, type CheckinCommand, typ
 import { createPolicyRevision, type PolicyRevisionInput } from '../core/policy.ts';
 
 const DATABASE = 'modu-habit-tracker';
-const VERSION = 2;
+const VERSION = 3;
 const CHANGE = 'modu:habit-changed';
 const CHANNEL = 'modu-habit-tracker-changes';
-type StoreName = 'habits' | 'policies' | 'checkins' | 'preferences';
+type StoreName = 'habits' | 'policies' | 'checkins' | 'preferences' | typeof OUTBOX_STORE | typeof SYNC_META_STORE;
 
 export interface HabitSnapshot {
   habits: HabitDefinition[];
@@ -49,6 +53,7 @@ function openDatabase(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains('preferences')) {
         db.createObjectStore('preferences', { keyPath: 'id' });
       }
+      ensureOutboxStores(db);
     };
     request.onsuccess = () => {
       // An upgrade can eventually proceed after onblocked already rejected.
@@ -233,9 +238,10 @@ export async function createConfiguredHabit(input: HabitSetup, date: LocalDate):
   const id = crypto.randomUUID();
   const { habit, policy } = makeConfiguredDailyHabit(id, input, date);
   await withDatabase(db => transaction<void>(
-    db, ['habits', 'policies'], 'readwrite', tx => {
+    db, ['habits', 'policies', OUTBOX_STORE, SYNC_META_STORE], 'readwrite', tx => {
       tx.objectStore('habits').add(habit);
       tx.objectStore('policies').add(policy);
+      queueLocalMutation(tx, 'habit-tracker', id, 'upsert', { habit, policy });
     }
   ));
   broadcastChange();
@@ -243,12 +249,16 @@ export async function createConfiguredHabit(input: HabitSetup, date: LocalDate):
 
 export async function changeHabitTitle(id: string, title: string): Promise<void> {
   await withDatabase(db => transaction<void>(
-    db, ['habits'], 'readwrite', (tx, _set, fail) => {
+    db, ['habits', OUTBOX_STORE, SYNC_META_STORE], 'readwrite', (tx, _set, fail) => {
       const store = tx.objectStore('habits');
       const request = store.get(id);
       request.onsuccess = () => {
         if (!request.result) { fail(new HabitStorageError('Habit not found.')); return; }
-        try { store.put(renameHabit(request.result as HabitDefinition, title)); }
+        try {
+          const updated = renameHabit(request.result as HabitDefinition, title);
+          store.put(updated);
+          queueLocalMutation(tx, 'habit-tracker', id, 'upsert', { habit: updated });
+        }
         catch (error) { fail(error as Error); }
       };
     }
@@ -271,7 +281,7 @@ export async function updateHabitConfiguration(
     throw new RangeError('The local date changed. Reopen the editor before saving.');
   }
   await withDatabase(db => transaction<void>(
-    db, ['habits', 'policies'], 'readwrite', (tx, _set, fail) => {
+    db, ['habits', 'policies', OUTBOX_STORE, SYNC_META_STORE], 'readwrite', (tx, _set, fail) => {
       const habitStore = tx.objectStore('habits');
       const policyStore = tx.objectStore('policies');
       const getHabit = habitStore.get(id);
@@ -287,6 +297,9 @@ export async function updateHabitConfiguration(
             ) : null;
             if (renamed.title !== habit.title) habitStore.put(renamed);
             if (revision) policyStore.add(revision);
+            if (renamed.title !== habit.title || revision) {
+              queueLocalMutation(tx, 'habit-tracker', id, 'upsert', { habit: renamed, policy: revision });
+            }
           } catch (error) { fail(error as Error); }
         };
       };
@@ -300,14 +313,16 @@ export async function setHabitArchived(id: string, archive: boolean, date: Local
     throw new RangeError('The tracking date has changed. Refresh before changing archive status.');
   }
   await withDatabase(db => transaction<void>(
-    db, ['habits'], 'readwrite', (tx, _set, fail) => {
+    db, ['habits', OUTBOX_STORE, SYNC_META_STORE], 'readwrite', (tx, _set, fail) => {
       const store = tx.objectStore('habits');
       const request = store.get(id);
       request.onsuccess = () => {
         if (!request.result) { fail(new HabitStorageError('Habit not found.')); return; }
         try {
           const previous = request.result as HabitDefinition;
-          store.put(archive ? archiveHabit(previous, date) : restoreHabit(previous, date));
+          const updated = archive ? archiveHabit(previous, date) : restoreHabit(previous, date);
+          store.put(updated);
+          queueLocalMutation(tx, 'habit-tracker', id, 'upsert', { habit: updated });
         } catch (error) { fail(error as Error); }
       };
     }
@@ -317,8 +332,9 @@ export async function setHabitArchived(id: string, archive: boolean, date: Local
 
 export async function deleteHabit(id: string): Promise<void> {
   await withDatabase(db => transaction<void>(
-    db, ['habits', 'policies', 'checkins'], 'readwrite', tx => {
+    db, ['habits', 'policies', 'checkins', OUTBOX_STORE, SYNC_META_STORE], 'readwrite', tx => {
       tx.objectStore('habits').delete(id);
+      queueLocalMutation(tx, 'habit-tracker', id, 'delete', { id });
       for (const name of ['policies', 'checkins'] as const) {
         const store = tx.objectStore(name);
         const request = store.index('habitId').openKeyCursor(IDBKeyRange.only(id));
@@ -346,7 +362,7 @@ export async function mutateHabitCheckin(
     throw new RangeError('Cannot record progress for a future or invalid date.');
   }
   await withDatabase(db => transaction<void>(
-    db, ['habits', 'policies', 'checkins'], 'readwrite', (tx, _set, fail) => {
+    db, ['habits', 'policies', 'checkins', OUTBOX_STORE, SYNC_META_STORE], 'readwrite', (tx, _set, fail) => {
       const habitRequest = tx.objectStore('habits').get(id);
       habitRequest.onsuccess = () => {
         const habit = habitRequest.result as HabitDefinition | undefined;
@@ -365,8 +381,12 @@ export async function mutateHabitCheckin(
                 const current = currentRequest.result as HabitCheckin | undefined;
                 if (current) enforceValid(validateCheckin(current, policy));
                 const next = applyCheckinCommand(habit, policy, current, date, command);
-                if (next) store.put({ ...next, recordedAt: new Date().toISOString(), id: id + ':' + date });
+                const persisted = next ? { ...next, recordedAt: new Date().toISOString(), id: id + ':' + date } : null;
+                if (persisted) store.put(persisted);
                 else store.delete(id + ':' + date);
+                queueLocalMutation(tx, 'habit-tracker', id + ':' + date, 'command', {
+                  command, before: current ?? null, after: persisted, habitId: id, localDate: date
+                });
               } catch (error) { fail(error as Error); }
             };
           } catch (error) { fail(error as Error); }
@@ -390,7 +410,7 @@ export async function replaceHabitSnapshotForRestore(input: HabitSnapshot): Prom
     throw new HabitStorageError('Backup is missing the tracking timezone.');
   }
   await withDatabase(db => transaction<void>(
-    db, ['habits', 'policies', 'checkins', 'preferences'], 'readwrite',
+    db, ['habits', 'policies', 'checkins', 'preferences', OUTBOX_STORE, SYNC_META_STORE], 'readwrite',
     (tx, set) => {
       const habits = tx.objectStore('habits');
       const policies = tx.objectStore('policies');
@@ -404,8 +424,17 @@ export async function replaceHabitSnapshotForRestore(input: HabitSnapshot): Prom
       for (const policy of snapshot.policies) policies.add(policy);
       for (const checkin of snapshot.checkins) checkins.add(checkin);
       prefs.put({ id: 'tracking', trackingTimezone: snapshot.trackingTimezone });
+      resetCaptureAfterRestore(tx);
       set(undefined);
     }
   ));
   broadcastChange();
+}
+
+/** Public feature-owned transport boundary. No other module opens this database. */
+export function readHabitPendingSyncOperations(limit = 100) {
+  return withDatabase(db => readOutbox(db, 'habit-tracker', limit));
+}
+export function acknowledgeHabitSyncOperations(operationIds: readonly string[]) {
+  return withDatabase(db => acknowledgeOutbox(db, operationIds));
 }
