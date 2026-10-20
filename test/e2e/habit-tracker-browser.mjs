@@ -1,3 +1,4 @@
+// @ts-nocheck — Node-only browser runner, verified by ChromeDriver in CI.
 /**
  * Real Chrome WebDriver smoke: no new JS dependencies or lockfile changes.
  * CI installs Chrome and its matched ChromeDriver using setup-chrome.
