@@ -2,6 +2,7 @@ import type {
   GlobalBackupV1, ModuleDataId, RestorableDataPort, RestorePreview
 } from "./contracts.ts";
 import { createGlobalBackup } from "./backup.ts";
+import { requireNoOtherModuTabs } from "./peer-tabs.ts";
 import {
   readRestoreJournal, createRestoreJournal, deleteRestoreJournal
 } from "./recovery-journal.ts";
@@ -78,6 +79,9 @@ export async function commitGlobalRestore(
   prepared: PreparedGlobalRestore,
   ports: readonly RestorableDataPort[]
 ): Promise<void> {
+  if (!navigator.locks?.request) throw new Error("Safe restore requires browser Web Locks support.");
+  await requireNoOtherModuTabs();
+  return navigator.locks.request("modu-global-restore", { mode: "exclusive" }, async () => {
   // Validate the target again against the current set of modules.
   const target = await prepareGlobalRestore(JSON.stringify(prepared.backup), ports);
   if (target.preview.length !== ports.length) throw new Error("Incomplete restore validation.");
@@ -98,6 +102,7 @@ export async function commitGlobalRestore(
     }
     throw cause;
   }
+  });
 }
 
 /** Run before the app hydrates, so no controller can write a half-restored state. */
