@@ -1,3 +1,4 @@
+// @ts-ignore The repo lacks Cloudflare Durable Object type declarations; Wrangler validates this runtime import.
 import { DurableObject } from "cloudflare:workers";
 import { SyncSpaceHandler } from "./sync-space.ts";
 import type { SyncStorage } from "./journal.ts";
@@ -9,7 +10,7 @@ import type { SyncStorage } from "./journal.ts";
 export class SyncSpace extends DurableObject {
   private readonly handler: SyncSpaceHandler;
 
-  constructor(ctx: DurableObjectState, env: unknown) {
+  constructor(ctx: { storage: SyncStorage }, env: unknown) {
     super(ctx, env);
     this.handler = new SyncSpaceHandler({ storage: ctx.storage as unknown as SyncStorage });
   }
