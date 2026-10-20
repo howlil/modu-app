@@ -44,6 +44,20 @@ export async function pollPairing(code: string) {
     path(item.spaceId, "pairings/" + item.invitationId + "/status"), { secret: item.secret }
   );
 }
+export function encodeRecoveryCode(spaceId: string, secret: string): string {
+  if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/.test(spaceId) ||
+      !/^[A-Za-z0-9_-]{43}$/.test(secret)) throw new Error("Invalid recovery credentials.");
+  return spaceId + "." + secret;
+}
+export function decodeRecoveryCode(code: string): { spaceId: string; recoveryKey: string } {
+  const value = code.trim();
+  const separator = value.indexOf(".");
+  if (separator < 0) throw new Error("Recovery code must contain the space ID and key.");
+  const spaceId = value.slice(0, separator);
+  const recoveryKey = value.slice(separator + 1);
+  encodeRecoveryCode(spaceId, recoveryKey);
+  return { spaceId, recoveryKey };
+}
 export async function recoverSpace(spaceId: string, recoveryKey: string, device: NewDeviceIdentity) {
   return invoke<{ recovered: true; recoveryKey: string }>(
     path(spaceId, "recover"), { recoveryKey, identity: identityBody(device) }
