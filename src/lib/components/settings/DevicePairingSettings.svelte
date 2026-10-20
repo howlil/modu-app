@@ -171,12 +171,20 @@
         notice = "Your data is now available on this device.";
       }
     } catch (cause) {
+      // The server may already have approved the device while its first
+      // inbound snapshot failed. Reflect durable identity, not stale UI.
+      await loadIdentity();
+      if (identity?.status === "paired") mode = "overview";
       error = explainSyncFailure(cause);
     }
   }
   async function cancelPendingJoin() {
     await action(async () => {
       if (!identity || identity.enrollmentKind !== "join" || identity.status !== "pending") return;
+      const persisted = await readDeviceIdentity();
+      if (!persisted || persisted.status !== "pending" || persisted.deviceId !== identity.deviceId) {
+        throw new Error("Device authorization changed. Reload before cancelling.");
+      }
       // Only remove an unapproved local device. No remote data is touched.
       await clearPendingPairing();
       await clearDeviceIdentity();
