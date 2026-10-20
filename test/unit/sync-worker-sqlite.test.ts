@@ -2,7 +2,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 import { SyncSpaceHandler as SyncSpace } from "../../src/sync-worker/sync-space.ts";
-import { SyncJournal, type SyncStorage, type SqlValue } from "../../src/sync-worker/journal.ts";
+import { SyncJournal, MAX_SYNC_SPACE_BYTES, type SyncStorage, type SqlValue } from "../../src/sync-worker/journal.ts";
 import { signedRequestBytes } from "../../src/sync-worker/signature.ts";
 
 const SPACE = "00000000-1111-4222-8333-444444444444";
@@ -310,5 +310,54 @@ describe("M5 pairing and recovery in real SQLite", () => {
     const joinBody = JSON.stringify({ secret: invite.secret, identity: ownerBody(candidate, "device-second-0002") });
     expect((await space.fetch(new Request(url, { method: "POST", headers: {"content-type":"application/json"}, body: joinBody }))).status).toBe(200);
     expect((await space.fetch(new Request(url, { method: "POST", headers: {"content-type":"application/json"}, body: joinBody }))).status).toBe(409);
+  });
+});
+
+describe("M6 bounded retention and fault-injection guards", () => {
+  it("returns 507 and rolls back an entire batch at the storage limit", async () => {
+    const storage = createStorage();
+    const journal = new SyncJournal(storage);
+    const keys = await credential();
+    journal.registerApprovedDevice(device, keys.jwk);
+    const handler = new SyncSpace({ storage });
+    storage.sql.exec(
+      "UPDATE journal_usage SET bytes=? WHERE id=1", MAX_SYNC_SPACE_BYTES - 50
+    );
+    const response = await handler.fetch(await signed(keys.privateKey, "POST", ROUTE,
+      JSON.stringify({ operations: [op("quota-1"), op("quota-2")] })));
+    expect(response.status).toBe(507);
+    const result = await handler.fetch(await signed(keys.privateKey, "GET", ROUTE + "?after=0"));
+    expect((await result.json()).operations).toHaveLength(0);
+    const usage = storage.sql.exec("SELECT bytes,events FROM journal_usage WHERE id=1").toArray()[0];
+    expect(usage.bytes).toBe(MAX_SYNC_SPACE_BYTES - 50);
+    expect(usage.events).toBe(0);
+  });
+  it("breaks large pull responses into bounded pages while preserving every sequence", async () => {
+    const storage = createStorage();
+    const journal = new SyncJournal(storage);
+    const keys = await credential();
+    journal.registerApprovedDevice(device, keys.jwk);
+    const handler = new SyncSpace({ storage });
+    const huge = { text: "L".repeat(190_000) };
+    for (let i = 0; i < 6; i++) {
+      const push = await handler.fetch(await signed(keys.privateKey, "POST", ROUTE,
+        JSON.stringify({ operations: [op("large-" + i, huge)] })));
+      expect(push.status).toBe(200);
+    }
+    const seen: number[] = [];
+    let cursor = 0, pages = 0;
+    while (true) {
+      const reply = await handler.fetch(await signed(keys.privateKey, "GET",
+        ROUTE + "?after=" + cursor + "&limit=100"));
+      const parsed = await reply.json();
+      expect(reply.status).toBe(200);
+      expect(JSON.stringify(parsed).length).toBeLessThan(800_000);
+      seen.push(...parsed.operations.map(x => x.sequence));
+      cursor = parsed.nextCursor;
+      pages++;
+      if (!parsed.hasMore) break;
+    }
+    expect(seen).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(pages).toBeGreaterThan(1);
   });
 });
