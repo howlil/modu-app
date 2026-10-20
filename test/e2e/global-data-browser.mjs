@@ -71,7 +71,7 @@ async function run() {
   session = created.sessionId;
   await navigate(SITE + "/settings/data");
   await waitFor("global data modules", 'document.body.textContent.includes("habit-tracker") && document.body.textContent.includes("language-learning")');
-  assert.equal(await execute('return document.body.textContent.includes("Device pairing");'), true);
+  assert.equal(await execute('return document.body.textContent.includes("Keep your Modu data on your devices.");'), true);
   assert.equal(await execute(`const old=URL.createObjectURL; URL.createObjectURL=function(blob){window.__moduBlob=blob;return old.call(URL,blob)};return true;`), true);
   await click("Export");
   await waitFor("download confirmation", 'document.body.textContent.includes("Global backup exported")');
