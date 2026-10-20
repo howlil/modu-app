@@ -22,6 +22,11 @@ import {
   OUTBOX_STORE, SYNC_META_STORE, ensureOutboxStores, queueLocalMutation,
   resetCaptureAfterRestore, readOutbox, acknowledgeOutbox, initializeCaptureWithBaseline
 } from '#lib/platform/data/outbox.ts';
+import {
+  INBOX_STORE, TOMBSTONE_STORE, ensureInboxStores,
+  resetInboxAfterRestore, readInboxCursor, applyIncomingInTransaction, RemoteApplyConflict
+} from '#lib/platform/data/inbox.ts';
+import type { SequencedSyncOperation } from '#lib/platform/data/sync-protocol.ts';
 
 /** Browser-local, single-learner storage. All authoritative writes use one IDB transaction. */
 export class LearningPersistenceError extends Error {
@@ -33,7 +38,7 @@ export class LearningPersistenceError extends Error {
   }
 }
 const DB_NAME = 'modu-language-learning';
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 const SESSIONS = 'sessions';
 const ATTEMPTS = 'attempts';
 const META = 'meta';
@@ -130,6 +135,7 @@ function openDatabase(): Promise<IDBDatabase> {
         catalog.createIndex('profileId','profileId',{unique:false});
       }
       ensureOutboxStores(db);
+      ensureInboxStores(db);
     };
     request.onblocked = () => {
       cancelled = true;
@@ -895,7 +901,7 @@ export const learningPersistence = {
   async importBackup(text: string): Promise<void> {
     // Validate the entire source before opening the destructive transaction.
     const {records, attempts, reviews, latestSessionId,profiles,catalogs} = asBackup(text);
-    await transaction<void>([SESSIONS, ATTEMPTS, META, REVIEWS, PROFILES, CATALOGS, OUTBOX_STORE, SYNC_META_STORE], 'readwrite', (tx, complete) => {
+    await transaction<void>([SESSIONS, ATTEMPTS, META, REVIEWS, PROFILES, CATALOGS, OUTBOX_STORE, SYNC_META_STORE, INBOX_STORE, TOMBSTONE_STORE], 'readwrite', (tx, complete) => {
       const sessions = tx.objectStore(SESSIONS);
       const journal = tx.objectStore(ATTEMPTS);
       const meta = tx.objectStore(META);
@@ -924,6 +930,7 @@ export const learningPersistence = {
       if (latestSessionId !== null) meta.put({key: 'latest', sessionId: latestSessionId});
       meta.put({key: 'epoch', value: crypto.randomUUID()});
       resetCaptureAfterRestore(tx);
+      resetInboxAfterRestore(tx);
       complete(undefined);
     });
   },
