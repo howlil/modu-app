@@ -5,6 +5,7 @@ const DB_NAME = 'module-pomodoro-activity';
 const STORE_NAME = 'sessions';
 const DB_VERSION = 2;
 const FALLBACK_KEY = 'module-pomodoro-activity-fallback';
+const CAPTURE_ACTIVE_KEY = 'modu-pomodoro-sync-active';
 
 function openDatabase() {
   return new Promise<IDBDatabase>((resolve, reject) => {
@@ -146,9 +147,13 @@ export async function loadFocusSessions() {
 }
 
 export async function clearFocusSessions() {
+  if (typeof indexedDB !== 'undefined') await reconcileFocusFallbackForSync();
   let database: IDBDatabase;
   try { database = await openDatabase(); }
   catch {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem(CAPTURE_ACTIVE_KEY) === '1') {
+      throw new Error('Cannot clear synchronized focus history while IndexedDB is unavailable.');
+    }
     if (typeof localStorage !== 'undefined') localStorage.removeItem(FALLBACK_KEY);
     announceChange();
     return;
@@ -204,6 +209,9 @@ export async function assignFocusSession(sessionId: string, taskId: string | nul
   let database: IDBDatabase;
   try { database = await openDatabase(); }
   catch {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem(CAPTURE_ACTIVE_KEY) === '1') {
+      throw new Error('Cannot update synchronized focus assignment while IndexedDB is unavailable.');
+    }
     const fallback = readFallback();
     const found = fallback.find(item => item.id === sessionId);
     if (!found) throw new Error('Focus session not found');
@@ -302,16 +310,69 @@ export async function replaceFocusSessionsForRestore(sessions: readonly FocusAct
   } finally {
     db.close();
   }
-  if (typeof localStorage !== 'undefined') localStorage.removeItem(FALLBACK_KEY);
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem(FALLBACK_KEY);
+    localStorage.removeItem(CAPTURE_ACTIVE_KEY);
+  }
   announceChange();
 }
 
 /** Feature-owned outbox: only completed sessions/assignments, never running timers. */
 export async function readFocusPendingSyncOperations(limit = 100) {
+  await reconcileFocusFallbackForSync();
   const db = await openDatabase();
   try { return await readOutbox(db, 'pomodoro', limit); }
   finally { db.close(); }
 }
+/** Replay fallback sessions into IDB and the active outbox atomically. */
+export async function reconcileFocusFallbackForSync(): Promise<void> {
+  const raw = typeof localStorage === 'undefined' ? null : localStorage.getItem(FALLBACK_KEY);
+  if (raw === null) return;
+  const parsed: unknown = JSON.parse(raw);
+  if (!Array.isArray(parsed) || !parsed.every(isFocusActivitySession) ||
+      new Set(parsed.map((entry: FocusActivitySession) => entry.id)).size !== parsed.length) {
+    throw new Error('Pomodoro fallback history requires repair before synchronization.');
+  }
+  if (!parsed.length) {
+    if (typeof localStorage !== 'undefined') localStorage.removeItem(FALLBACK_KEY);
+    return;
+  }
+  const db = await openDatabase();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction([STORE_NAME, OUTBOX_STORE, SYNC_META_STORE], 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      let failure: Error | null = null;
+      const rows = store.getAll();
+      rows.onsuccess = () => {
+        try {
+          if (!Array.isArray(rows.result) || !rows.result.every(isFocusActivitySession)) {
+            throw new Error('Invalid authoritative Pomodoro history.');
+          }
+          const authoritative = new Map((rows.result as FocusActivitySession[]).map(x => [x.id, x]));
+          for (const item of parsed) {
+            const previous = authoritative.get(item.id);
+            if (previous && JSON.stringify(previous) !== JSON.stringify(item)) {
+              throw new Error('Conflicting Pomodoro fallback history requires manual resolution.');
+            }
+            if (!previous) {
+              store.add(item);
+              queueLocalMutation(tx, 'pomodoro', item.id, 'upsert', { session: item });
+            }
+          }
+        } catch (cause) {
+          failure = cause instanceof Error ? cause : new Error('Pomodoro history reconciliation failed.');
+          tx.abort();
+        }
+      };
+      tx.oncomplete = () => resolve();
+      tx.onabort = () => reject(failure ?? tx.error ?? new Error('Pomodoro reconciliation aborted.'));
+      tx.onerror = () => reject(tx.error ?? new Error('Pomodoro reconciliation failed.'));
+    });
+    if (typeof localStorage !== 'undefined') localStorage.removeItem(FALLBACK_KEY);
+  } finally { db.close(); }
+}
+
 export async function acknowledgeFocusSyncOperations(operationIds: readonly string[]) {
   const db = await openDatabase();
   try { await acknowledgeOutbox(db, operationIds); }
@@ -324,6 +385,13 @@ export async function acknowledgeFocusSyncOperations(operationIds: readonly stri
  * Running timers / notifications / extension state never enter the outbox.
  */
 export async function beginFocusSyncCapture(deviceId: string): Promise<void> {
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(CAPTURE_ACTIVE_KEY, '1');
+  }
+  return beginFocusSyncCaptureLocked(deviceId);
+}
+
+async function beginFocusSyncCaptureLocked(deviceId: string): Promise<void> {
   let fallback: FocusActivitySession[] = [];
   if (typeof localStorage !== 'undefined') {
     const raw = localStorage.getItem(FALLBACK_KEY);
