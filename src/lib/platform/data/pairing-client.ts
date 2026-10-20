@@ -41,6 +41,22 @@ export function readPairingFragment(fragment: string): string | null {
   return code;
 }
 
+/** Accept a raw invitation or its share link, never a foreign-origin URL. */
+export function resolvePairingInput(input: string, currentOrigin: string): string {
+  const trimmed = input.trim();
+  if (!/^https?:\/\//i.test(trimmed)) {
+    decodePairingCode(trimmed);
+    return trimmed;
+  }
+  const url = new URL(trimmed);
+  if (url.origin !== new URL(currentOrigin).origin || url.pathname !== "/settings/data" || url.search) {
+    throw new Error("This pairing link does not belong to this Modu application.");
+  }
+  const invitation = readPairingFragment(url.hash);
+  if (!invitation) throw new Error("This link is missing its pairing invitation.");
+  return invitation;
+}
+
 export async function initializeSpace(device: NewDeviceIdentity) {
   return invoke<{ spaceId: string; recoveryKey: string }>(
     "/api/sync/initialize", identityBody(device)
