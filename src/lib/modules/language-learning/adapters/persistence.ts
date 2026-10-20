@@ -12,6 +12,11 @@ import {
   type LearningProfile, type LearningPlan, type PlanOptions
 } from '../core/orchestration.ts';
 import type { LanguageIsland } from '../core/learning.ts';
+import {
+  archiveIsland, decodeLearningProfile, reviseIsland, validateContentIsland,
+  ContentRuleError, type ContentIsland, type IslandDraft
+} from '../core/content.ts';
+import { STARTER_ISLAND } from './starter-content.ts';
 
 /** Browser-local, single-learner storage. All authoritative writes use one IDB transaction. */
 export class LearningPersistenceError extends Error {
@@ -23,11 +28,13 @@ export class LearningPersistenceError extends Error {
   }
 }
 const DB_NAME = 'modu-language-learning';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 const SESSIONS = 'sessions';
 const ATTEMPTS = 'attempts';
 const META = 'meta';
 const REVIEWS = 'reviews';
+const PROFILES = 'profiles';
+const CATALOGS = 'catalogs';
 const BACKUP_FORMAT = 'modu-language-learning';
 const MAX_BACKUP_LENGTH = 256 * 1024 * 1024;
 
@@ -39,11 +46,13 @@ interface SessionRow {
 type BrowserPractice = StoredPractice & {storageEpoch: string | null};
 export interface LearningBackup {
   format: typeof BACKUP_FORMAT;
-  version: 1 | 2;
+  version: 1 | 2 | 3;
   exportedAt: string;
   sessions: StoredPractice[];
   latestSessionId?: string | null;
   reviews?: MemoryState[];
+  profiles?: LearningProfile[];
+  catalogs?: ContentIsland[];
 }
 function translateError(cause: unknown): LearningPersistenceError {
   if (cause instanceof LearningPersistenceError) return cause;
@@ -55,6 +64,7 @@ function translateError(cause: unknown): LearningPersistenceError {
   }
   if (cause instanceof LearningRuleError) return new LearningPersistenceError('invalid', cause.message);
   if (cause instanceof MemoryRuleError) return new LearningPersistenceError(cause.code === 'invalid_state' ? 'corrupt' : 'invalid', cause.message);
+  if (cause instanceof ContentRuleError) return new LearningPersistenceError(cause.code==='conflict'?'conflict':'invalid',cause.message);
   if (cause instanceof OrchestrationRuleError) {
     return new LearningPersistenceError('invalid', cause.message);
   }
@@ -105,6 +115,13 @@ function openDatabase(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(REVIEWS)) {
         const store = db.createObjectStore(REVIEWS, {keyPath: 'key'});
         store.createIndex('profileDue', ['profileId', 'dueAt'], {unique: false});
+      }
+      if(!db.objectStoreNames.contains(PROFILES)){
+        db.createObjectStore(PROFILES,{keyPath:'id'});
+      }
+      if(!db.objectStoreNames.contains(CATALOGS)){
+        const catalog=db.createObjectStore(CATALOGS,{keyPath:'key'});
+        catalog.createIndex('profileId','profileId',{unique:false});
       }
     };
     request.onblocked = () => {
@@ -272,8 +289,209 @@ async function ensureMemoryInitialized(): Promise<void> {
   });
 }
 
+
+type CatalogRow = {key:string;profileId:string;content:ContentIsland};
+function catalogKey(profileId:string,islandId:string):string {
+  return JSON.stringify([profileId,islandId]);
+}
+function decodeCatalogRow(raw:unknown):ContentIsland {
+  if(!raw || typeof raw!=='object')throw new LearningPersistenceError('corrupt','Invalid content row.');
+  const row=raw as Partial<CatalogRow>;
+  let content:ContentIsland;
+  try {content=validateContentIsland(row.content);}
+  catch {throw new LearningPersistenceError('corrupt','Stored Island data is invalid.');}
+  if(row.profileId!==content.profileId || row.key!==catalogKey(content.profileId,content.island.id))
+    throw new LearningPersistenceError('corrupt','Catalog key or profile does not match Island.');
+  return content;
+}
+const starterProfile:LearningProfile={id:'starter-id-en',targetLanguage:'en'};
+const starterContent:ContentIsland={
+  profileId:starterProfile.id,archived:false,island:STARTER_ISLAND,vocabulary:[]
+};
+/** One-time non-destructive seed, serialized with all content writers.
+ * The marker prevents user-empty catalogs from silently reseeding. */
+async function ensureCatalogInitialized():Promise<void> {
+  await transaction<void>([PROFILES,CATALOGS,META],'readwrite',(tx,complete,fail)=>{
+    const marker=tx.objectStore(META).get('catalogSeedV1');
+    marker.onsuccess=()=>{
+      try {
+        if(marker.result?.done===true){complete(undefined);return;}
+        const profiles=tx.objectStore(PROFILES);
+        const catalogs=tx.objectStore(CATALOGS);
+        const existing=profiles.get(starterProfile.id);
+        existing.onsuccess=()=>{
+          try {
+            if(existing.result===undefined)profiles.add(starterProfile);
+            const row:CatalogRow={key:catalogKey(starterProfile.id,STARTER_ISLAND.id),
+              profileId:starterProfile.id,content:starterContent};
+            const present=catalogs.get(row.key);
+            present.onsuccess=()=>{
+              try {
+                if(present.result===undefined)catalogs.add(row);
+                tx.objectStore(META).put({key:'catalogSeedV1',done:true});
+                complete(undefined);
+              }catch(cause){fail(cause);}
+            };
+          }catch(cause){fail(cause);}
+        };
+      }catch(cause){fail(cause);}
+    };
+  });
+}
+
 /** No server endpoint. This browser origin owns the canonical practice history. */
 export const learningPersistence = {
+  async profiles():Promise<LearningProfile[]> {
+    await ensureCatalogInitialized();
+    return transaction<LearningProfile[]>([PROFILES],'readonly',(tx,complete,fail)=>{
+      const req=tx.objectStore(PROFILES).getAll();
+      req.onsuccess=()=>{
+        try{complete((req.result as unknown[]).map(decodeLearningProfile));}
+        catch(cause){fail(cause);}
+      };
+    });
+  },
+  async createProfile(profile:LearningProfile):Promise<LearningProfile> {
+    let checked:LearningProfile;
+    try{checked=decodeLearningProfile(profile);}
+    catch(cause){throw translateError(cause);}
+    await ensureCatalogInitialized();
+    return transaction<LearningProfile>([PROFILES],'readwrite',(tx,complete,fail)=>{
+      const store=tx.objectStore(PROFILES);
+      const req=store.get(checked.id);
+      req.onsuccess=()=>{
+        try{
+          if(req.result!==undefined)throw new LearningPersistenceError('conflict','Language profile already exists.');
+          store.add(checked);
+          complete(checked);
+        }catch(cause){fail(cause);}
+      };
+    });
+  },
+  async catalog(profileId:string,includeArchived=false):Promise<ContentIsland[]> {
+    await ensureCatalogInitialized();
+    return transaction<ContentIsland[]>([PROFILES,CATALOGS],'readonly',(tx,complete,fail)=>{
+      const profileReq=tx.objectStore(PROFILES).get(profileId);
+      profileReq.onsuccess=()=>{
+        try{
+          if(profileReq.result===undefined)throw new LearningPersistenceError('invalid','Language profile was not found.');
+          const profile=decodeLearningProfile(profileReq.result);
+          const rows=tx.objectStore(CATALOGS).index('profileId').getAll(profileId);
+          rows.onsuccess=()=>{
+            try{
+              const items=(rows.result as unknown[]).map(decodeCatalogRow);
+              for(const item of items)validateContentIsland(item,profile);
+              complete(items.filter(x=>includeArchived || !x.archived));
+            }catch(cause){fail(cause);}
+          };
+        }catch(cause){fail(cause);}
+      };
+    });
+  },
+  async saveIsland(profileId:string,draft:IslandDraft,expectedRevision:number|null):Promise<ContentIsland> {
+    if(expectedRevision!==null && (!Number.isSafeInteger(expectedRevision)||expectedRevision<1))
+      throw new LearningPersistenceError('invalid','Expected Island revision is invalid.');
+    await ensureCatalogInitialized();
+    return transaction<ContentIsland>([PROFILES,CATALOGS],'readwrite',(tx,complete,fail)=>{
+      const profiles=tx.objectStore(PROFILES);
+      const catalogs=tx.objectStore(CATALOGS);
+      const profileReq=profiles.get(profileId);
+      profileReq.onsuccess=()=>{
+        try{
+          if(profileReq.result===undefined)throw new LearningPersistenceError('invalid','Language profile was not found.');
+          const profile=decodeLearningProfile(profileReq.result);
+          if(!draft || typeof draft.id!=='string' || !draft.id.trim())
+            throw new LearningPersistenceError('invalid','Island ID is required.');
+          const key=catalogKey(profile.id,draft.id);
+          const req=catalogs.get(key);
+          req.onsuccess=()=>{
+            try{
+              const prior=req.result===undefined?null:decodeCatalogRow(req.result);
+              if((prior?.island.revision??null)!==expectedRevision)
+                throw new LearningPersistenceError('conflict','Island changed in another tab. Reload before editing.');
+              const updated=reviseIsland(prior,profile,draft,prior?.archived??false);
+              catalogs.put({key,profileId:profile.id,content:updated} satisfies CatalogRow);
+              complete(updated);
+            }catch(cause){fail(cause);}
+          };
+        }catch(cause){fail(cause);}
+      };
+    });
+  },
+  async setArchived(profileId:string,islandId:string,expectedRevision:number,archived:boolean):Promise<ContentIsland> {
+    await ensureCatalogInitialized();
+    return transaction<ContentIsland>([CATALOGS],'readwrite',(tx,complete,fail)=>{
+      const store=tx.objectStore(CATALOGS);
+      const key=catalogKey(profileId,islandId);
+      const req=store.get(key);
+      req.onsuccess=()=>{
+        try{
+          if(req.result===undefined)throw new LearningPersistenceError('invalid','Island not found.');
+          const existing=decodeCatalogRow(req.result);
+          if(existing.island.revision!==expectedRevision)
+            throw new LearningPersistenceError('conflict','Island was changed in another tab.');
+          const next=archiveIsland(existing,archived);
+          if(next!==existing)store.put({key,profileId,content:next} satisfies CatalogRow);
+          complete(next);
+        }catch(cause){fail(cause);}
+      };
+    });
+  },
+  /** Import only new Island IDs, atomically. Never silently replace authored materials. */
+  async importCatalog(profileId:string,text:string):Promise<number> {
+    if(!text || new Blob([text]).size>2*1024*1024)
+      throw new LearningPersistenceError('invalid','Catalog import exceeds 2 MiB.');
+    let raw:unknown;
+    try{raw=JSON.parse(text);}catch{throw new LearningPersistenceError('invalid','Invalid catalog JSON.');}
+    if(!raw||typeof raw!=='object'||Array.isArray(raw))
+      throw new LearningPersistenceError('invalid','Invalid catalog document.');
+    const doc=raw as Record<string,unknown>;
+    if(doc.format!=='modu-language-catalog'||doc.version!==1||!Array.isArray(doc.islands)||
+      doc.islands.length>100)
+      throw new LearningPersistenceError('invalid','Unsupported catalog document.');
+    // Drafts are validated against the authoritative profile inside the transaction.
+    await ensureCatalogInitialized();
+    return transaction<number>([PROFILES,CATALOGS],'readwrite',(tx,complete,fail)=>{
+      const req=tx.objectStore(PROFILES).get(profileId);
+      req.onsuccess=()=>{
+        try{
+          if(req.result===undefined)throw new LearningPersistenceError('invalid','Profile not found.');
+          const profile=decodeLearningProfile(req.result);
+          const entries=(doc.islands as IslandDraft[]).map(d=>reviseIsland(null,profile,d));
+          const ids=new Set(entries.map(x=>x.island.id));
+          if(ids.size!==entries.length)throw new LearningPersistenceError('invalid','Duplicate Island IDs in import.');
+          const store=tx.objectStore(CATALOGS);
+          let index=0;
+          const next=()=>{
+            try{
+              if(index===entries.length){complete(entries.length);return;}
+              const entry=entries[index++];
+              const key=catalogKey(profileId,entry.island.id);
+              const check=store.get(key);
+              check.onsuccess=()=>{
+                try{
+                  if(check.result!==undefined)
+                    throw new LearningPersistenceError('conflict','Imported Island already exists; nothing was imported.');
+                  store.add({key,profileId,content:entry} satisfies CatalogRow);
+                  next();
+                }catch(cause){fail(cause);}
+              };
+            }catch(cause){fail(cause);}
+          };
+          next();
+        }catch(cause){fail(cause);}
+      };
+    });
+  },
+  async exportCatalog(profileId:string):Promise<string> {
+    const content=await this.catalog(profileId,true);
+    return JSON.stringify({format:'modu-language-catalog',version:1,
+      islands:content.map(x=>({
+        ...x.island,
+        sentences:x.island.sentences.map(s=>({id:s.id,prompt:s.prompt,answer:s.answer})),
+        vocabulary:x.vocabulary.map(v=>({id:v.id,sentenceId:v.sentenceId,term:v.term,meaning:v.meaning}))
+      }))});
+  },
   latest(): Promise<BrowserPractice | null> {
     return transaction<BrowserPractice | null>([SESSIONS, META], 'readonly', (tx, complete, fail) => {
       const store = tx.objectStore(SESSIONS);
@@ -485,6 +703,40 @@ export const learningPersistence = {
   },
   /** One consistent browser snapshot; never use a limited due queue as the
    * source for joining current content, because stale revisions could crowd it. */
+  async planStored(profile:LearningProfile,options:PlanOptions):Promise<{
+    plan:LearningPlan; islands:LanguageIsland[];
+  }> {
+    const expected=decodeLearningProfile(profile);
+    await ensureCatalogInitialized();
+    await ensureMemoryInitialized();
+    return transaction<{plan:LearningPlan;islands:LanguageIsland[]}>([PROFILES,CATALOGS,REVIEWS],'readonly',
+      (tx,complete,fail)=>{
+        const loaded=tx.objectStore(PROFILES).get(expected.id);
+        loaded.onsuccess=()=>{
+          try{
+            if(loaded.result===undefined)throw new LearningPersistenceError('invalid','Language profile not found.');
+            const stored=decodeLearningProfile(loaded.result);
+            if(stored.targetLanguage!==expected.targetLanguage)
+              throw new LearningPersistenceError('conflict','Language profile changed.');
+            const catalogs=tx.objectStore(CATALOGS).index('profileId').getAll(expected.id);
+            catalogs.onsuccess=()=>{
+              try{
+                const all=(catalogs.result as unknown[]).map(decodeCatalogRow);
+                for(const item of all)validateContentIsland(item,stored);
+                const islands=all.filter(x=>!x.archived).map(x=>x.island);
+                const range=IDBKeyRange.bound([expected.id,0],[expected.id,8_640_000_000_000_000]);
+                const reviews=tx.objectStore(REVIEWS).index('profileDue').getAll(range);
+                reviews.onsuccess=()=>{
+                  try{complete({plan:createLearningPlan({profile:stored,islands,
+                    states:(reviews.result as unknown[]).map(decodeMemoryState),options}),islands});}
+                  catch(cause){fail(cause);}
+                };
+              }catch(cause){fail(cause);}
+            };
+          }catch(cause){fail(cause);}
+        };
+      });
+  },
   async plan(profile: LearningProfile, islands: readonly LanguageIsland[],
     options: PlanOptions): Promise<LearningPlan> {
     // Validate the external catalog before touching storage.
