@@ -29,6 +29,7 @@ export function subscribeSyncStatus(listener: (status: SyncStatus) => void): () 
 }
 const ERROR_REVIEW = /conflict|concurrent|baseline|revision|manual resolution|immutable/i;
 const ERROR_REVOKED = /revoked|not paired|unauthorized|\(401\)|\(403\)/i;
+const ERROR_PERMANENT = /quota|retention limit|storage limit|payload size|\(507\)|\(413\)/i;
 /**
  * One scheduler per mounted app shell. It only runs after a stored device has
  * opted in and become paired; no uploads for local-only users.
