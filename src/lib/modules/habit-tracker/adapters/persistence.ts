@@ -661,8 +661,8 @@ export async function applyHabitRemoteChanges(events: readonly SequencedSyncOper
 /** Activate capture only after validated inbound journal is committed. */
 export async function beginHabitRemoteCapture(deviceId: string): Promise<void> {
   await withDatabase(db => transaction<void>(
-    db, [SYNC_META_STORE, OUTBOX_STORE], 'readwrite', (tx, complete) => {
-      activateCaptureFromRemote(tx, deviceId);
+    db, [SYNC_META_STORE, OUTBOX_STORE, INBOX_STORE], 'readwrite', (tx, complete) => {
+      activateCaptureFromRemote(tx, deviceId, "habit-tracker");
       complete(undefined);
     }
   ));
