@@ -7,7 +7,7 @@
   import { requireNoOtherModuTabs } from "#lib/platform/data/peer-tabs.ts";
   import {
     readDeviceIdentity, storeDeviceIdentity, markDevicePaired, generateDeviceIdentity,
-    clearDeviceIdentity, type StoredDeviceIdentity
+    type StoredDeviceIdentity
   } from "#lib/platform/data/device-identity.ts";
   import {
     initializeSpace, decodePairingCode, joinWithCode, pollPairing, recoverSpace,
@@ -132,6 +132,12 @@
   function invite() {
     void execute(async () => {
       if (!identity) return;
+      for (const module of globalDataPorts) {
+        const pending = await module.readPendingSyncOperations(1);
+        if (pending.length || await module.readRemoteCursor() === 0) {
+          throw new Error("Sync this browser successfully before inviting another device.");
+        }
+      }
       const result = await createPairingInvite(identity);
       activeInvitation = result.invitationId;
       pairingCode = encodePairingCode(identity.spaceId, result.invitationId, result.secret);
@@ -174,15 +180,6 @@
       await revokePairedDevice(identity, deviceId);
       deviceList = (await listPairedDevices(identity)).devices;
       notice = "Device revoked. Already-downloaded local data cannot be remotely erased.";
-    });
-  }
-  function disconnect() {
-    if (!window.confirm("Forget this browser's pairing credentials? Existing local module data will remain, including any pending sync operations.")) return;
-    void execute(async () => {
-      // Intentionally does NOT alter feature outbox: deleting it could lose data.
-      // Re-enrollment is blocked by old capture IDs until migration/recovery.
-      await clearDeviceIdentity(); identity = null;
-      notice = "Credentials cleared. Local module data is unchanged.";
     });
   }
   onMount(() => { void execute(loadIdentity); });
@@ -253,7 +250,7 @@
           </div>
         {/each}
       {/if}
-      <Button variant="ghost" size="sm" class="rounded-full text-muted-foreground" disabled={busy} onclick={disconnect}>Forget device credentials</Button>
+
     </div>
   {:else}
     <div class="mt-4 flex flex-wrap gap-1.5">
