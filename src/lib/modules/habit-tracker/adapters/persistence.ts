@@ -1,7 +1,7 @@
 import type { GoalPolicy, HabitCheckin, HabitDefinition, LocalDate } from '../core/types.ts';
 import {
   OUTBOX_STORE, SYNC_META_STORE, ensureOutboxStores, queueLocalMutation,
-  resetCaptureAfterRestore, readOutbox, acknowledgeOutbox
+  resetCaptureAfterRestore, readOutbox, acknowledgeOutbox, initializeCaptureWithBaseline
 } from '#lib/platform/data/outbox.ts';
 import { isLocalDate, resolveEffectivePolicy } from '../core/scheduling.ts';
 import {
@@ -437,4 +437,45 @@ export function readHabitPendingSyncOperations(limit = 100) {
 }
 export function acknowledgeHabitSyncOperations(operationIds: readonly string[]) {
   return withDatabase(db => acknowledgeOutbox(db, operationIds));
+}
+
+/**
+ * Sync enrollment MUST snapshot existing feature state and enable capture in
+ * one write transaction. The global coordinator is not allowed to construct
+ * this baseline from a prior, potentially stale UI snapshot.
+ */
+export async function beginHabitSyncCapture(deviceId: string): Promise<void> {
+  await loadHabitSnapshot(); // seed pinned timezone for a fresh database
+  await withDatabase(db => transaction<void>(
+    db, ['habits', 'policies', 'checkins', 'preferences', OUTBOX_STORE, SYNC_META_STORE],
+    'readwrite',
+    (tx, set, fail) => {
+      const result: HabitSnapshot = { habits: [], policies: [], checkins: [] };
+      let completed = 0;
+      const ready = () => {
+        completed++;
+        if (completed !== 4) return;
+        try {
+          validateHabitSnapshot(result);
+          initializeCaptureWithBaseline(tx, 'habit-tracker', deviceId, result);
+          set(undefined);
+        } catch (cause) { fail(cause instanceof Error ? cause : new HabitStorageError('Invalid Habit baseline.')); }
+      };
+      const habits = tx.objectStore('habits').getAll();
+      habits.onsuccess = () => { result.habits = habits.result; ready(); };
+      const policies = tx.objectStore('policies').getAll();
+      policies.onsuccess = () => { result.policies = policies.result; ready(); };
+      const checkins = tx.objectStore('checkins').getAll();
+      checkins.onsuccess = () => { result.checkins = checkins.result; ready(); };
+      const timezone = tx.objectStore('preferences').get('tracking');
+      timezone.onsuccess = () => {
+        const value: unknown = timezone.result?.trackingTimezone;
+        if (typeof value !== 'string' || !isSupportedTimezone(value)) {
+          fail(new HabitStorageError('Cannot sync without a valid pinned tracking timezone.')); return;
+        }
+        result.trackingTimezone = value;
+        ready();
+      };
+    }
+  ));
 }
