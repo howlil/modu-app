@@ -2,7 +2,7 @@ import type { SyncOutboxPort } from "#lib/platform/data/contracts.ts";
 import { readPomodoroSnapshot, savePomodoroSnapshot, clearPomodoroSnapshot, type PersistedPomodoroState } from "./persistence.ts";
 import {
   exportFocusSessionsForBackup, replaceFocusSessionsForRestore,
-  isFocusActivitySession, readFocusPendingSyncOperations, beginFocusSyncCapture, acknowledgeFocusSyncOperations
+  isFocusActivitySession, readFocusPendingSyncOperations, beginFocusSyncCapture, acknowledgeFocusSyncOperations, readFocusRemoteCursor, applyFocusRemoteChanges, beginFocusRemoteCapture
 } from "#lib/shared/focus-sessions/repository.ts";
 import type { FocusActivitySession } from "#lib/shared/focus-sessions/types.ts";
 
@@ -41,6 +41,10 @@ export const pomodoroDataPort: SyncOutboxPort = {
     return { moduleId: "pomodoro", backupVersion: 1, recordCount, state: recordCount ? "ready" : "empty" };
   },
   exportBackup: snapshot,
+  beginRemoteSyncCapture: beginFocusRemoteCapture,
+  readRemoteCursor: readFocusRemoteCursor,
+  applyRemoteChanges: applyFocusRemoteChanges,
+
   beginSyncCapture: beginFocusSyncCapture,
   readPendingSyncOperations: readFocusPendingSyncOperations,
   acknowledgeSyncOperations: acknowledgeFocusSyncOperations,
