@@ -93,12 +93,18 @@ export async function commitGlobalRestore(
   if (await readRestoreJournal()) throw new Error("Previous restore needs recovery first.");
   const checkpoint = await createGlobalBackup(ports);
   const recovery = await prepareGlobalRestore(JSON.stringify(checkpoint), ports);
-  await createRestoreJournal({ id: "active", createdAt: Date.now(), checkpoint: recovery.backup });
+  // Set the marker before the journal. A crash at either step cannot leave a
+  // partially committed restore hidden from the next startup recovery check.
   try {
     localStorage.setItem(RESTORE_PENDING_KEY, "1");
   } catch (cause) {
-    await deleteRestoreJournal();
     throw new Error("Cannot record restore recovery marker. No module data was changed.", { cause });
+  }
+  try {
+    await createRestoreJournal({ id: "active", createdAt: Date.now(), checkpoint: recovery.backup });
+  } catch (cause) {
+    clearRestoreMarker();
+    throw cause;
   }
 
   try {
@@ -121,7 +127,7 @@ export async function commitGlobalRestore(
 /** Run before the app hydrates, so no controller can write a half-restored state. */
 export async function recoverInterruptedRestore(ports: readonly RestorableDataPort[]): Promise<boolean> {
   const journal = await readRestoreJournal();
-  if (!journal) return false;
+  if (!journal) { clearRestoreMarker(); return false; }
   const backup = await prepareGlobalRestore(JSON.stringify(journal.checkpoint), ports);
   await restoreEach(backup.backup, ports);
   await deleteRestoreJournal();
