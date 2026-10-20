@@ -43,7 +43,7 @@ function writeFallback(sessions: FocusActivitySession[]) {
   localStorage.setItem(FALLBACK_KEY, JSON.stringify(sessions.slice(-1000)));
 }
 
-function isFocusActivitySession(value: unknown): value is FocusActivitySession {
+export function isFocusActivitySession(value: unknown): value is FocusActivitySession {
   if (!value || typeof value !== 'object') return false;
   const session = value as Partial<FocusActivitySession>;
 
@@ -252,4 +252,28 @@ export async function exportFocusSessionsForBackup(): Promise<FocusActivitySessi
   const merged = new Map(fallback.map(item => [item.id, item]));
   for (const item of persisted) merged.set(item.id, item);
   return [...merged.values()].sort((a, b) => b.endedAt - a.endedAt);
+}
+
+/** Replace only completed sessions in a single IndexedDB transaction. */
+export async function replaceFocusSessionsForRestore(sessions: readonly FocusActivitySession[]): Promise<void> {
+  if (!sessions.every(isFocusActivitySession) ||
+    new Set(sessions.map(item => item.id)).size !== sessions.length) {
+    throw new Error('Invalid or duplicate Pomodoro session in restore.');
+  }
+  const db = await openDatabase();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      store.clear();
+      for (const session of sessions) store.add(session);
+      tx.oncomplete = () => resolve();
+      tx.onabort = () => reject(tx.error ?? new Error('Pomodoro history restore aborted.'));
+      tx.onerror = () => reject(tx.error ?? new Error('Pomodoro history restore failed.'));
+    });
+  } finally {
+    db.close();
+  }
+  if (typeof localStorage !== 'undefined') localStorage.removeItem(FALLBACK_KEY);
+  announceChange();
 }
