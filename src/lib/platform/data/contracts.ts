@@ -28,3 +28,15 @@ export type GlobalBackupV1 = {
   exportedAt: string;
   modules: Partial<Record<ModuleDataId, GlobalModuleBackup>>;
 };
+
+/** Restore is optional at the adapter boundary and must validate before mutation. */
+export type RestorePreview = {
+  moduleId: ModuleDataId;
+  recordCount: number;
+  warnings: string[];
+};
+
+export interface RestorableDataPort extends ModuleDataPort {
+  validateBackup(data: unknown): Promise<RestorePreview>;
+  restoreBackup(data: unknown): Promise<void>;
+}
