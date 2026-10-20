@@ -1,6 +1,6 @@
 import type { PendingSyncOperation } from "./outbox.ts";
 import {
-  parseSyncOperation, SYNC_MAX_BATCH, SYNC_MAX_BODY_BYTES, SYNC_MAX_PULL,
+  parseSyncOperation, validatePushReply, validatePullReply, SYNC_MAX_BATCH, SYNC_MAX_BODY_BYTES, SYNC_MAX_PULL,
   type SyncPullReply, type SyncPushReply
 } from "./sync-protocol.ts";
 import { signedRequestBytes } from "../../../sync-worker/signature.ts";
@@ -71,7 +71,8 @@ export class SyncTransport {
       throw new Error("Sync batch exceeds the payload size limit.");
     }
     const route = "/api/sync/spaces/" + this.device.spaceId + "/changes";
-    return await (await this.send("POST", route, body)).json() as SyncPushReply;
+    const result: unknown = await (await this.send("POST", route, body)).json();
+    return validatePushReply(result, wire.map(x => x.operationId));
   }
 
   async pull(after: number, limit = SYNC_MAX_PULL): Promise<SyncPullReply> {
@@ -81,6 +82,7 @@ export class SyncTransport {
     }
     const route = "/api/sync/spaces/" + this.device.spaceId +
       "/changes?after=" + after + "&limit=" + limit;
-    return await (await this.send("GET", route)).json() as SyncPullReply;
+    const result: unknown = await (await this.send("GET", route)).json();
+    return validatePullReply(result, after, limit);
   }
 }
