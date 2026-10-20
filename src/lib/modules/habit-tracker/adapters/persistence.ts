@@ -1,7 +1,7 @@
 import type { GoalPolicy, HabitCheckin, HabitDefinition, LocalDate } from '../core/types.ts';
 import {
   OUTBOX_STORE, SYNC_META_STORE, ensureOutboxStores, queueLocalMutation,
-  resetCaptureAfterRestore, readOutbox, acknowledgeOutbox, initializeCaptureWithBaseline
+  resetCaptureAfterRestore, readOutbox, acknowledgeOutbox, initializeCaptureWithBaseline, activateCaptureFromRemote
 } from '#lib/platform/data/outbox.ts';
 import {
   INBOX_STORE, TOMBSTONE_STORE, ensureInboxStores,
@@ -656,4 +656,14 @@ export async function applyHabitRemoteChanges(events: readonly SequencedSyncOper
     }
   ));
   broadcastChange();
+}
+
+/** Activate capture only after validated inbound journal is committed. */
+export async function beginHabitRemoteCapture(deviceId: string): Promise<void> {
+  await withDatabase(db => transaction<void>(
+    db, [SYNC_META_STORE, OUTBOX_STORE], 'readwrite', (tx, complete) => {
+      activateCaptureFromRemote(tx, deviceId);
+      complete(undefined);
+    }
+  ));
 }
