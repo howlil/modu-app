@@ -2,7 +2,7 @@ import type { SyncOutboxPort } from "#lib/platform/data/contracts.ts";
 import {
   loadHabitSnapshot, replaceHabitSnapshotForRestore,
   validateHabitSnapshot, type HabitSnapshot,
-  readHabitPendingSyncOperations, acknowledgeHabitSyncOperations
+  readHabitPendingSyncOperations, beginHabitSyncCapture, acknowledgeHabitSyncOperations
 } from "./persistence.ts";
 
 type HabitBackup = { format: "modu-habit-tracker"; version: 1; data: HabitSnapshot };
@@ -36,6 +36,7 @@ export const habitDataPort: SyncOutboxPort = {
     return { moduleId: "habit-tracker", backupVersion: 1, recordCount, state: recordCount ? "ready" : "empty" };
   },
   exportBackup: snapshot,
+  beginSyncCapture: beginHabitSyncCapture,
   readPendingSyncOperations: readHabitPendingSyncOperations,
   acknowledgeSyncOperations: acknowledgeHabitSyncOperations,
 
