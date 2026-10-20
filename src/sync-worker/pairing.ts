@@ -197,11 +197,20 @@ export class PairingRegistry {
       if (!row || row.recovery_hash !== digest || this.journal.deviceExists(identity.deviceId)) {
         throw new SyncProtocolError(401, "Invalid recovery authorization.");
       }
+      // Recovery is a compromise-response operation, not ordinary device pairing.
+      // Revocation, pending invitation invalidation, key rotation, and the new
+      // authorized device must be one SQLite transaction.
+      this.storage.sql.exec(
+        "UPDATE devices SET revoked_at=? WHERE revoked_at IS NULL", now
+      );
+      this.storage.sql.exec(
+        "DELETE FROM pairing_invitations"
+      );
       this.journal.registerApprovedDevice(identity.deviceId, identity.publicKey, now, identity.name);
       this.storage.sql.exec(
         "UPDATE sync_space_meta SET recovery_hash=? WHERE id=1", rotatedHash
       );
-      return { recovered: true, recoveryKey: rotated };
+      return { recovered: true, recoveryKey: rotated, previousDevicesRevoked: true };
     });
   }
 }
