@@ -70,7 +70,7 @@ async function forward(
 }
 
 export const GET: RequestHandler = ({ request, params, url }) =>
-  forward(request, params.spaceId, url.origin);
+  forward(request, params.spaceId ?? '', url.origin);
 
 export const POST: RequestHandler = ({ request, params, url }) =>
-  forward(request, params.spaceId, url.origin);
+  forward(request, params.spaceId ?? '', url.origin);
