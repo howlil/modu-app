@@ -166,7 +166,8 @@ export class PairingRegistry {
     const digest = await secretDigest(secret);
     return this.storage.transactionSync(() => {
       const row = this.find(invitationId, digest, now);
-      return { status: row.approved_at ? "approved" : row.candidate_id ? "pending-approval" : "awaiting-device" };
+      return { status: row.approved_at ? "approved" : row.candidate_id ? "pending-approval" : "awaiting-device",
+        confirmation: row.confirmation };
     });
   }
   list(deviceId: string, nonce: string) {
