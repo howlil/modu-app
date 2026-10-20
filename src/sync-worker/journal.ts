@@ -21,6 +21,7 @@ const SCHEMA = `
   CREATE TABLE IF NOT EXISTS devices (
     device_id TEXT PRIMARY KEY,
     public_key TEXT NOT NULL,
+    display_name TEXT NOT NULL DEFAULT 'Device',
     added_at INTEGER NOT NULL,
     revoked_at INTEGER
   );
@@ -62,20 +63,36 @@ export class SyncJournal {
    * Internal trusted enrollment primitive for the M5 approved-pairing flow.
    * This is deliberately NOT reachable over an HTTP route in M4.
    */
-  registerApprovedDevice(deviceId: string, publicKeyJson: string, at = Date.now()): void {
+  deviceExists(deviceId: string): boolean {
+    return !!this.storage.sql.exec<{ device_id: string }>(
+      "SELECT device_id FROM devices WHERE device_id = ?", deviceId
+    ).toArray()[0];
+  }
+
+  registerApprovedDevice(deviceId: string, publicKeyJson: string, at = Date.now(), name = "Device"): void {
     if (!/^[a-zA-Z0-9_-]{8,128}$/.test(deviceId) ||
-        typeof publicKeyJson !== "string" || publicKeyJson.length > 4096) {
+        typeof publicKeyJson !== "string" || publicKeyJson.length > 4096 ||
+        typeof name !== "string" || !name.trim() || name.length > 60) {
       throw new SyncProtocolError(400, "Invalid device enrollment.");
     }
-    this.storage.transactionSync(() => {
-      const existing = this.storage.sql.exec<DeviceRow>(
-        "SELECT public_key, revoked_at FROM devices WHERE device_id = ?", deviceId
-      ).toArray()[0];
-      if (existing) throw new SyncProtocolError(409, "Device identity already registered.");
-      this.storage.sql.exec(
-        "INSERT INTO devices(device_id, public_key, added_at) VALUES(?, ?, ?)",
-        deviceId, publicKeyJson, at
-      );
+    const existing = this.storage.sql.exec<DeviceRow>(
+      "SELECT public_key, revoked_at FROM devices WHERE device_id = ?", deviceId
+    ).toArray()[0];
+    if (existing) throw new SyncProtocolError(409, "Device identity already registered.");
+    this.storage.sql.exec(
+      "INSERT INTO devices(device_id,public_key,display_name,added_at) VALUES(?,?,?,?)",
+      deviceId, publicKeyJson, name, at
+    );
+  }
+
+  /** Signed administrative operation and replay claim are one SQLite transaction. */
+  authorizedControl<T>(deviceId: string, nonce: string, operation: () => T, now = Date.now()): T {
+    return this.storage.transactionSync(() => {
+      if (!this.getActiveDevice(deviceId)) {
+        throw new SyncProtocolError(401, "Device is not authorized.");
+      }
+      this.claimNonce(deviceId, nonce, now);
+      return operation();
     });
   }
 
