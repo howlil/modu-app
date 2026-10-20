@@ -20,7 +20,7 @@ export function explainSyncFailure(cause: unknown): string {
   if (/\(429\)|too many pairing attempts/i.test(error)) {
     return "Request rate limit reached. Try again later. Existing local data is unaffected.";
   }
-  if (/\(503\)|\(504\)|network|connection|fetch failed|offline/i.test(error)) {
+  if (/\(503\)|\(504\)|network|connection|fetch failed|failed to fetch|offline/i.test(error)) {
     return "Cloud service or network unavailable. Nothing was discarded locally; retry Sync now when connectivity returns.";
   }
   if (/quota|indexeddb|browser storage|blocked/i.test(error)) {
