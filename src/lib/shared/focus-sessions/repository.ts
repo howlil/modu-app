@@ -548,8 +548,8 @@ export async function beginFocusRemoteCapture(deviceId: string): Promise<void> {
   const db = await openDatabase();
   try {
     await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction([SYNC_META_STORE, OUTBOX_STORE], 'readwrite');
-      activateCaptureFromRemote(tx, deviceId);
+      const tx = db.transaction([SYNC_META_STORE, OUTBOX_STORE, INBOX_STORE], 'readwrite');
+      activateCaptureFromRemote(tx, deviceId, "pomodoro");
       tx.oncomplete = () => resolve();
       tx.onabort = () => reject(tx.error ?? new Error('Focus remote activation requires a committed sync cursor.'));
       tx.onerror = () => reject(tx.error ?? new Error('Focus remote activation failed.'));
