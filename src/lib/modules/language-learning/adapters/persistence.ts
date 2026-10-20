@@ -467,8 +467,17 @@ export const learningPersistence = {
               if((prior?.island.revision??null)!==expectedRevision)
                 throw new LearningPersistenceError('conflict','Island changed in another tab. Reload before editing.');
               const updated=reviseIsland(prior,profile,draft,prior?.archived??false);
-              catalogs.put({key,profileId:profile.id,content:updated} satisfies CatalogRow);
-              complete(updated);
+              const items=catalogs.index('profileId').getAll(profile.id);
+              items.onsuccess=()=>{
+                try {
+                  const catalog=(items.result as unknown[]).map(decodeCatalogRow)
+                    .filter(x=>x.island.id!==updated.island.id);
+                  catalog.push(updated);
+                  catalogKeys(profile,catalog.filter(x=>!x.archived).map(x=>x.island));
+                  catalogs.put({key,profileId:profile.id,content:updated} satisfies CatalogRow);
+                  complete(updated);
+                }catch(cause){fail(cause);}
+              };
             }catch(cause){fail(cause);}
           };
         }catch(cause){fail(cause);}
@@ -488,8 +497,18 @@ export const learningPersistence = {
           if(existing.island.revision!==expectedRevision)
             throw new LearningPersistenceError('conflict','Island was changed in another tab.');
           const next=archiveIsland(existing,archived);
-          if(next!==existing)store.put({key,profileId,content:next} satisfies CatalogRow);
-          complete(next);
+          const rows=store.index('profileId').getAll(profileId);
+          rows.onsuccess=()=>{
+            try {
+              const current=(rows.result as unknown[]).map(decodeCatalogRow)
+                .filter(x=>x.island.id!==next.island.id);
+              current.push(next);
+              catalogKeys({id:profileId,targetLanguage:next.island.targetLanguage},
+                current.filter(x=>!x.archived).map(x=>x.island));
+              if(next!==existing)store.put({key,profileId,content:next} satisfies CatalogRow);
+              complete(next);
+            }catch(cause){fail(cause);}
+          };
         }catch(cause){fail(cause);}
       };
     });
@@ -518,7 +537,21 @@ export const learningPersistence = {
           const ids=new Set(entries.map(x=>x.island.id));
           if(ids.size!==entries.length)throw new LearningPersistenceError('invalid','Duplicate Island IDs in import.');
           const store=tx.objectStore(CATALOGS);
+          const existingRows=store.index('profileId').getAll(profileId);
+          existingRows.onsuccess=()=>{
+            try{
+              const existing=(existingRows.result as unknown[]).map(decodeCatalogRow);
+              catalogKeys(profile,[
+                ...existing.filter(x=>!x.archived).map(x=>x.island),
+                ...entries.map(x=>x.island)
+              ]);
+              proceed();
+            }catch(cause){fail(cause);}
+          };
           let index=0;
+          const proceed=()=>{
+            next();
+          };
           const next=()=>{
             try{
               if(index===entries.length){complete(entries.length);return;}
