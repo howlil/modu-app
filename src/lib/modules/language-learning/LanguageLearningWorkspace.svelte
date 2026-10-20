@@ -2,13 +2,14 @@
   import { onMount } from 'svelte';
   import ToolHeader from '#lib/components/ToolHeader.svelte';
   import PracticeView from './components/PracticeView.svelte';
+  import ProgressView from './components/ProgressView.svelte';
   import ContentEditor from './components/ContentEditor.svelte';
   import { createLanguageLearningController } from './controller/language-learning.svelte.ts';
   const controller = createLanguageLearningController();
   let backupInput: HTMLInputElement;
   let catalogInput: HTMLInputElement;
   let newLanguage=$state('');
-  onMount(() => { void controller.load(); });
+  onMount(() => { void controller.load(); return () => controller.dispose(); });
   async function downloadBackup() {
     const content = await controller.exportBackup();
     if (!content) return;
@@ -171,6 +172,16 @@
           {/if}
         </section>
       {/if}
+      {#if controller.catalogs.some(c=>!c.archived)}
+        <div class="mt-4 flex flex-wrap gap-2">
+          <button type="button" class="rounded-full border border-border px-4 py-3 text-ui"
+            disabled={controller.pending || controller.canRetry}
+            onclick={()=>controller.start('listening')}>Practice listening</button>
+          <button type="button" class="rounded-full border border-border px-4 py-3 text-ui"
+            disabled={controller.pending || controller.canRetry}
+            onclick={()=>controller.start('shadowing')}>Practice shadowing</button>
+        </div>
+      {/if}
       {#if controller.planError}
         <p class="mt-3 text-ui text-destructive" role="alert">{controller.planError}</p>
         <button type="button" class="mt-2 rounded-full border border-border px-4 py-2 text-ui"
@@ -183,6 +194,8 @@
       </div>
     {/if}
     {#if controller.ready}
+      <ProgressView progress={controller.progress} error={controller.progressError}
+        onRefresh={controller.refreshProgress}/>
       <section class="mt-8 border-t border-border pt-4" aria-label="Learning data">
         <div class="flex flex-wrap items-center gap-2">
           <button type="button" class="rounded-full border border-border px-4 py-2 text-ui disabled:opacity-50"
