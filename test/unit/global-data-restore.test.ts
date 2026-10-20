@@ -37,7 +37,7 @@ function makePorts() {
     async exportBackup() { return { value: values.get(moduleId)! }; },
     async validateBackup(raw) {
       if (!raw || typeof raw !== "object" || !("value" in raw) ||
-        !Number.isSafeInteger(raw.value)) throw new Error("Invalid " + moduleId);
+        (typeof raw.value !== "number" || !Number.isSafeInteger(raw.value))) throw new Error("Invalid " + moduleId);
       return { moduleId, recordCount: Number(raw.value), warnings: [] };
     },
     async restoreBackup(raw) {
