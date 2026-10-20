@@ -14,7 +14,15 @@ export const learningDataPort: ModuleDataPort = {
     if (!data || typeof data !== "object" || !("sessions" in data) || !Array.isArray(data.sessions)) {
       throw new Error("Learning data backup is invalid.");
     }
-    const recordCount = data.sessions.length;
+    const counters = [data.sessions];
+    for (const field of ["profiles", "catalogs", "reviews"] as const) {
+      if (field in data) {
+        const collection = data[field];
+        if (!Array.isArray(collection)) throw new Error("Invalid Language Learning " + field + " collection.");
+        counters.push(collection);
+      }
+    }
+    const recordCount = counters.reduce((sum, collection) => sum + collection.length, 0);
     return { moduleId: "language-learning", backupVersion: 3, recordCount, state: recordCount ? "ready" : "empty" };
   },
   exportBackup: snapshot
