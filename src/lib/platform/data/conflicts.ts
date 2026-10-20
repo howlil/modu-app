@@ -7,9 +7,9 @@ export type ConflictDecision =
   | { kind: "conflict"; reason: "revision" | "immutable" | "concurrent-command" | "delete-vs-edit" };
 
 /**
- * Strict domain-aware admission policy. No remote writes occur here.
- * M4 transport may apply only an "apply" decision through the owning module
- * and must preserve a durable dedup journal for already accepted operation IDs.
+ * Conservative, pure conflict admission for M3. Never use wall-clock LWW.
+ * The M4 receiving module remains responsible for validating actual domain
+ * invariants and tracking accepted operation IDs in a durable journal.
  */
 export function decideRemoteOperation(args: {
   moduleId: ModuleDataId;
@@ -23,14 +23,17 @@ export function decideRemoteOperation(args: {
   if (local.kind === "delete" || incoming.kind === "delete") {
     return { kind: "conflict", reason: "delete-vs-edit" };
   }
-  if (moduleId === "pomodoro" || (moduleId === "language-learning" &&
-    incoming.kind === "command")) {
-    // Completed focus sessions and practice evidence are immutable by identity.
+  // Completed focus sessions are immutable by session identity. Assignments
+  // are separate commands and may need a domain-specific rebase.
+  if (moduleId === "pomodoro" && incoming.kind === "upsert" && local.kind === "upsert") {
     return { kind: "conflict", reason: "immutable" };
   }
-  if (incoming.baseRevision !== local.revision) {
-    // Concurrent Habit commands (including increments) cannot use timestamp LWW;
-    // they require a domain rebase against the authoritative policy/target.
+  if (incoming.kind === "baseline") {
+    return { kind: "conflict", reason: "revision" };
+  }
+  // Without a known source revision, applying any write over an existing
+  // entity would be an unsafe blind overwrite, even if both are increments.
+  if (incoming.baseRevision === null || incoming.baseRevision !== local.revision) {
     return { kind: "conflict", reason: incoming.kind === "command" ? "concurrent-command" : "revision" };
   }
   return { kind: "apply" };
