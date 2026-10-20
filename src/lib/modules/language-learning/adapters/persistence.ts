@@ -411,8 +411,8 @@ async function ensureCatalogInitialized():Promise<void> {
 /** No server endpoint. This browser origin owns the canonical practice history. */
 export const learningPersistence = {
   async beginRemoteSyncCapture(deviceId: string): Promise<void> {
-    return transaction<void>([SYNC_META_STORE, OUTBOX_STORE], 'readwrite', (tx, complete) => {
-      activateCaptureFromRemote(tx, deviceId);
+    return transaction<void>([SYNC_META_STORE, OUTBOX_STORE, INBOX_STORE], 'readwrite', (tx, complete) => {
+      activateCaptureFromRemote(tx, deviceId, "language-learning");
       complete(undefined);
     });
   },
