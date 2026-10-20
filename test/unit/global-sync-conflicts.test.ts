@@ -25,6 +25,23 @@ describe("strict no-data-loss conflict admission", () => {
       local: { operationId: "local", kind: "upsert", revision: "r1", payload: {} } }))
       .toEqual({ kind: "conflict", reason: "delete-vs-edit" });
   });
+  it("rejects an unversioned concurrent Habit write even if local revision is null", () => {
+    expect(decideRemoteOperation({
+      moduleId: "habit-tracker", incoming: op("habit-tracker", "upsert", null),
+      local: { operationId: "other", kind: "upsert", revision: null, payload: {} }
+    })).toEqual({ kind: "conflict", reason: "revision" });
+  });
+  it("permits sequential Learning commands only against the expected revision", () => {
+    expect(decideRemoteOperation({
+      moduleId: "language-learning", incoming: op("language-learning", "command", "r1"),
+      local: { operationId: "other", kind: "command", revision: "r1", payload: {} }
+    })).toEqual({ kind: "apply" });
+    expect(decideRemoteOperation({
+      moduleId: "language-learning", incoming: op("language-learning", "command", "r1"),
+      local: { operationId: "other", kind: "command", revision: "r2", payload: {} }
+    })).toEqual({ kind: "conflict", reason: "concurrent-command" });
+  });
+
   it("rejects cross-module operations", () => {
     expect(() => decideRemoteOperation({ moduleId: "language-learning", incoming: op("habit-tracker", "command") }))
       .toThrow("module boundary");
