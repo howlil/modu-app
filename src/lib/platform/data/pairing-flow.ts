@@ -41,6 +41,17 @@ export async function resumeDeviceJoin(): Promise<{
   const decoded = decodePairingCode(pending.invitationCode);
   if (decoded.spaceId !== identity.spaceId) throw new Error("Invitation belongs to another space.");
   const status = await pollPairing(pending.invitationCode);
+  if (status.status === "awaiting-device") {
+    // A join request may have been lost before reaching the server. Retrying
+    // with the SAME persistent key is safe only while the invitation is unused.
+    if (Date.now() - pending.requestedAt > 15_000) {
+      await storePendingPairing({ ...pending, requestedAt: Date.now() });
+      const retried = await joinWithCode(pending.invitationCode, identity);
+      await storePendingPairing({ ...pending, confirmation: retried.confirmation,
+        requestedAt: Date.now() });
+      return { phase: "waiting", confirmation: retried.confirmation };
+    }
+  }
   if (status.status !== "approved") {
     const confirmation = pending.confirmation ?? status.confirmation;
     if (confirmation && !pending.confirmation) await storePendingPairing({ ...pending, confirmation });
