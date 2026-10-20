@@ -1,11 +1,12 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { Download, Upload, Database, RefreshCw, HardDrive, CloudOff, ArrowLeft } from "lucide-svelte";
+  import { Download, Upload, Database, RefreshCw, HardDrive, ArrowLeft } from "lucide-svelte";
   import { Button } from "#lib/components/ui/button/index.js";
   import { globalDataPorts } from "#lib/platform/data/registry.ts";
   import { createGlobalBackup, encodeGlobalBackup, inspectGlobalData } from "#lib/platform/data/backup.ts";
   import type { DataInspection } from "#lib/platform/data/contracts.ts";
   import { prepareGlobalRestore, commitGlobalRestore, type PreparedGlobalRestore } from "#lib/platform/data/restore.ts";
+  import DevicePairingSettings from "#lib/components/settings/DevicePairingSettings.svelte";
 
   let summaries = $state<DataInspection[]>([]);
   let busy = $state(false);
@@ -172,13 +173,7 @@
         </div>
       {/if}
     </section>
-    <section class="flex items-center gap-3 border-t border-border p-5">
-      <CloudOff class="size-4 shrink-0 text-muted-foreground" />
-      <div>
-        <h2 class="text-ui font-medium">Device sync is not configured</h2>
-        <p class="mt-1 text-meta text-muted-foreground">Cross-browser sync is not configured. Local storage and manual backup/restore work without an account.</p>
-      </div>
-    </section>
+    <DevicePairingSettings />
   </div>
   {#if error}
     <p role="alert" class="mt-4 rounded-xl border border-destructive/30 px-4 py-3 text-ui text-destructive">{error}</p>
