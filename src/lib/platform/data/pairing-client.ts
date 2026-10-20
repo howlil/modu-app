@@ -25,6 +25,22 @@ export function decodePairingCode(code: string) {
   const [spaceId, invitationId, secret] = trimmed.split(".");
   return { spaceId, invitationId, secret };
 }
+/** Invitation secrets remain in the URL fragment, never in a request path/query. */
+export function createPairingLink(origin: string, code: string): string {
+  decodePairingCode(code);
+  const url = new URL("/settings/data", origin);
+  url.hash = "pair=" + encodeURIComponent(code);
+  return url.href;
+}
+/** Safe to use after reading location.hash; caller immediately replaces the URL. */
+export function readPairingFragment(fragment: string): string | null {
+  const params = new URLSearchParams(fragment.replace(/^#/, ""));
+  const code = params.get("pair");
+  if (!code) return null;
+  decodePairingCode(code);
+  return code;
+}
+
 export async function initializeSpace(device: NewDeviceIdentity) {
   return invoke<{ spaceId: string; recoveryKey: string }>(
     "/api/sync/initialize", identityBody(device)
