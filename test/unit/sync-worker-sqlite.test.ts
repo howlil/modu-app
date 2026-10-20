@@ -199,6 +199,19 @@ describe("M5 pairing and recovery in real SQLite", () => {
       body: JSON.stringify({ identity: ownerBody(keys), recoveryKey })
     }));
   }
+  it("rejects structurally plausible but mathematically invalid P-256 public keys", async () => {
+    const storage = createStorage();
+    const space = new SyncSpace({ storage });
+    const invalid = { deviceId: device, name: "Invalid key",
+      publicKey: { kty: "EC", crv: "P-256", x: "A".repeat(43), y: "A".repeat(43) } };
+    const request = new Request(bootstrapPath, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ identity: invalid,
+        recoveryKey: encode(crypto.getRandomValues(new Uint8Array(32))) })
+    });
+    expect((await space.fetch(request)).status).toBe(400);
+  });
+
   it("initializes only once and never re-enrolls owner by guessing the space ID", async () => {
     const storage = createStorage();
     const space = new SyncSpace({ storage });
