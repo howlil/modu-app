@@ -111,3 +111,22 @@ export function clearPendingPairing(): Promise<void> {
 export function notifyDeviceIdentityChanged(): void {
   if (typeof window !== "undefined") window.dispatchEvent(new Event("modu:sync-identity-changed"));
 }
+
+export interface PendingOwnerInvitation {
+  id: "owner-invitation";
+  code: string;
+  invitationId: string;
+  expiresAt: number;
+}
+export function readOwnerInvitation(): Promise<PendingOwnerInvitation | null> {
+  return operation("readonly", (store, done) => {
+    const request = store.get("owner-invitation");
+    request.onsuccess = () => done((request.result as PendingOwnerInvitation | undefined) ?? null);
+  });
+}
+export function storeOwnerInvitation(invite: PendingOwnerInvitation): Promise<void> {
+  return operation("readwrite", (store, done) => { store.put(invite); done(undefined); });
+}
+export function clearOwnerInvitation(): Promise<void> {
+  return operation("readwrite", (store, done) => { store.delete("owner-invitation"); done(undefined); });
+}
