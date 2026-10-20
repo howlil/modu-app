@@ -395,3 +395,34 @@ Latest verified M1 refactor CI: https://github.com/howlil/modu-app/actions/runs/
 - **Code review — resolved:** writer admission (save/edit, unarchive, template import) enforces M4's 100 active Islands / 1000 active sentences per profile so users cannot create a catalog that the planner rejects. Duplicate imported Island IDs produce a conflict before capacity validation, with atomic rollback.
 - **Code review — resolved:** catalog template export/import have symmetrical 32 MiB UTF-8 limits; *templates* do not migrate SRS history, revisions or archive state. Full backup v3 remains the lossless recovery format for practice, profiles, archived material, vocabulary and SRS.
 - **Final test evidence:** https://github.com/howlil/modu-app/actions/runs/39347612996 — Bun frozen install, Svelte/TS check, unit tests (including fake-indexeddb migration, CAS, import rollback, archiving, revision & SRS compatibility), and Cloudflare build all passed. Browser-native E2E and production launcher activation have not been performed.
+
+## M6 checkpoint — Audio & Progress (2026-10-20)
+
+**Implemented on master as a prelaunch vertical slice.** M6 adds optional browser-native text-to-speech (TTS) for listening/shadowing and a per-language progress projection from M0–M5 committed history. No user voice is recorded, stored, transmitted, or automatically graded. Module is still not registered in the public launcher.
+
+### `$design-thinking` implementation graph
+
+- **Shapes:** optional speech capability, `SpeechPlaybackError {unsupported | invalid | cancelled | playback}`, transient audio status `idle | playing | played | error`, scoped sentence identity from session ID + cursor + sentence ID/revision, learner shadowing confirmation, immutable `LearningProgress v1` and `ActivityItem` projection.
+- **A (audio):** user clicks Play for active listening/shadowing sentence -> `speechSynthesis.speak(SpeechSynthesisUtterance)` in browser -> onend for matching request + unchanged active sentence -> local `played` state -> user confirms listening, or for shadowing explicitly confirms repetition aloud -> M0/M1 `attempt` with `exposure: listening | shadowing` -> durable ack. Skipping never invents exposure. Repeat/replay never creates a second attempt by itself.
+- **A (progress):** current language profile -> one IndexedDB readonly transaction spanning profiles/sessions/reviews/catalog -> validate and decode committed records -> `projectLearningProgress` calculates session counts, recall attempts, successful recalls, listening exposures, shadowing exposures, skips and current-catalog due/scheduled records -> order bounded recent attempt timeline -> present data. No mutable analytics counter or new object store.
+- **E failures:** unsupported speech engine, missing language voice, speech error, cancelled playback, pause, abandoned session, sentence change, disposed view or concurrent playback cannot produce positive exposure acknowledgement; when audio fails, the user can skip. Corrupt history and duplicate global attempt IDs produce explicit progress failure; no silent progress reset.
+- **Execution:** speech is a scoped browser side effect owned by one mounted controller. Audio stop/dispose on unmount, pause, skip, session change, replay or abandon. Late callbacks are guarded by both generation number and complete sentence identity. New native utterance is started only from a user action. A previously saved attempt remains authoritative even when UI rerenders or audio is replayed.
+- **R:** native Web Speech `speechSynthesis` / `SpeechSynthesisUtterance` when supported, optional browser voices, and existing IndexedDB; no speech service token, microphone permission, network transport, recordings, server or added package. A voice-synthesis onend event is **not** a validated language listening/pronunciation score; learners self-report repetition.
+- **Boundary:** audio completion is transient UI eligibility, not durable proof of audio comprehension. `canCommitAudioExposure` is a pure gate for currently active matching sentence and explicit shadowing confirmation. Existing M2 evidence contract and M3 SRS eligibility remain unchanged: exposure and skip do not update memory.
+- **Progress policy:** historical attempt aggregates remain visible after Island archive or sentence revision; current due/scheduled counts include only active current sentence revisions. Activity ordering is most-recent attempt first, bounded to 15 events in UI. No derived practice duration, false proficiency percentage, pronunication score or fabricated activity streak.
+- **Lifecycle / recovery:** no speech state survives reload; unfinished listening/shadowing playback is repeated after reopening the session. Committed exposure and recall history survive IndexedDB reload and full backup/restore. Progress is recomputed rather than synchronized or migrated. UI can manually refresh progress and does not claim real-time cross-tab updates.
+
+### Code, review, and verification
+
+- `src/lib/modules/language-learning/core/audio-policy.ts`: required active mode, playback identity and explicit shadowing confirmation.
+- `src/lib/modules/language-learning/core/progress.ts`: attempt-based progress and activity projection with current SRS/content join.
+- `src/lib/modules/language-learning/adapters/speech.ts`: browser TTS adapter with stop/replay/teardown and explicit errors.
+- `src/lib/modules/language-learning/adapters/persistence.ts`: atomic readonly progress snapshot scoped by language profile.
+- `controller/language-learning.svelte.ts`, `components/PracticeView.svelte`, `components/ProgressView.svelte`, and `LanguageLearningWorkspace.svelte`: audio controls, progress UI and cleanup on unmount.
+- Tests: `test/unit/language-learning-audio-policy.test.ts`, `test/unit/language-learning-speech.test.ts`, `test/unit/language-learning-progress.test.ts`, `test/unit/language-learning-progress-indexeddb.test.ts`.
+- `$code-review` remedied: a stale asynchronous playback completion during rapid replay of the same sentence; invalid historical timestamp throwing during activity render; and stale language-profile progress results overwriting the newly selected profile.
+- Verify final GitHub Actions outcome separately; browser-native TTS playback and user-interaction E2E have not been validated. Final release still needs browser/device acceptance and explicit launch/route registration.
+
+### Next milestone / boundary
+
+- M0–M6 internal engine now covers durable practice, evaluation, SRS, plan, vocabulary/catalog authoring, optional TTS, and profile progress. The module is not publicly launched. Next work, only on explicit command: browser-native acceptance, launch integration, or higher-fidelity audio/pronunciation research—not implicitly a new M7 feature.
