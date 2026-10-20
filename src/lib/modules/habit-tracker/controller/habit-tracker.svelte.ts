@@ -9,7 +9,7 @@ import {
   createConfiguredHabit, deleteHabit, loadHabitSnapshot, updateHabitConfiguration,
   mutateHabitCheckin, setHabitArchived, subscribeHabitChanges
 } from '../adapters/persistence.ts';
-import { browserLocalDate } from '../adapters/browser-date.ts';
+import { browserLocalDate, browserTimezone, reconcileTrackingDay } from '../adapters/browser-date.ts';
 import { createInsightSnapshot, summarizeCalendarDay } from '../core/insights.ts';
 
 type HabitEditorState = { mode: 'create' | 'edit'; id?: string; title: string; policy?: GoalPolicy; direction?: HabitDefinition['direction'] };
@@ -37,6 +37,7 @@ export async function commitThenRefresh(
 
 export function createHabitTrackerController() {
   let today = $state<LocalDate>('');
+  let trackingTimezone = $state(browserTimezone());
   let selectedDate = $state<LocalDate>('');
   let view = $state<'today' | 'history' | 'insights'>('today');
   let insightHabitId = $state('');
@@ -103,6 +104,12 @@ export function createHabitTrackerController() {
     try {
       const snapshot = await loadHabitSnapshot();
       if (version !== readVersion) return false;
+      const pinnedTimezone = snapshot.trackingTimezone ?? browserTimezone();
+      const date = browserLocalDate(new Date(), pinnedTimezone);
+      const reconciled = reconcileTrackingDay(today, selectedDate, date);
+      trackingTimezone = pinnedTimezone;
+      today = reconciled.today;
+      selectedDate = reconciled.selectedDate || date;
       habits = snapshot.habits;
       policies = snapshot.policies;
       checkins = snapshot.checkins;
@@ -234,7 +241,7 @@ export function createHabitTrackerController() {
   }
 
   onMount(() => {
-    today = browserLocalDate();
+    today = browserLocalDate(new Date(), trackingTimezone);
     selectedDate = today;
     void reload(true);
     const unsubscribe = subscribeHabitChanges(() => {
@@ -243,18 +250,25 @@ export function createHabitTrackerController() {
     });
     const refresh = () => {
       if (document.visibilityState !== 'visible') return;
-      const currentDate = browserLocalDate();
-      if (currentDate !== today) {
-        const followingToday = selectedDate === today;
-        today = currentDate;
-        if (followingToday) selectedDate = currentDate;
+      const date = browserLocalDate(new Date(), trackingTimezone);
+      const next = reconcileTrackingDay(today, selectedDate, date);
+      if (next.changed) {
+        today = next.today;
+        selectedDate = next.selectedDate;
       }
       if (busy) refreshQueued = true;
       else void reload();
     };
+    // A visible tab can cross midnight without receiving a focus event.
+    // Polling once per minute is bounded and disabled for hidden documents.
+    const tick = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      if (browserLocalDate(new Date(), trackingTimezone) !== today) refresh();
+    }, 60_000);
     document.addEventListener('visibilitychange', refresh);
     window.addEventListener('focus', refresh);
     return () => {
+      window.clearInterval(tick);
       ++readVersion;
       unsubscribe();
       document.removeEventListener('visibilitychange', refresh);
@@ -264,6 +278,7 @@ export function createHabitTrackerController() {
 
   return {
     get today() { return today; },
+    get trackingTimezone() { return trackingTimezone; },
     get insights() { return insights; },
     get insightHabits() { return insightHabits; },
     get insightHabitId() { return insightHabitId; },

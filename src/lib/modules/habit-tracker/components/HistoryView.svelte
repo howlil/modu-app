@@ -13,7 +13,7 @@
   <div class="flex flex-wrap items-end justify-between gap-3">
     <div>
       <h2 class="text-title-lg font-medium">History</h2>
-      <p class="mt-1 text-meta text-muted-foreground">Select a date to inspect and correct recorded progress.</p>
+      <p class="mt-1 text-meta text-muted-foreground">Select a date to inspect and correct recorded progress. Dates use {controller.trackingTimezone}.</p>
     </div>
     <div>
       <label for="habit-history-date" class="mb-1 block text-meta text-muted-foreground">Selected date</label>

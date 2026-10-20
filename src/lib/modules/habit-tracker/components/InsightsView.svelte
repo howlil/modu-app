@@ -87,6 +87,6 @@
         </section>
       </div>
     </div>
-    <p class="mt-4 text-meta text-muted-foreground">Reporting period: {snapshot.fromDate} through {snapshot.throughDate}.{snapshot.truncated ? ' Older activity is outside the displayed ten-year history window.' : ''}</p>
+    <p class="mt-4 text-meta text-muted-foreground">Reporting period: {snapshot.fromDate} through {snapshot.throughDate}. Tracking timezone: {controller.trackingTimezone}.{snapshot.truncated ? ' Older activity is outside the displayed ten-year history window.' : ''}</p>
   {/if}
 </section>

@@ -4,20 +4,21 @@ import {
   archiveHabit, booleanCheckin, makeDailyBooleanHabit, renameHabit, restoreHabit
 } from '../core/management.ts';
 import { validateCheckin, validateGoalPolicy, validateHabit } from '../core/validation.ts';
-import { browserLocalDate } from './browser-date.ts';
+import { browserLocalDate, browserTimezone, isSupportedTimezone } from './browser-date.ts';
 import { applyCheckinCommand, makeConfiguredDailyHabit, type CheckinCommand, type HabitSetup } from '../core/progress.ts';
 import { createPolicyRevision, type PolicyRevisionInput } from '../core/policy.ts';
 
 const DATABASE = 'modu-habit-tracker';
-const VERSION = 1;
+const VERSION = 2;
 const CHANGE = 'modu:habit-changed';
 const CHANNEL = 'modu-habit-tracker-changes';
-type StoreName = 'habits' | 'policies' | 'checkins';
+type StoreName = 'habits' | 'policies' | 'checkins' | 'preferences';
 
 export interface HabitSnapshot {
   habits: HabitDefinition[];
   policies: GoalPolicy[];
   checkins: HabitCheckin[];
+  trackingTimezone?: string;
 }
 
 export class HabitStorageError extends Error {
@@ -44,8 +45,14 @@ function openDatabase(): Promise<IDBDatabase> {
         const checkins = db.createObjectStore('checkins', { keyPath: 'id' });
         checkins.createIndex('habitId', 'habitId', { unique: false });
       }
+      if (!db.objectStoreNames.contains('preferences')) {
+        db.createObjectStore('preferences', { keyPath: 'id' });
+      }
     };
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      request.result.onversionchange = () => request.result.close();
+      resolve(request.result);
+    };
     request.onerror = () => reject(new HabitStorageError('Unable to open the Habit Tracker database.'));
     request.onblocked = () => reject(new HabitStorageError('Close other tabs that are blocking database access, then retry.'));
   });
@@ -86,6 +93,10 @@ function enforceValid(result: ReturnType<typeof validateHabit>): void {
 
 /** Validate the complete loaded snapshot before any record reaches reactive UI. */
 export function validateHabitSnapshot(snapshot: HabitSnapshot): HabitSnapshot {
+  if (snapshot.trackingTimezone !== undefined &&
+    !isSupportedTimezone(snapshot.trackingTimezone)) {
+    throw new HabitStorageError('Invalid stored tracking timezone; no data has been changed.');
+  }
   const byId = new Map<string, HabitDefinition>();
   for (const habit of snapshot.habits) {
     enforceValid(validateHabit(habit));
@@ -151,9 +162,14 @@ export function subscribeHabitChanges(onChange: () => void): () => void {
   };
 }
 
+/**
+ * A version-1 database is upgraded non-destructively to version 2.
+ * The user's initial tracking timezone is pinned once in preferences, while
+ * existing habits, policies and check-ins remain completely unchanged.
+ */
 export async function loadHabitSnapshot(): Promise<HabitSnapshot> {
   const snapshot = await withDatabase(db => transaction<HabitSnapshot>(
-    db, ['habits', 'policies', 'checkins'], 'readonly', (tx, set) => {
+    db, ['habits', 'policies', 'checkins', 'preferences'], 'readwrite', (tx, set, fail) => {
       const result: HabitSnapshot = { habits: [], policies: [], checkins: [] };
       set(result);
       tx.objectStore('habits').getAll().onsuccess = e => {
@@ -165,9 +181,37 @@ export async function loadHabitSnapshot(): Promise<HabitSnapshot> {
       tx.objectStore('checkins').getAll().onsuccess = e => {
         result.checkins = (e.target as IDBRequest).result as HabitCheckin[];
       };
+      const preferences = tx.objectStore('preferences');
+      const timezoneRequest = preferences.get('tracking');
+      timezoneRequest.onsuccess = () => {
+        const saved = timezoneRequest.result as { id: string; trackingTimezone?: string } | undefined;
+        const timezone = saved ? saved.trackingTimezone : browserTimezone();
+        if (!timezone || !isSupportedTimezone(timezone)) {
+          fail(new HabitStorageError('Stored tracking timezone is invalid.')); return;
+        }
+        result.trackingTimezone = timezone;
+        if (!saved) preferences.add({ id: 'tracking', trackingTimezone: timezone });
+      };
     }
   ));
   return validateHabitSnapshot(snapshot);
+}
+
+/** Calendar boundary for all writes must match the persisted tracking timezone. */
+async function currentTrackingDate(): Promise<LocalDate> {
+  const timezone = await withDatabase(db => transaction<string>(
+    db, ['preferences'], 'readonly', (tx, set, fail) => {
+      const request = tx.objectStore('preferences').get('tracking');
+      request.onsuccess = () => {
+        const value = request.result?.trackingTimezone as string | undefined;
+        if (!value || !isSupportedTimezone(value)) {
+          fail(new HabitStorageError('Open Habit Tracker to initialize its tracking timezone.')); return;
+        }
+        set(value);
+      };
+    }
+  ));
+  return browserLocalDate(new Date(), timezone);
 }
 
 /** M1 entrypoint retained for existing callers. */
@@ -176,7 +220,7 @@ export async function createDailyHabit(title: string, date: LocalDate): Promise<
 }
 
 export async function createConfiguredHabit(input: HabitSetup, date: LocalDate): Promise<void> {
-  if (!isLocalDate(date) || date !== browserLocalDate()) {
+  if (!isLocalDate(date) || date !== await currentTrackingDate()) {
     throw new RangeError('New habits must begin on the current local day.');
   }
   const id = crypto.randomUUID();
@@ -216,7 +260,7 @@ export async function updateHabitConfiguration(
   today: LocalDate,
   revisePolicy: boolean
 ): Promise<void> {
-  if (!isLocalDate(today) || today !== browserLocalDate()) {
+  if (!isLocalDate(today) || today !== await currentTrackingDate()) {
     throw new RangeError('The local date changed. Reopen the editor before saving.');
   }
   await withDatabase(db => transaction<void>(
@@ -245,6 +289,9 @@ export async function updateHabitConfiguration(
 }
 
 export async function setHabitArchived(id: string, archive: boolean, date: LocalDate): Promise<void> {
+  if (!isLocalDate(date) || date !== await currentTrackingDate()) {
+    throw new RangeError('The tracking date has changed. Refresh before changing archive status.');
+  }
   await withDatabase(db => transaction<void>(
     db, ['habits'], 'readwrite', (tx, _set, fail) => {
       const store = tx.objectStore('habits');
@@ -288,7 +335,7 @@ export async function deleteHabit(id: string): Promise<void> {
 export async function mutateHabitCheckin(
   id: string, date: LocalDate, command: CheckinCommand
 ): Promise<void> {
-  if (!isLocalDate(date) || date > browserLocalDate()) {
+  if (!isLocalDate(date) || date > await currentTrackingDate()) {
     throw new RangeError('Cannot record progress for a future or invalid date.');
   }
   await withDatabase(db => transaction<void>(
@@ -297,6 +344,9 @@ export async function mutateHabitCheckin(
       habitRequest.onsuccess = () => {
         const habit = habitRequest.result as HabitDefinition | undefined;
         if (!habit) { fail(new HabitStorageError('Habit not found.')); return; }
+        if (habit.status !== 'ACTIVE') {
+          fail(new HabitStorageError('Archived habits cannot accept new check-ins.')); return;
+        }
         const policiesRequest = tx.objectStore('policies').index('habitId').getAll(id);
         policiesRequest.onsuccess = () => {
           try {
@@ -322,6 +372,6 @@ export async function mutateHabitCheckin(
 
 /** Compatibility for existing M1 boolean callers. */
 export async function setDailyCompleted(id: string, date: LocalDate, complete: boolean): Promise<void> {
-  if (date !== browserLocalDate()) throw new RangeError('M1 boolean check-ins require today.');
+  if (date !== await currentTrackingDate()) throw new RangeError('M1 boolean check-ins require today.');
   await mutateHabitCheckin(id, date, complete ? { type: 'set', value: 1 } : { type: 'clear' });
 }

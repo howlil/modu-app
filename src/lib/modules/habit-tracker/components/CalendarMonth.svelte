@@ -45,9 +45,13 @@
     const label = new Date(info.date + 'T12:00:00Z').toLocaleDateString(undefined, {
       weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC'
     });
-    if (info.weeklyQualified) return label + ', ' + info.weeklyQualified + ' weekly quota date(s) qualified';
-    if (info.weeklyOpportunity && !info.scheduled) return label + ', weekly quota opportunity';
-    return label + ', ' + info.status.toLowerCase().replace('_', ' ');
+    const daily = info.scheduled
+      ? info.met + ' of ' + info.scheduled + ' daily goals met, ' + info.status.toLowerCase().replace('_', ' ')
+      : 'no daily goals scheduled';
+    const weekly = info.weeklyOpportunity
+      ? ', ' + info.weeklyQualified + ' of ' + info.weeklyOpportunity + ' weekly opportunities qualified'
+      : '';
+    return label + ', ' + daily + weekly;
   }
 </script>
 
@@ -66,8 +70,11 @@
     </button>
   </div>
   <div class="mt-4 grid grid-cols-7 gap-1">
-    {#each ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as letter, index (index)}
-      <div class="pb-2 text-center text-meta text-muted-foreground" aria-hidden="true">{letter}</div>
+    {#each [{short:'M',long:'Monday'},{short:'T',long:'Tuesday'},{short:'W',long:'Wednesday'},{short:'T',long:'Thursday'},{short:'F',long:'Friday'},{short:'S',long:'Saturday'},{short:'S',long:'Sunday'}] as weekday (weekday.long)}
+      <div class="pb-2 text-center text-meta text-muted-foreground">
+        <span aria-hidden="true">{weekday.short}</span>
+        <span class="sr-only">{weekday.long}</span>
+      </div>
     {/each}
     {#each days as day, index (index)}
       {#if day}
