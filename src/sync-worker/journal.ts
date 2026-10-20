@@ -16,6 +16,14 @@ export interface SyncStorage {
 type DeviceRow = { public_key: string; revoked_at: number | null };
 type SequenceRow = { seq: number; device_id: string; body: string };
 type CountRow = { count: number };
+type UsageRow = { bytes: number; events: number };
+export const MAX_SYNC_SPACE_BYTES = 64 * 1024 * 1024;
+export const MAX_SYNC_SPACE_EVENTS = 100_000;
+// Never emit an enormous HTTP response when each individual event fits its
+// own signed push request. Keep a single largest permitted event receivable.
+export const MAX_SYNC_PULL_BYTES = 768 * 1024;
+const MAX_SQL_PAGE_ROWS = 8;
+
 
 const SCHEMA = `
   CREATE TABLE IF NOT EXISTS devices (
@@ -44,6 +52,13 @@ const SCHEMA = `
     committed_at INTEGER NOT NULL
   );
   CREATE INDEX IF NOT EXISTS operations_device ON operations(device_id, seq);
+  CREATE TABLE IF NOT EXISTS journal_usage (
+    id INTEGER PRIMARY KEY CHECK(id=1),
+    bytes INTEGER NOT NULL CHECK(bytes>=0),
+    events INTEGER NOT NULL CHECK(events>=0)
+  );
+  INSERT OR IGNORE INTO journal_usage(id, bytes, events)
+    SELECT 1, COALESCE(SUM(LENGTH(CAST(body AS BLOB))), 0), COUNT(*) FROM operations;
 `;
 
 /** Trust boundary: callers authenticate device signatures before invoking push/pull. */
@@ -139,6 +154,15 @@ export class SyncJournal {
           accepted.push({ operationId: operation.operationId, sequence: existing.seq });
           continue;
         }
+        const bytes = new TextEncoder().encode(body).byteLength;
+        const usage = this.storage.sql.exec<UsageRow>(
+          "SELECT bytes, events FROM journal_usage WHERE id = 1"
+        ).toArray()[0];
+        if (!usage || usage.bytes + bytes > MAX_SYNC_SPACE_BYTES ||
+            usage.events + 1 > MAX_SYNC_SPACE_EVENTS) {
+          throw new SyncProtocolError(507,
+            "Sync space has reached its retention limit. Export local backups before retrying.");
+        }
         this.storage.sql.exec(
           "INSERT INTO operations(operation_id,device_id,module_id,entity_id,kind,body,created_at,committed_at) VALUES(?,?,?,?,?,?,?,?)",
           operation.operationId, deviceId, operation.moduleId, operation.entityId,
@@ -148,6 +172,10 @@ export class SyncJournal {
           "SELECT seq, device_id, body FROM operations WHERE operation_id = ?", operation.operationId
         ).toArray()[0];
         if (!saved) throw new Error("Durable journal did not persist the operation.");
+        this.storage.sql.exec(
+          "UPDATE journal_usage SET bytes = bytes + ?, events = events + 1 WHERE id = 1",
+          bytes
+        );
         accepted.push({ operationId: operation.operationId, sequence: saved.seq });
       }
       return { accepted };
@@ -160,15 +188,23 @@ export class SyncJournal {
       this.claimNonce(deviceId, nonce, now);
       const rows = this.storage.sql.exec<{ seq: number; body: string }>(
         "SELECT seq, body FROM operations WHERE seq > ? ORDER BY seq ASC LIMIT ?",
-        after, limit
+        after, Math.min(limit, MAX_SQL_PAGE_ROWS)
       ).toArray();
-      const operations: SequencedSyncOperation[] = rows.map(row => {
+      const operations: SequencedSyncOperation[] = [];
+      let bytes = 0;
+      for (const row of rows) {
         if (!Number.isSafeInteger(row.seq) || row.seq <= 0) {
           throw new Error("Invalid sync sequence stored in SQLite.");
         }
+        const length = new TextEncoder().encode(row.body).byteLength + 64;
+        if (operations.length && bytes + length > MAX_SYNC_PULL_BYTES) break;
+        if (length > MAX_SYNC_PULL_BYTES) {
+          throw new SyncProtocolError(507, "Stored sync event exceeds the supported reply size.");
+        }
         const parsed = JSON.parse(row.body) as WireSyncOperation;
-        return { ...parsed, sequence: row.seq };
-      });
+        operations.push({ ...parsed, sequence: row.seq });
+        bytes += length;
+      }
       const nextCursor = operations.at(-1)?.sequence ?? after;
       const remaining = this.storage.sql.exec<CountRow>(
         "SELECT COUNT(*) AS count FROM operations WHERE seq > ?", nextCursor
