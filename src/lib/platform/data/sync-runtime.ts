@@ -7,7 +7,7 @@ import { subscribeHabitChanges } from "#lib/modules/habit-tracker/adapters/persi
 import { subscribeLearningChanges } from "#lib/modules/language-learning/adapters/persistence.ts";
 
 export type SyncHealth = "local" | "connecting" | "syncing" | "up-to-date" |
-  "offline" | "needs-review" | "revoked" | "error";
+  "offline" | "needs-review" | "blocked" | "revoked" | "error";
 export type SyncStatus = {
   kind: SyncHealth;
   updatedAt: number | null;
@@ -36,6 +36,7 @@ const ERROR_REVOKED = /revoked|not paired|unauthorized|\(401\)|\(403\)/i;
 export function startGlobalSyncRuntime(): () => void {
   let disposed = false;
   let busy = false;
+  let paused = false;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let backoff = 3_000;
   const cleanTimer = () => { if (timer !== null) clearTimeout(timer); timer = null; };
@@ -50,7 +51,7 @@ export function startGlobalSyncRuntime(): () => void {
     return pending;
   };
   const run = async () => {
-    if (disposed || busy) return;
+    if (disposed || busy || paused) return;
     if (document.visibilityState === "hidden") return;
     let identity;
     try { identity = await readDeviceIdentity(); }
@@ -85,20 +86,23 @@ export function startGlobalSyncRuntime(): () => void {
       if (disposed) return;
       const raw = cause instanceof Error ? cause.message : "";
       const kind: SyncHealth = ERROR_REVIEW.test(raw) ? "needs-review" :
-        ERROR_REVOKED.test(raw) ? "revoked" : "error";
+        ERROR_REVOKED.test(raw) ? "revoked" :
+        ERROR_PERMANENT.test(raw) ? "blocked" : "error";
+      paused = kind !== "error";
       broadcast({ ...current, kind, description: explainSyncFailure(cause) });
       if (kind === "error") { schedule(backoff); backoff = Math.min(backoff * 2, 60_000); }
     } finally { busy = false; }
   };
   const changed = () => schedule(1_500);
   const online = () => schedule(100);
+  const identityChanged = () => {paused = false; schedule(100);};
   const visible = () => { if (document.visibilityState === "visible") schedule(100); };
   const unsubscribeFocus = subscribeFocusSessions(changed);
   const unsubscribeHabit = subscribeHabitChanges(changed);
   const unsubscribeLearning = subscribeLearningChanges(changed);
   window.addEventListener("online", online);
   window.addEventListener("focus", visible);
-  window.addEventListener("modu:sync-identity-changed", online);
+  window.addEventListener("modu:sync-identity-changed", identityChanged);
   document.addEventListener("visibilitychange", visible);
   const interval = setInterval(() => { if (!busy && document.visibilityState === "visible") schedule(200); }, 45_000);
   schedule(200);
@@ -107,7 +111,7 @@ export function startGlobalSyncRuntime(): () => void {
     unsubscribeFocus(); unsubscribeHabit(); unsubscribeLearning();
     window.removeEventListener("online", online);
     window.removeEventListener("focus", visible);
-    window.removeEventListener("modu:sync-identity-changed", online);
+    window.removeEventListener("modu:sync-identity-changed", identityChanged);
     document.removeEventListener("visibilitychange", visible);
   };
 }
