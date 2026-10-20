@@ -100,7 +100,7 @@ async function run() {
     'const box=document.querySelector("input[type=checkbox]");if(!box)return false;box.click();return box.checked;'
   ), true);
   await click("Restore all modules");
-  await waitFor("restored storage after reload", 'document.body.textContent.includes("Data & Sync") && document.body.textContent.includes("Module data")', 30000);
+  await waitFor("restored storage after reload", 'performance.getEntriesByType("navigation")[0]?.type === "reload" && document.body.textContent.includes("Module data")', 30000);
   await navigate(SITE + "/habit");
   await waitFor("habit restored", 'document.body.textContent.includes("New habit") && !document.body.textContent.includes("Loading habits")');
   assert.equal(await execute('return document.body.textContent.includes("Restore smoke");'), false);
