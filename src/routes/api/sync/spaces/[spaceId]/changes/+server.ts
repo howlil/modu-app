@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { json, type RequestHandler } from "@sveltejs/kit";
-import { SYNC_MAX_BODY_BYTES } from "#lib/platform/data/sync-protocol.ts";
+import { SYNC_MAX_BODY_BYTES, SyncProtocolError } from "#lib/platform/data/sync-protocol.ts";
+import { readLimitedSyncBody } from "#lib/platform/data/sync-body.ts";
 
 type SyncStub = { fetch(request: Request): Promise<Response> };
 type SyncNamespace = {
@@ -36,9 +37,15 @@ async function forward(
   if (!Number.isFinite(length) || length > SYNC_MAX_BODY_BYTES) {
     return json({ error: "Sync payload too large." }, { status: 413 });
   }
-  const payload = request.method === "POST" ? await request.text() : "";
-  if (new TextEncoder().encode(payload).byteLength > SYNC_MAX_BODY_BYTES) {
-    return json({ error: "Sync payload too large." }, { status: 413 });
+  let payload = "";
+  if (request.method === "POST") {
+    try { payload = await readLimitedSyncBody(request); }
+    catch (cause) {
+      if (cause instanceof SyncProtocolError) {
+        return json({ error: cause.message }, { status: cause.status });
+      }
+      return json({ error: "Failed to read sync payload." }, { status: 400 });
+    }
   }
   const allowedHeaders = new Headers();
   for (const key of [
