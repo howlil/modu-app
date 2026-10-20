@@ -1,8 +1,9 @@
 import type { FocusActivitySession } from './types.ts';
+import { OUTBOX_STORE, SYNC_META_STORE, ensureOutboxStores, queueLocalMutation, resetCaptureAfterRestore, readOutbox, acknowledgeOutbox } from '#lib/platform/data/outbox.ts';
 
 const DB_NAME = 'module-pomodoro-activity';
 const STORE_NAME = 'sessions';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const FALLBACK_KEY = 'module-pomodoro-activity-fallback';
 
 function openDatabase() {
@@ -20,6 +21,7 @@ function openDatabase() {
         const store = database.createObjectStore(STORE_NAME, { keyPath: 'id' });
         store.createIndex('endedAt', 'endedAt');
       }
+      ensureOutboxStores(database);
     };
 
     request.onsuccess = () => resolve(request.result);
@@ -65,8 +67,9 @@ export async function saveFocusSession(session: FocusActivitySession) {
     const database = await openDatabase();
 
     await new Promise<void>((resolve, reject) => {
-      const transaction = database.transaction(STORE_NAME, 'readwrite');
+      const transaction = database.transaction([STORE_NAME, OUTBOX_STORE, SYNC_META_STORE], 'readwrite');
       transaction.objectStore(STORE_NAME).put(session);
+      queueLocalMutation(transaction, 'pomodoro', session.id, 'upsert', { session });
       transaction.oncomplete = () => resolve();
       transaction.onerror = () => reject(transaction.error ?? new Error('Unable to save session'));
     });
@@ -88,10 +91,13 @@ export async function saveFocusSessions(sessions: FocusActivitySession[]) {
     const database = await openDatabase();
 
     await new Promise<void>((resolve, reject) => {
-      const transaction = database.transaction(STORE_NAME, 'readwrite');
+      const transaction = database.transaction([STORE_NAME, OUTBOX_STORE, SYNC_META_STORE], 'readwrite');
       const store = transaction.objectStore(STORE_NAME);
 
-      for (const session of sessions) store.put(session);
+      for (const session of sessions) {
+        store.put(session);
+        queueLocalMutation(transaction, 'pomodoro', session.id, 'upsert', { session });
+      }
 
       transaction.oncomplete = () => resolve();
       transaction.onerror = () => reject(transaction.error ?? new Error('Unable to save sessions'));
@@ -132,8 +138,15 @@ export async function clearFocusSessions() {
     const database = await openDatabase();
 
     await new Promise<void>((resolve, reject) => {
-      const transaction = database.transaction(STORE_NAME, 'readwrite');
-      transaction.objectStore(STORE_NAME).clear();
+      const transaction = database.transaction([STORE_NAME, OUTBOX_STORE, SYNC_META_STORE], 'readwrite');
+      const store = transaction.objectStore(STORE_NAME);
+      const before = store.getAllKeys();
+      before.onsuccess = () => {
+        for (const id of before.result) {
+          queueLocalMutation(transaction, 'pomodoro', String(id), 'delete', { sessionId: String(id) });
+        }
+        store.clear();
+      };
       transaction.oncomplete = () => resolve();
       transaction.onerror = () => reject(transaction.error ?? new Error('Unable to clear sessions'));
     });
@@ -179,12 +192,14 @@ export async function assignFocusSession(sessionId: string, taskId: string | nul
   try {
     const database = await openDatabase();
     await new Promise<void>((resolve, reject) => {
-      const transaction = database.transaction(STORE_NAME, 'readwrite');
+      const transaction = database.transaction([STORE_NAME, OUTBOX_STORE, SYNC_META_STORE], 'readwrite');
       const store = transaction.objectStore(STORE_NAME);
       const request = store.get(sessionId);
       request.onsuccess = () => {
         if (!request.result) { transaction.abort(); return; }
-        store.put({ ...request.result, taskId });
+        const updated = { ...request.result, taskId } as FocusActivitySession;
+        store.put(updated);
+        queueLocalMutation(transaction, 'pomodoro', sessionId, 'command', { action: 'assign-task', taskId });
       };
       transaction.oncomplete = () => resolve();
       transaction.onabort = () => reject(new Error('Focus session not found'));
@@ -269,10 +284,11 @@ export async function replaceFocusSessionsForRestore(sessions: readonly FocusAct
   const db = await openDatabase();
   try {
     await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const tx = db.transaction([STORE_NAME, OUTBOX_STORE, SYNC_META_STORE], 'readwrite');
       const store = tx.objectStore(STORE_NAME);
       store.clear();
       for (const session of sessions) store.add(session);
+      resetCaptureAfterRestore(tx);
       tx.oncomplete = () => resolve();
       tx.onabort = () => reject(tx.error ?? new Error('Pomodoro history restore aborted.'));
       tx.onerror = () => reject(tx.error ?? new Error('Pomodoro history restore failed.'));
@@ -282,4 +298,16 @@ export async function replaceFocusSessionsForRestore(sessions: readonly FocusAct
   }
   if (typeof localStorage !== 'undefined') localStorage.removeItem(FALLBACK_KEY);
   announceChange();
+}
+
+/** Feature-owned outbox: only completed sessions/assignments, never running timers. */
+export async function readFocusPendingSyncOperations(limit = 100) {
+  const db = await openDatabase();
+  try { return await readOutbox(db, 'pomodoro', limit); }
+  finally { db.close(); }
+}
+export async function acknowledgeFocusSyncOperations(operationIds: readonly string[]) {
+  const db = await openDatabase();
+  try { await acknowledgeOutbox(db, operationIds); }
+  finally { db.close(); }
 }
