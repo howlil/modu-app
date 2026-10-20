@@ -6,11 +6,11 @@ import {
 import {
   loadHabitSnapshot, createConfiguredHabit, changeHabitTitle,
   deleteHabit, replaceHabitSnapshotForRestore, readHabitPendingSyncOperations,
-  acknowledgeHabitSyncOperations
+  acknowledgeHabitSyncOperations, beginHabitSyncCapture
 } from "../../src/lib/modules/habit-tracker/adapters/persistence.ts";
 import {
   saveFocusSession, exportFocusSessionsForBackup,
-  readFocusPendingSyncOperations
+  readFocusPendingSyncOperations, beginFocusSyncCapture
 } from "../../src/lib/shared/focus-sessions/repository.ts";
 import { learningPersistence } from "../../src/lib/modules/language-learning/adapters/persistence.ts";
 import type { FocusActivitySession } from "../../src/lib/shared/focus-sessions/types.ts";
@@ -66,6 +66,12 @@ async function reset(): Promise<void> {
 }
 
 beforeEach(async () => {
+  const storage = new Map<string, string>();
+  vi.stubGlobal("localStorage", {
+    getItem: (key: string) => storage.get(key) ?? null,
+    setItem: (key: string, val: string) => { storage.set(key, val); },
+    removeItem: (key: string) => { storage.delete(key); }
+  });
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-10-20T12:00:00Z"));
   await reset();
@@ -76,6 +82,52 @@ afterEach(() => {
 });
 
 describe("M3 per-module atomic outbox", () => {
+  it("atomically captures existing Habit data, then journals subsequent edits", async () => {
+    await loadHabitSnapshot();
+    await createConfiguredHabit({ title: "Existing", direction: "BUILD", measurement: "COUNT", target: 3 }, "2026-10-20");
+    await beginHabitSyncCapture("paired-habit");
+    const pending = await readHabitPendingSyncOperations();
+    expect(pending).toHaveLength(1);
+    expect(pending[0]).toMatchObject({ kind: "baseline", deviceId: "paired-habit" });
+    const baseline = pending[0].payload as { habits: unknown[]; policies: unknown[] };
+    expect(baseline.habits).toHaveLength(1);
+    expect(baseline.policies).toHaveLength(1);
+    await createConfiguredHabit({ title: "Next", direction: "BUILD", measurement: "COUNT", target: 2 }, "2026-10-20");
+    expect((await readHabitPendingSyncOperations()).map(x => x.kind)).toEqual(["baseline", "upsert"]);
+    await expect(beginHabitSyncCapture("other-device")).rejects.toThrow();
+    expect(await readHabitPendingSyncOperations()).toHaveLength(2);
+  });
+
+  it("migrates Pomodoro fallback history into a single authoritative baseline", async () => {
+    const historical = session("fallback-id");
+    localStorage.setItem("module-pomodoro-activity-fallback", JSON.stringify([historical]));
+    await saveFocusSession(session("indexed-id"));
+    await beginFocusSyncCapture("paired-focus");
+    const pending = await readFocusPendingSyncOperations();
+    expect(pending).toHaveLength(1);
+    expect(pending[0]).toMatchObject({ kind: "baseline", deviceId: "paired-focus" });
+    expect((pending[0].payload as { sessions: FocusActivitySession[] }).sessions.map(x => x.id).sort())
+      .toEqual(["fallback-id", "indexed-id"]);
+    expect((await exportFocusSessionsForBackup()).map(x => x.id).sort())
+      .toEqual(["fallback-id", "indexed-id"]);
+    expect(localStorage.getItem("module-pomodoro-activity-fallback")).toBeNull();
+  });
+
+  it("baselines the validated Learning profile and catalog before further writes", async () => {
+    await learningPersistence.profiles();
+    await learningPersistence.createProfile({ id: "spanish", targetLanguage: "es" });
+    await learningPersistence.beginSyncCapture("paired-learning");
+    const pending = await learningPersistence.readPendingSyncOperations();
+    expect(pending).toHaveLength(1);
+    const backup = pending[0].payload as { profiles: Array<{id:string}>; catalogs: unknown[] };
+    expect(backup.profiles.some(x => x.id === "spanish")).toBe(true);
+    expect(Array.isArray(backup.catalogs)).toBe(true);
+    await learningPersistence.createProfile({ id: "french", targetLanguage: "fr" });
+    expect((await learningPersistence.readPendingSyncOperations()).map(x => x.kind))
+      .toEqual(["baseline", "upsert"]);
+  });
+
+
   it("defaults to local-only and avoids accumulating queue entries", async () => {
     await loadHabitSnapshot();
     await createConfiguredHabit({ title: "Read", direction: "BUILD", measurement: "COUNT", target: 3 }, "2026-10-20");
