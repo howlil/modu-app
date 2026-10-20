@@ -35,6 +35,7 @@
   let notice = $state("");
   let error = $state("");
   let mode = $state<"create" | "join" | "recover">("create");
+  let syncAvailable = $state(false);
 
   async function execute(task: () => Promise<void>) {
     if (busy) return;
@@ -42,6 +43,17 @@
     try { await task(); }
     catch (cause) { error = cause instanceof Error ? cause.message : "Device operation failed."; }
     finally { busy = false; }
+  }
+  async function loadSyncAvailability() {
+    try {
+      const response = await fetch("/api/sync/status", {
+        method: "GET", cache: "no-store", credentials: "omit"
+      });
+      if (!response.ok) return;
+      const state: unknown = await response.json();
+      syncAvailable = !!state && typeof state === "object" &&
+        (state as { enabled?: unknown }).enabled === true;
+    } catch { syncAvailable = false; }
   }
   async function loadIdentity() {
     identity = await readDeviceIdentity();
@@ -185,7 +197,7 @@
       notice = "Device revoked. Already-downloaded local data cannot be remotely erased.";
     });
   }
-  onMount(() => { void execute(loadIdentity); });
+  onMount(() => { void execute(async () => { await Promise.all([loadIdentity(), loadSyncAvailability()]); }); });
 </script>
 
 <section class="border-t border-border px-5 py-5">
@@ -196,7 +208,11 @@
     </div>
     <ShieldCheck class="mt-0.5 size-4 shrink-0 text-muted-foreground" />
   </div>
-  {#if identity}
+  {#if !syncAvailable}
+    <p class="mt-4 text-meta text-muted-foreground" role="status">
+      Device sync is not enabled on this deployment. Local data and manual backup/restore remain available.
+    </p>
+  {:else if identity}
     <div class="mt-4 space-y-3">
       <div class="flex items-center justify-between gap-3 text-meta">
         <span><strong>{identity.name}</strong> · {identity.status === "paired" ? "Authorized" : "Setup pending"}</span>
