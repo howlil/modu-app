@@ -42,7 +42,9 @@ export async function resumeDeviceJoin(): Promise<{
   if (decoded.spaceId !== identity.spaceId) throw new Error("Invitation belongs to another space.");
   const status = await pollPairing(pending.invitationCode);
   if (status.status !== "approved") {
-    return { phase: "waiting", confirmation: pending.confirmation };
+    const confirmation = pending.confirmation ?? status.confirmation;
+    if (confirmation && !pending.confirmation) await storePendingPairing({ ...pending, confirmation });
+    return { phase: "waiting", confirmation };
   }
   // Server verifies actual possession of this device's P-256 signing key.
   await new SyncTransport(identity).control("GET", "devices");
