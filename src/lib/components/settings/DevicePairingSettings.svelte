@@ -4,7 +4,7 @@
   import { Cloud, RefreshCw, Smartphone, Laptop, Copy,
     AlertTriangle, Plus, ChevronRight } from "lucide-svelte";
   import PairingInvitePanel from "./PairingInvitePanel.svelte";
-  import { createPairingLink, readPairingFragment, encodePairingCode,
+  import { createPairingLink, readPairingFragment, resolvePairingInput, encodePairingCode,
     createPairingInvite, inspectPairingInvite, approvePairingInvite,
     listPairedDevices, revokePairedDevice, recoverSpace, decodeRecoveryCode } from "#lib/platform/data/pairing-client.ts";
   import { enableSyncOnce, resumeOwnerSetup, type SetupStage } from "#lib/platform/data/setup-flow.ts";
@@ -149,7 +149,7 @@
   }
   async function beginJoin() {
     await action(async () => {
-      const code = joinCode.trim();
+      const code = resolvePairingInput(joinCode, location.origin);
       const confirmation = await requestDeviceJoin(code,deviceName);
       phoneConfirmation = confirmation;
       await loadIdentity();
