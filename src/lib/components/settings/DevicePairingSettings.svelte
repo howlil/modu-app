@@ -26,6 +26,7 @@
   let myConfirmation = $state("");
   let pendingName = $state("");
   let pendingConfirmation = $state("");
+  let approvalCodeInput = $state("");
   let deviceList = $state<Array<{ deviceId: string; name: string; addedAt: number; revoked: boolean }>>([]);
   let busy = $state(false);
   let notice = $state("");
@@ -141,8 +142,9 @@
   function approve() {
     void execute(async () => {
       if (!identity || !activeInvitation || !pendingConfirmation) return;
-      await approvePairingInvite(identity, activeInvitation, pendingConfirmation);
-      pendingName = ""; pendingConfirmation = ""; pairingCode = ""; activeInvitation = "";
+      if (approvalCodeInput !== pendingConfirmation) throw new Error("The codes do not match. Check the new device.");
+      await approvePairingInvite(identity, activeInvitation, approvalCodeInput);
+      pendingName = ""; pendingConfirmation = ""; approvalCodeInput = ""; pairingCode = ""; activeInvitation = "";
       notice = "New device approved. No data was transferred automatically.";
       const result = await listPairedDevices(identity);
       deviceList = result.devices;
@@ -221,7 +223,10 @@
             </div>
             {#if pendingName}
               <p class="mt-3 text-meta">Request: <strong>{pendingName}</strong> · Compare code <strong class="tabular-nums">{pendingConfirmation}</strong></p>
-              <Button size="sm" class="mt-2 rounded-full" onclick={approve} disabled={busy}>Approve matched device</Button>
+              <label class="mt-2 block text-meta">Enter the 6-digit code shown on the new device
+                <input inputmode="numeric" maxlength="6" pattern="[0-9]{6}" class="mt-1 h-9 w-full rounded-lg border border-border bg-background px-3 font-mono" bind:value={approvalCodeInput}/>
+              </label>
+              <Button size="sm" class="mt-2 rounded-full" onclick={approve} disabled={busy || approvalCodeInput.length !== 6 || approvalCodeInput !== pendingConfirmation}>Approve matched device</Button>
             {/if}
           </div>
         {/if}
