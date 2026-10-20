@@ -385,3 +385,13 @@ Latest verified M1 refactor CI: https://github.com/howlil/modu-app/actions/runs/
 - `$code-review` detected and fixed two major issues: silently carrying vocabulary into rewritten sentence revisions without confirmation; and starting a new session from a catalog revision edited/archived in another tab. Fixed a local backup-template limit mismatch and last-session language-profile recovery.
 - Verify GitHub CI final run before claiming closure. Browser-native E2E, robust larger-scale catalog importing, and final public launch acceptance remain separate milestones.
 - **Next M6:** Audio & Progress. Reuse content, session evidence, SRS due state, and profile isolation; do not introduce accounts or paid integrations.
+
+### Final M5 verification and code-review remediation
+
+- **Code review — resolved:** retained vocabulary on edited sentence text now requires explicit author reconfirmation, rather than silently reattaching old lexemes to new sentence meanings.
+- **Code review — resolved:** start of newly recommended practice checks the current, non-archived catalog revision and every selected sentence snapshot in the same IDB transaction that creates the session; pre-existing active practice snapshots remain unchanged.
+- **Code review — resolved:** earlier language's completed session is hidden when another language is selected; on browser reload, a saved session selects its historic profile if available.
+- **Code review — resolved:** one-time schema v4 seed backfills profile IDs and target languages from immutable M0–M3 session snapshots. Older full-backup v1/v2 import also infers legacy profile identities, preserving accessibility without rewriting attempts or SRS state.
+- **Code review — resolved:** writer admission (save/edit, unarchive, template import) enforces M4's 100 active Islands / 1000 active sentences per profile so users cannot create a catalog that the planner rejects. Duplicate imported Island IDs produce a conflict before capacity validation, with atomic rollback.
+- **Code review — resolved:** catalog template export/import have symmetrical 32 MiB UTF-8 limits; *templates* do not migrate SRS history, revisions or archive state. Full backup v3 remains the lossless recovery format for practice, profiles, archived material, vocabulary and SRS.
+- **Final test evidence:** https://github.com/howlil/modu-app/actions/runs/39347612996 — Bun frozen install, Svelte/TS check, unit tests (including fake-indexeddb migration, CAS, import rollback, archiving, revision & SRS compatibility), and Cloudflare build all passed. Browser-native E2E and production launcher activation have not been performed.
