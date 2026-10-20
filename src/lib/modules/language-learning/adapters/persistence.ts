@@ -157,6 +157,22 @@ function openDatabase(): Promise<IDBDatabase> {
     };
   });
 }
+const LEARNING_CHANGE = "modu:learning-changed";
+const LEARNING_CHANNEL = "modu-language-learning-change";
+function notifyLearningChanges(): void {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(LEARNING_CHANGE));
+  if (typeof BroadcastChannel !== "undefined") {
+    const channel = new BroadcastChannel(LEARNING_CHANNEL);
+    channel.postMessage({ type: "changed" });
+    channel.close();
+  }
+}
+export function subscribeLearningChanges(listener: () => void): () => void {
+  window.addEventListener(LEARNING_CHANGE, listener);
+  const channel = typeof BroadcastChannel === "undefined" ? null : new BroadcastChannel(LEARNING_CHANNEL);
+  if (channel) channel.onmessage = () => listener();
+  return () => { window.removeEventListener(LEARNING_CHANGE, listener); channel?.close(); };
+}
 /** Owns connection and transaction lifetime. Never await inside IDB request callbacks. */
 async function transaction<T>(
   stores: string[], mode: IDBTransactionMode,
@@ -181,7 +197,10 @@ async function transaction<T>(
     tx.oncomplete = () => {
       db.close();
       if (failure) reject(translateError(failure));
-      else if (hasResult) resolve(result);
+      else if (hasResult) {
+        resolve(result);
+        if (mode === "readwrite") notifyLearningChanges();
+      }
       else reject(new LearningPersistenceError('corrupt', 'Learning transaction completed without a result.'));
     };
     tx.onabort = () => {

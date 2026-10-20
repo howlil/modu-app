@@ -81,3 +81,52 @@ export async function generateDeviceIdentity(name: string): Promise<NewDeviceIde
   return { deviceId: "device_" + crypto.randomUUID().replace(/-/g, ""),
     name: name.trim(), publicKey, privateKey: keys.privateKey };
 }
+
+/** Persisted in the same device-identity database, isolated from module data. */
+export interface PendingPairing {
+  id: "pairing";
+  invitationCode: string;
+  confirmation: string | null;
+  requestedAt: number;
+}
+export function readPendingPairing(): Promise<PendingPairing | null> {
+  return operation("readonly", (store, done) => {
+    const request = store.get("pairing");
+    request.onsuccess = () => done((request.result as PendingPairing | undefined) ?? null);
+  });
+}
+export function storePendingPairing(session: PendingPairing): Promise<void> {
+  return operation("readwrite", (store, done) => {
+    store.put(session);
+    done(undefined);
+  });
+}
+export function clearPendingPairing(): Promise<void> {
+  return operation("readwrite", (store, done) => {
+    store.delete("pairing");
+    done(undefined);
+  });
+}
+/** Other mounted tabs or the root runtime can respond to pairing completion. */
+export function notifyDeviceIdentityChanged(): void {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("modu:sync-identity-changed"));
+}
+
+export interface PendingOwnerInvitation {
+  id: "owner-invitation";
+  code: string;
+  invitationId: string;
+  expiresAt: number;
+}
+export function readOwnerInvitation(): Promise<PendingOwnerInvitation | null> {
+  return operation("readonly", (store, done) => {
+    const request = store.get("owner-invitation");
+    request.onsuccess = () => done((request.result as PendingOwnerInvitation | undefined) ?? null);
+  });
+}
+export function storeOwnerInvitation(invite: PendingOwnerInvitation): Promise<void> {
+  return operation("readwrite", (store, done) => { store.put(invite); done(undefined); });
+}
+export function clearOwnerInvitation(): Promise<void> {
+  return operation("readwrite", (store, done) => { store.delete("owner-invitation"); done(undefined); });
+}

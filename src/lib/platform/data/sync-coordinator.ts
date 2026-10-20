@@ -1,7 +1,6 @@
 import { globalDataPorts } from "./registry.ts";
 import { pairedTransport } from "./pairing-client.ts";
 import type { StoredDeviceIdentity } from "./device-identity.ts";
-import { requireNoOtherModuTabs } from "./peer-tabs.ts";
 
 export interface SyncProgress {
   pushed: number;
@@ -11,7 +10,7 @@ export interface SyncProgress {
 }
 
 /**
- * Explicit foreground sync, NEVER a hidden background upload.
+ * Explicit sync operation, called by opt-in foreground scheduler or manual retry.
  * Push must finish before pull to avoid merging unacknowledged local writes.
  * Each module independently advances its durable cursor in the same IDB
  * transaction as domain apply; retry starts from the minimum module cursor.
@@ -22,7 +21,6 @@ export async function syncNow(
 ): Promise<SyncProgress> {
   if (identity.status !== "paired") throw new Error("Device must be approved before synchronization.");
   if (!navigator.locks?.request) throw new Error("Web Locks support is required for safe sync.");
-  await requireNoOtherModuTabs();
   const transport = pairedTransport(identity);
   return navigator.locks.request("modu-global-restore", { mode: "exclusive" }, async () => {
     const progress: SyncProgress = { pushed: 0, pulled: 0, cursor: 0, modules: globalDataPorts.length };

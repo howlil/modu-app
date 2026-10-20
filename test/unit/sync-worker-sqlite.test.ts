@@ -1,6 +1,6 @@
 // @ts-nocheck — Node SQLite integration test runs in Vitest; browser tsconfig intentionally excludes Node types.
 import { DatabaseSync } from "node:sqlite";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { SyncSpaceHandler as SyncSpace } from "../../src/sync-worker/sync-space.ts";
 import { SyncJournal, MAX_SYNC_SPACE_BYTES, type SyncStorage, type SqlValue } from "../../src/sync-worker/journal.ts";
 import { signedRequestBytes } from "../../src/sync-worker/signature.ts";
@@ -262,6 +262,38 @@ describe("M5 pairing and recovery in real SQLite", () => {
     const revoked = await space.fetch(await signed(owner.privateKey, "DELETE", base + "/devices/" + phoneId));
     expect(revoked.status).toBe(200);
     expect((await space.fetch(await signed(phone.privateKey, "GET", base + "/devices", "", undefined, phoneId))).status).toBe(401);
+  });
+
+  it("lets an already approved device finish checking approval after QR expiry", async () => {
+    const storage = createStorage();
+    const space = new SyncSpace({ storage });
+    const owner = await credential();
+    await bootstrap(space, owner, encode(crypto.getRandomValues(new Uint8Array(32))));
+    const invitation = await space.fetch(await signed(owner.privateKey, "POST", base + "/pairings", "{}"));
+    const invite = await invitation.json() as { invitationId: string; secret: string };
+    const url = base + "/pairings/" + invite.invitationId;
+    const candidate = await credential();
+    const joined = await space.fetch(new Request(url + "/join", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ secret: invite.secret, identity: {
+        deviceId: "device-late-0002", name: "Phone",
+        publicKey: JSON.parse(candidate.jwk)
+      } })
+    }));
+    const info = await joined.json() as { confirmation: string };
+    const approved = await space.fetch(await signed(owner.privateKey,"POST",url+"/approve",
+      JSON.stringify({confirmation:info.confirmation})));
+    expect(approved.status).toBe(200);
+    vi.useFakeTimers({toFake:["Date"]});
+    try {
+      vi.setSystemTime(Date.now() + 6 * 60_000);
+      const status = await space.fetch(new Request(url + "/status", {
+        method:"POST",headers:{"content-type":"application/json"},
+        body:JSON.stringify({secret:invite.secret})
+      }));
+      expect(status.status).toBe(200);
+      expect((await status.json()).status).toBe("approved");
+    } finally { vi.useRealTimers(); }
   });
 
   it("rotates the recovery key atomically and invalidates the previous one", async () => {

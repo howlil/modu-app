@@ -1,6 +1,10 @@
 <script lang="ts">
   import '../app.css';
   import AppHeader from '#lib/components/AppHeader.svelte';
+  import { onMount } from 'svelte';
+  import { startGlobalSyncRuntime } from '#lib/platform/data/sync-runtime.ts';
+
+  onMount(() => startGlobalSyncRuntime());
 
   let { children } = $props();
 </script>
