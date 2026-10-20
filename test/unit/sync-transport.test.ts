@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { SyncTransport } from "../../src/lib/platform/data/sync-transport.ts";
+import { SyncTransport, readBoundedSyncJson } from "../../src/lib/platform/data/sync-transport.ts";
 import { readSignedHeaders, verifyDeviceSignature } from "../../src/sync-worker/signature.ts";
 import type { PendingSyncOperation } from "../../src/lib/platform/data/outbox.ts";
 
@@ -13,6 +13,19 @@ const operation: PendingSyncOperation = {
 
 afterEach(() => vi.unstubAllGlobals());
 
+describe("M6 bounded browser response safety", () => {
+  it("rejects oversized streaming responses even without Content-Length", async () => {
+    const body = JSON.stringify({ operations: [], extra: "x".repeat(1_100_000) });
+    const response = new Response(body, { status: 200 });
+    response.headers.delete("content-length");
+    await expect(readBoundedSyncJson(response)).rejects.toThrow("size limit");
+  });
+  it("rejects invalid JSON and malformed UTF-8", async () => {
+    await expect(readBoundedSyncJson(new Response("not JSON"))).rejects.toThrow("invalid JSON");
+    await expect(readBoundedSyncJson(new Response(new Uint8Array([0xff]))))
+      .rejects.toThrow("invalid JSON");
+  });
+});
 describe("explicit signed client transport", () => {
   it("signs all request fields, drops local sequence and validates server acknowledgement", async () => {
     vi.stubGlobal("location", { origin: "https://modu.example" });
