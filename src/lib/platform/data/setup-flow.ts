@@ -1,4 +1,5 @@
 import { globalDataPorts } from "./registry.ts";
+import type { ModuleDataPort } from "./contracts.ts";
 import { generateDeviceIdentity, markDevicePaired, notifyDeviceIdentityChanged,
   readDeviceIdentity, storeDeviceIdentity, type StoredDeviceIdentity } from "./device-identity.ts";
 import { initializeSpace } from "./pairing-client.ts";
@@ -14,8 +15,10 @@ function sizeInBytes(input: unknown): number {
   return new TextEncoder().encode(encoded).length;
 }
 
-export async function preflightSyncBaseline(): Promise<void> {
-  for (const port of globalDataPorts) {
+export async function preflightSyncBaseline(
+  ports: readonly ModuleDataPort[] = globalDataPorts
+): Promise<void> {
+  for (const port of ports) {
     await port.inspect();
     const size = sizeInBytes(await port.exportBackup());
     if (size > SAFE_BASELINE_BYTES) {
