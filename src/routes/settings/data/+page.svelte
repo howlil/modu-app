@@ -137,11 +137,46 @@
         <Download class="size-3.5" /> Export
       </Button>
     </section>
+    <section class="border-t border-border p-5">
+      <div class="flex items-center justify-between gap-3">
+        <div>
+          <h2 class="text-ui font-medium">Restore backup</h2>
+          <p class="mt-1 text-meta text-muted-foreground">Validate a global JSON backup, then replace local module data.</p>
+        </div>
+        <Button variant="outline" size="sm" class="shrink-0 rounded-full shadow-none"
+          onclick={() => backupInput?.click()} disabled={busy}>
+          <Upload class="size-3.5" /> Choose file
+        </Button>
+        <input bind:this={backupInput} type="file" accept=".json,application/json" class="sr-only"
+          aria-label="Choose global Modu backup" onchange={selectRestoreFile}/>
+      </div>
+      {#if restorePreview}
+        <div class="mt-4 rounded-xl border border-border bg-muted/50 p-4">
+          <p class="mb-2 text-meta font-medium">Restore preview</p>
+          {#each restorePreview.preview as item (item.moduleId)}
+            <div class="flex justify-between gap-3 py-1 text-meta">
+              <span>{item.moduleId}</span><span>{item.recordCount} records</span>
+            </div>
+            {#each item.warnings as warning}
+              <p class="mt-1 text-meta text-muted-foreground">{warning}</p>
+            {/each}
+          {/each}
+          <label class="mt-3 flex cursor-pointer items-start gap-2 text-meta text-muted-foreground">
+            <input type="checkbox" bind:checked={restoreConfirmed} class="mt-0.5" />
+            <span>I have closed other Modu tabs. Replace the local data in all modules. A recovery checkpoint will be created first.</span>
+          </label>
+          <Button size="sm" class="mt-3 rounded-full shadow-none"
+            disabled={!restoreConfirmed || busy} onclick={restoreBackup}>
+            Restore all modules
+          </Button>
+        </div>
+      {/if}
+    </section>
     <section class="flex items-center gap-3 border-t border-border p-5">
       <CloudOff class="size-4 shrink-0 text-muted-foreground" />
       <div>
         <h2 class="text-ui font-medium">Device sync is not configured</h2>
-        <p class="mt-1 text-meta text-muted-foreground">Cross-browser sync and global restore are not available yet. Local storage works offline.</p>
+        <p class="mt-1 text-meta text-muted-foreground">Cross-browser sync is not configured. Local storage and manual backup/restore work without an account.</p>
       </div>
     </section>
   </div>
