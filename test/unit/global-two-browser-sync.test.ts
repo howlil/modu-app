@@ -4,6 +4,7 @@ import { globalDataPorts } from "../../src/lib/platform/data/registry.ts";
 import { saveFocusSession, exportFocusSessionsForBackup } from "../../src/lib/shared/focus-sessions/repository.ts";
 import { createConfiguredHabit, loadHabitSnapshot } from "../../src/lib/modules/habit-tracker/adapters/persistence.ts";
 import { learningPersistence } from "../../src/lib/modules/language-learning/adapters/persistence.ts";
+import type { PracticeCommand } from "../../src/lib/modules/language-learning/core/persistence.ts";
 import type { SequencedSyncOperation } from "../../src/lib/platform/data/sync-protocol.ts";
 import type { PendingSyncOperation } from "../../src/lib/platform/data/outbox.ts";
 
@@ -68,7 +69,21 @@ describe("M5 two isolated browsers, feature-owned sync replay", () => {
     await saveFocusSession(record("focus-b"));
     await createConfiguredHabit({ title: "Exercise", direction: "BUILD", measurement: "COUNT", target: 1 }, "2026-10-20");
     await learningPersistence.createProfile({ id: "german-custom", targetLanguage: "de" });
-    expect(await pushBrowserEvents(server)).toBe(3);
+    const start: Extract<PracticeCommand, { type: "start" }> = {
+      type: "start", sessionId: "session-remote", profileId: "en", mode: "recall",
+      island: { id: "cafe", revision: 1, title: "Café",
+        sourceLanguage: "id", targetLanguage: "en",
+        sentences: [{ id: "coffee", revision: 1, prompt: "Kopi", answer: "Coffee" }] }
+    };
+    const started = await learningPersistence.execute(start, null);
+    const revealed = await learningPersistence.execute({ type: "reveal", sessionId: "session-remote" }, started.revision);
+    await learningPersistence.execute({
+      type: "attempt", sessionId: "session-remote", attempt: {
+        attemptId: "attempt-remote", sentenceId: "coffee", sentenceRevision: 1,
+        evidence: { kind: "recall", rating: "good" }, recordedAt: 1000
+      }
+    }, revealed.revision);
+    expect(await pushBrowserEvents(server)).toBe(6);
     await pullBrowserEvents(server);
 
     useBrowser(0);
@@ -76,6 +91,7 @@ describe("M5 two isolated browsers, feature-owned sync replay", () => {
     expect((await exportFocusSessionsForBackup()).map(x=>x.id).sort()).toEqual(["focus-a","focus-b"]);
     expect((await loadHabitSnapshot()).habits.map(x=>x.title).sort()).toEqual(["Exercise","Read"]);
     expect((await learningPersistence.profiles()).some(x=>x.id==="german-custom")).toBe(true);
-    expect(new Set(await Promise.all(globalDataPorts.map(x=>x.readRemoteCursor())))).toEqual(new Set([6]));
+    expect((await learningPersistence.get("session-remote"))?.session.attempts).toHaveLength(1);
+    expect(new Set(await Promise.all(globalDataPorts.map(x=>x.readRemoteCursor())))).toEqual(new Set([9]));
   });
 });
