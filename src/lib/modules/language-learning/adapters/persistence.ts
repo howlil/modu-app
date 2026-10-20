@@ -20,7 +20,7 @@ import { STARTER_ISLAND } from './starter-content.ts';
 import {projectLearningProgress,type LearningProgress} from '../core/progress.ts';
 import {
   OUTBOX_STORE, SYNC_META_STORE, ensureOutboxStores, queueLocalMutation,
-  resetCaptureAfterRestore, readOutbox, acknowledgeOutbox
+  resetCaptureAfterRestore, readOutbox, acknowledgeOutbox, initializeCaptureWithBaseline
 } from '#lib/platform/data/outbox.ts';
 
 /** Browser-local, single-learner storage. All authoritative writes use one IDB transaction. */
@@ -404,6 +404,54 @@ async function ensureCatalogInitialized():Promise<void> {
 
 /** No server endpoint. This browser origin owns the canonical practice history. */
 export const learningPersistence = {
+  async beginSyncCapture(deviceId: string): Promise<void> {
+    await ensureCatalogInitialized();
+    await ensureMemoryInitialized();
+    return transaction<void>(
+      [SESSIONS, META, REVIEWS, PROFILES, CATALOGS, OUTBOX_STORE, SYNC_META_STORE],
+      'readwrite', (tx, complete, fail) => {
+        const sessions = tx.objectStore(SESSIONS).getAll();
+        const reviews = tx.objectStore(REVIEWS).getAll();
+        const profiles = tx.objectStore(PROFILES).getAll();
+        const catalogs = tx.objectStore(CATALOGS).getAll();
+        const latest = tx.objectStore(META).get('latest');
+        let remaining = 5;
+        const ready = () => {
+          remaining--;
+          if (remaining !== 0) return;
+          try {
+            const records = (sessions.result as unknown[]).map(row => {
+              const decoded = decodeSessionRow(row);
+              if (!decoded) throw new LearningPersistenceError('corrupt', 'Invalid session in sync baseline.');
+              return decoded;
+            });
+            const states = (reviews.result as unknown[]).map(decodeMemoryState);
+            const identities = (profiles.result as unknown[]).map(decodeLearningProfile);
+            const islands = (catalogs.result as unknown[]).map(decodeCatalogRow);
+            const pointer: unknown = latest.result?.sessionId ?? null;
+            if (pointer !== null &&
+                (typeof pointer !== 'string' || !records.some(row => row.session.id === pointer))) {
+              throw new LearningPersistenceError('corrupt', 'Invalid latest session pointer in sync baseline.');
+            }
+            const backup: LearningBackup = {
+              format: BACKUP_FORMAT, version: 3, exportedAt: new Date().toISOString(),
+              sessions: records, latestSessionId: pointer as string | null,
+              reviews: states, profiles: identities, catalogs: islands
+            };
+            // Same module-specific referential and evidence checks as manual restore.
+            asBackup(JSON.stringify(backup));
+            initializeCaptureWithBaseline(tx, 'language-learning', deviceId, backup);
+            complete(undefined);
+          } catch (cause) { fail(cause); }
+        };
+        sessions.onsuccess = ready;
+        reviews.onsuccess = ready;
+        profiles.onsuccess = ready;
+        catalogs.onsuccess = ready;
+        latest.onsuccess = ready;
+      }
+    );
+  },
   async readPendingSyncOperations(limit = 100) {
     const db = await openDatabase();
     try { return await readOutbox(db, 'language-learning', limit); }
