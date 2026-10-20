@@ -3,6 +3,11 @@ import {
   OUTBOX_STORE, SYNC_META_STORE, ensureOutboxStores, queueLocalMutation,
   resetCaptureAfterRestore, readOutbox, acknowledgeOutbox, initializeCaptureWithBaseline
 } from '#lib/platform/data/outbox.ts';
+import {
+  INBOX_STORE, TOMBSTONE_STORE, ensureInboxStores,
+  resetInboxAfterRestore, readInboxCursor, applyIncomingInTransaction, RemoteApplyConflict
+} from '#lib/platform/data/inbox.ts';
+import type { SequencedSyncOperation } from '#lib/platform/data/sync-protocol.ts';
 import { isLocalDate, resolveEffectivePolicy } from '../core/scheduling.ts';
 import {
   archiveHabit, booleanCheckin, makeDailyBooleanHabit, renameHabit, restoreHabit
@@ -13,7 +18,7 @@ import { applyCheckinCommand, makeConfiguredDailyHabit, type CheckinCommand, typ
 import { createPolicyRevision, type PolicyRevisionInput } from '../core/policy.ts';
 
 const DATABASE = 'modu-habit-tracker';
-const VERSION = 3;
+const VERSION = 4;
 const CHANGE = 'modu:habit-changed';
 const CHANNEL = 'modu-habit-tracker-changes';
 type StoreName = 'habits' | 'policies' | 'checkins' | 'preferences' | typeof OUTBOX_STORE | typeof SYNC_META_STORE;
@@ -54,6 +59,7 @@ function openDatabase(): Promise<IDBDatabase> {
         db.createObjectStore('preferences', { keyPath: 'id' });
       }
       ensureOutboxStores(db);
+      ensureInboxStores(db);
     };
     request.onsuccess = () => {
       // An upgrade can eventually proceed after onblocked already rejected.
@@ -257,7 +263,7 @@ export async function changeHabitTitle(id: string, title: string): Promise<void>
         try {
           const updated = renameHabit(request.result as HabitDefinition, title);
           store.put(updated);
-          queueLocalMutation(tx, 'habit-tracker', id, 'upsert', { habit: updated });
+          queueLocalMutation(tx, 'habit-tracker', id, 'upsert', { habit: updated, before: previous });
         }
         catch (error) { fail(error as Error); }
       };
@@ -298,7 +304,7 @@ export async function updateHabitConfiguration(
             if (renamed.title !== habit.title) habitStore.put(renamed);
             if (revision) policyStore.add(revision);
             if (renamed.title !== habit.title || revision) {
-              queueLocalMutation(tx, 'habit-tracker', id, 'upsert', { habit: renamed, policy: revision });
+              queueLocalMutation(tx, 'habit-tracker', id, 'upsert', { habit: renamed, policy: revision, before: habit });
             }
           } catch (error) { fail(error as Error); }
         };
@@ -322,7 +328,7 @@ export async function setHabitArchived(id: string, archive: boolean, date: Local
           const previous = request.result as HabitDefinition;
           const updated = archive ? archiveHabit(previous, date) : restoreHabit(previous, date);
           store.put(updated);
-          queueLocalMutation(tx, 'habit-tracker', id, 'upsert', { habit: updated });
+          queueLocalMutation(tx, 'habit-tracker', id, 'upsert', { habit: updated, before: request.result });
         } catch (error) { fail(error as Error); }
       };
     }
@@ -410,7 +416,7 @@ export async function replaceHabitSnapshotForRestore(input: HabitSnapshot): Prom
     throw new HabitStorageError('Backup is missing the tracking timezone.');
   }
   await withDatabase(db => transaction<void>(
-    db, ['habits', 'policies', 'checkins', 'preferences', OUTBOX_STORE, SYNC_META_STORE], 'readwrite',
+    db, ['habits', 'policies', 'checkins', 'preferences', OUTBOX_STORE, SYNC_META_STORE, INBOX_STORE, TOMBSTONE_STORE], 'readwrite',
     (tx, set) => {
       const habits = tx.objectStore('habits');
       const policies = tx.objectStore('policies');
@@ -425,6 +431,7 @@ export async function replaceHabitSnapshotForRestore(input: HabitSnapshot): Prom
       for (const checkin of snapshot.checkins) checkins.add(checkin);
       prefs.put({ id: 'tracking', trackingTimezone: snapshot.trackingTimezone });
       resetCaptureAfterRestore(tx);
+      resetInboxAfterRestore(tx);
       set(undefined);
     }
   ));
