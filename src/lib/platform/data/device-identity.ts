@@ -8,7 +8,7 @@ export interface StoredDeviceIdentity extends AuthorizedDevice {
   status: "pending" | "paired";
   enrollmentKind: "owner" | "join" | "recovery";
 }
-export type NewDeviceIdentity = Omit<StoredDeviceIdentity, "id" | "spaceId" | "status">;
+export type NewDeviceIdentity = Omit<StoredDeviceIdentity, "id" | "spaceId" | "status" | "enrollmentKind">;
 
 const DATABASE = "modu-device-identity";
 const STORE = "identity";
