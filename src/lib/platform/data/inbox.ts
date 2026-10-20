@@ -99,7 +99,7 @@ export function applyIncomingInTransaction(
               return;
             }
             const finish = () => {
-              inbox.add({ operationId: item.operationId, sequence: item.sequence, moduleId: item.moduleId });
+              inbox.add({ operationId: item.operationId, sequence: item.sequence, moduleId: item.moduleId, kind: item.kind, deviceId: item.deviceId });
               cursor = item.sequence;
               step();
             };
