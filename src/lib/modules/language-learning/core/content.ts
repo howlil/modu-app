@@ -21,6 +21,8 @@ export interface IslandDraft {
   readonly targetLanguage: string;
   readonly sentences: readonly {id: string; prompt: string; answer: string}[];
   readonly vocabulary: readonly {id: string; sentenceId: string; term: string; meaning: string}[];
+  /** Required when keeping existing vocabulary attached to rewritten sentences. */
+  readonly confirmRetainedVocabulary?: boolean;
 }
 export class ContentRuleError extends Error {
   constructor(readonly code: 'invalid' | 'conflict', message: string) {
@@ -101,6 +103,18 @@ export function reviseIsland(previous: ContentIsland | null, profile: LearningPr
     return {id:s.id,prompt:s.prompt,answer:s.answer,
       revision:prior ? (prior.prompt===s.prompt && prior.answer===s.answer ? prior.revision : prior.revision+1) : 1};
   });
+  if(previous){
+    const changed=new Set(sentences.filter(s=>{
+      const original=old.get(s.id);
+      return original && original.revision!==s.revision;
+    }).map(s=>s.id));
+    const retained= new Set(previous.vocabulary.map(v=>v.id));
+    if(!draft.confirmRetainedVocabulary && draft.vocabulary.some(v=>
+      changed.has(v.sentenceId) && retained.has(v.id))) {
+      throw new ContentRuleError('conflict',
+        'Review and confirm vocabulary attached to rewritten sentences before saving.');
+    }
+  }
   const byId=new Map(sentences.map(s=>[s.id,s]));
   const vocabSeen=new Set<string>();
   const vocabulary:VocabularyEntry[]=draft.vocabulary.map(v=>{
