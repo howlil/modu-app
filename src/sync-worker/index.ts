@@ -1,8 +1,28 @@
-export { SyncSpace } from "./sync-space.ts";
+import { DurableObject } from "cloudflare:workers";
+import { SyncSpaceHandler } from "./sync-space.ts";
+import type { SyncStorage } from "./journal.ts";
 
-/** No public routes. All access goes through the modu-app Worker DO binding. */
+/**
+ * Production Durable Object runtime. Every instance owns one persistent
+ * SQLite database. The public Worker has no enrollment/admin endpoints.
+ */
+export class SyncSpace extends DurableObject {
+  private readonly handler: SyncSpaceHandler;
+
+  constructor(ctx: DurableObjectState, env: unknown) {
+    super(ctx, env);
+    this.handler = new SyncSpaceHandler({ storage: ctx.storage as unknown as SyncStorage });
+  }
+
+  fetch(request: Request): Promise<Response> {
+    return this.handler.fetch(request);
+  }
+}
+
 export default {
   fetch(): Response {
-    return new Response("Not found", { status: 404, headers: { "cache-control": "no-store" } });
+    return new Response("Not found", {
+      status: 404, headers: { "cache-control": "no-store" }
+    });
   }
 };
