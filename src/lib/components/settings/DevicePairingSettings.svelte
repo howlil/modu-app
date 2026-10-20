@@ -280,12 +280,13 @@
              status.kind === "syncing" ? "Syncing changes…" :
              status.kind === "offline" ? "Saved on this device" :
              status.kind === "needs-review" ? "Changes need review" :
+             status.kind === "blocked" ? "Sync needs attention" :
              status.kind === "revoked" ? "Access removed" : "Connected"}
           </p>
           <p class="mt-1 text-meta text-muted-foreground">{status.description}</p>
         </div>
       </div>
-      {#if status.kind === "needs-review" || status.kind === "error" || status.kind === "offline"}
+      {#if status.kind === "needs-review" || status.kind === "blocked" || status.kind === "error" || status.kind === "offline"}
         <Button variant="outline" size="sm" class="rounded-full shadow-none" disabled={busy} onclick={retrySync}>
           <RefreshCw class="size-3.5"/> Retry sync
         </Button>
