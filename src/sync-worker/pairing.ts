@@ -165,7 +165,15 @@ export class PairingRegistry {
   async joinStatus(invitationId: string, secret: string, now = Date.now()) {
     const digest = await secretDigest(secret);
     return this.storage.transactionSync(() => {
-      const row = this.find(invitationId, digest, now);
+      const row = this.storage.sql.exec<PairingRow>(
+        "SELECT * FROM pairing_invitations WHERE id = ?", invitationId
+      ).toArray()[0];
+      // A candidate already approved before expiry may need to fetch this
+      // status after expiry because the device was offline. This grants NO new
+      // enrollment rights: join() and approve() still enforce the expiry.
+      if (!row || row.secret_hash !== digest || (row.expires_at <= now && !row.approved_at)) {
+        throw new SyncProtocolError(404, "Invitation expired or unavailable.");
+      }
       return { status: row.approved_at ? "approved" : row.candidate_id ? "pending-approval" : "awaiting-device",
         confirmation: row.confirmation };
     });
