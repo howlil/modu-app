@@ -6,7 +6,7 @@ import type { RateLimiter } from "./feature-request-security.ts";
 
 type Stub = { fetch(request: Request): Promise<Response> };
 type SyncNamespace = { idFromName(name: string): unknown; get(id: unknown): Stub };
-type SyncEnv = { SYNC_SPACE?: SyncNamespace; SYNC_PAIRING_IP_LIMITER?: RateLimiter };
+type SyncEnv = { SYNC_SPACE?: SyncNamespace; SYNC_PAIRING_IP_LIMITER?: RateLimiter; SYNC_ROLLOUT_ENABLED?: string };
 const UUID = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/;
 const SIGNED = ["x-modu-device", "x-modu-nonce", "x-modu-timestamp", "x-modu-signature"];
 
@@ -37,6 +37,11 @@ export async function forwardSyncControl(
     return json({ error: "Expected JSON." }, { status: 415 });
   }
   const runtime = env as unknown as SyncEnv;
+  // Fail closed by default: never expose device enrollment or journal APIs
+  // before an explicit operator-controlled staged rollout.
+  if (runtime.SYNC_ROLLOUT_ENABLED !== "true") {
+    return json({ error: "Device sync is not enabled." }, { status: 503 });
+  }
   if (!runtime.SYNC_SPACE?.idFromName || !runtime.SYNC_SPACE.get) {
     return json({ error: "Cloud sync is not configured." }, { status: 503 });
   }
