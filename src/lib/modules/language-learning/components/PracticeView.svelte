@@ -82,6 +82,10 @@
             Speech playback is not supported in this browser. You can skip this sentence.
           </p>
         {:else}
+          <p class="mt-2 text-center text-meta text-muted-foreground">
+            Speech uses your browser or device voice service; it may require network access.
+            No microphone recording or pronunciation score is collected.
+          </p>
           <div class="mt-5 flex flex-wrap justify-center gap-2">
             <button class="rounded-full border border-border px-5 py-3 text-ui disabled:opacity-50"
               disabled={controller.pending || controller.canRetry || controller.audioStatus === 'playing'}
