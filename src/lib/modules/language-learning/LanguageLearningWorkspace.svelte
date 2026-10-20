@@ -28,7 +28,7 @@
     const url=URL.createObjectURL(new Blob([content],{type:'application/json'}));
     const link=document.createElement('a');
     link.href=url;
-    link.download='modu-language-catalog-'+controller.profile.targetLanguage+'.json';
+    link.download='modu-language-template-'+controller.profile.targetLanguage+'.json';
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -39,7 +39,7 @@
     const file=input.files?.[0];
     if(!file)return;
     try {
-      if(file.size>2*1024*1024){window.alert('Catalog exceeds the 2 MiB import limit.');return;}
+      if(file.size>32*1024*1024){window.alert('Catalog exceeds the 32 MiB import limit.');return;}
       await controller.importCatalog(await file.text());
     } catch {window.alert('Unable to read catalog file.');}
     finally {input.value='';}
@@ -89,10 +89,10 @@
           <div class="flex flex-wrap gap-2">
             <button type="button" disabled={controller.pending}
               class="rounded-full border border-border px-4 py-2 text-ui"
-              onclick={downloadCatalog}>Export catalog</button>
+              onclick={downloadCatalog}>Export template</button>
             <button type="button" disabled={controller.pending}
               class="rounded-full border border-border px-4 py-2 text-ui"
-              onclick={()=>catalogInput?.click()}>Import catalog</button>
+              onclick={()=>catalogInput?.click()}>Import templates</button>
             <input type="file" bind:this={catalogInput} accept=".json,application/json"
               aria-label="Choose Language Island catalog" class="sr-only" onchange={selectCatalog}/>
           </div>
