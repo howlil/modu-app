@@ -17,6 +17,7 @@
   let sentences=$state<{id:string;prompt:string;answer:string}[]>(
     initial?.sentences.map(s=>({...s}))??[{id:'sentence-1',prompt:'',answer:''}]
   );
+  let confirmRetainedVocabulary=$state(false);
   let vocabulary=$state<{id:string;sentenceId:string;term:string;meaning:string}[]>(
     initial?.vocabulary.map(v=>({...v}))??[]
   );
@@ -39,7 +40,8 @@
     onSave({id:id.trim(),title:title.trim(),
       sourceLanguage:sourceLanguage.trim(),targetLanguage:profile.targetLanguage,
       sentences:sentences.map(s=>({...s,prompt:s.prompt.trim(),answer:s.answer.trim()})),
-      vocabulary:vocabulary.map(v=>({...v,term:v.term.trim(),meaning:v.meaning.trim()}))
+      vocabulary:vocabulary.map(v=>({...v,term:v.term.trim(),meaning:v.meaning.trim()})),
+      confirmRetainedVocabulary
     });
   }
 </script>
@@ -110,6 +112,12 @@
         onclick={()=>vocabulary=vocabulary.filter(v=>v.id!==word.id)}>Remove</button>
     </div>
   {/each}
+  {#if content && content.vocabulary.length>0}
+    <label class="mt-4 flex items-start gap-3 text-ui">
+      <input type="checkbox" class="mt-1" bind:checked={confirmRetainedVocabulary} disabled={busy}/>
+      <span>I checked that retained vocabulary still matches any rewritten sentences.</span>
+    </label>
+  {/if}
   <p class="mt-3 text-meta text-muted-foreground">Editing sentence text creates a new recall revision. Earlier practice history stays intact.</p>
   <button type="submit" disabled={busy} class="mt-5 rounded-full bg-primary px-5 py-3 text-ui font-medium text-primary-foreground disabled:opacity-50">
     Save Island
