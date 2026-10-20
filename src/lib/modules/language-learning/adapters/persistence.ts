@@ -17,6 +17,7 @@ import {
   ContentRuleError, type ContentIsland, type IslandDraft
 } from '../core/content.ts';
 import { STARTER_ISLAND } from './starter-content.ts';
+import {projectLearningProgress,type LearningProgress} from '../core/progress.ts';
 
 /** Browser-local, single-learner storage. All authoritative writes use one IDB transaction. */
 export class LearningPersistenceError extends Error {
@@ -941,6 +942,54 @@ export const learningPersistence = {
         } catch (cause) { fail(cause); }
       };
     });
+  },
+  /** One readonly snapshot of committed sessions, SRS and active content.
+   * Attempts are not tallied from playback events or independent counters. */
+  async progress(profile:LearningProfile,now:number):Promise<LearningProgress> {
+    const requested=decodeLearningProfile(profile);
+    await ensureCatalogInitialized();
+    await ensureMemoryInitialized();
+    return transaction<LearningProgress>([PROFILES,SESSIONS,REVIEWS,CATALOGS],
+      'readonly',(tx,complete,fail)=>{
+        const profileReq=tx.objectStore(PROFILES).get(requested.id);
+        profileReq.onsuccess=()=>{
+          try{
+            if(profileReq.result===undefined)
+              throw new LearningPersistenceError('invalid','Language profile was not found.');
+            const stored=decodeLearningProfile(profileReq.result);
+            if(stored.targetLanguage!==requested.targetLanguage)
+              throw new LearningPersistenceError('conflict','Language profile changed.');
+            const historyReq=tx.objectStore(SESSIONS).getAll();
+            historyReq.onsuccess=()=>{
+              try{
+                const records=(historyReq.result as unknown[]).map(decodeSessionRow);
+                if(records.some(x=>x===null))
+                  throw new LearningPersistenceError('corrupt','Missing historical session.');
+                const catalogReq=tx.objectStore(CATALOGS).index('profileId').getAll(requested.id);
+                catalogReq.onsuccess=()=>{
+                  try{
+                    const catalog=(catalogReq.result as unknown[]).map(decodeCatalogRow);
+                    for(const entry of catalog)validateContentIsland(entry,stored);
+                    const islands=catalog.filter(x=>!x.archived).map(x=>x.island);
+                    const range=IDBKeyRange.bound([requested.id,0],
+                      [requested.id,8_640_000_000_000_000]);
+                    const reviewReq=tx.objectStore(REVIEWS).index('profileDue').getAll(range);
+                    reviewReq.onsuccess=()=>{
+                      try{
+                        complete(projectLearningProgress({
+                          profile:stored,records:records as StoredPractice[],
+                          states:(reviewReq.result as unknown[]).map(decodeMemoryState),
+                          islands,now
+                        }));
+                      }catch(cause){fail(cause);}
+                    };
+                  }catch(cause){fail(cause);}
+                };
+              }catch(cause){fail(cause);}
+            };
+          }catch(cause){fail(cause);}
+        };
+      });
   },
   async persistenceStatus(): Promise<'granted' | 'not-granted' | 'unavailable'> {
     if (typeof navigator === 'undefined' || !navigator.storage?.persisted) return 'unavailable';
