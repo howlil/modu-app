@@ -6,6 +6,7 @@ export interface StoredDeviceIdentity extends AuthorizedDevice {
   name: string;
   publicKey: JsonWebKey;
   status: "pending" | "paired";
+  enrollmentKind: "owner" | "join" | "recovery";
 }
 export type NewDeviceIdentity = Omit<StoredDeviceIdentity, "id" | "spaceId" | "status">;
 
