@@ -249,8 +249,14 @@ export async function exportFocusSessionsForBackup(): Promise<FocusActivitySessi
   } finally {
     database.close();
   }
-  const merged = new Map(fallback.map(item => [item.id, item]));
-  for (const item of persisted) merged.set(item.id, item);
+  const merged = new Map(persisted.map(item => [item.id, item]));
+  for (const item of fallback) {
+    const previous = merged.get(item.id);
+    if (previous && JSON.stringify(previous) !== JSON.stringify(item)) {
+      throw new Error('Conflicting Pomodoro records in IndexedDB and fallback. Backup was cancelled.');
+    }
+    merged.set(item.id, item);
+  }
   return [...merged.values()].sort((a, b) => b.endedAt - a.endedAt);
 }
 
