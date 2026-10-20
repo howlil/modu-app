@@ -486,3 +486,170 @@ export async function beginHabitSyncCapture(deviceId: string): Promise<void> {
     }
   ));
 }
+
+/**
+ * Apply sequenced remote operations without ever bypassing Habit domain validation.
+ * Entity mutations, tombstones, operation receipts, and cursor advance share
+ * a single transaction. Any divergent prior state aborts the WHOLE batch.
+ */
+export function readHabitRemoteCursor(): Promise<number> {
+  return withDatabase(readInboxCursor);
+}
+export async function applyHabitRemoteChanges(events: readonly SequencedSyncOperation[]): Promise<void> {
+  if (!events.length) return;
+  await withDatabase(db => transaction<void>(
+    db, ['habits', 'policies', 'checkins', 'preferences',
+      OUTBOX_STORE, SYNC_META_STORE, INBOX_STORE, TOMBSTONE_STORE],
+    'readwrite', (tx, done, fail) => {
+      const habits = tx.objectStore('habits');
+      const policies = tx.objectStore('policies');
+      const checkins = tx.objectStore('checkins');
+      const prefs = tx.objectStore('preferences');
+      const tombstones = tx.objectStore(TOMBSTONE_STORE);
+      const conflict = (reason: string) => fail(new RemoteApplyConflict(reason));
+      applyIncomingInTransaction(tx, 'habit-tracker', events, (event, next, stop) => {
+        const payload = event.payload;
+        if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+          stop(new RemoteApplyConflict('Invalid Habit remote event.')); return;
+        }
+        const data = payload as Record<string, unknown>;
+        if (event.kind === 'baseline') {
+          let backup: HabitSnapshot;
+          try {
+            if (!Array.isArray(data.habits) || !Array.isArray(data.policies) ||
+                !Array.isArray(data.checkins) || typeof data.trackingTimezone !== 'string') {
+              throw new RemoteApplyConflict('Incomplete Habit baseline.');
+            }
+            backup = validateHabitSnapshot(data as unknown as HabitSnapshot);
+          } catch (error) {
+            stop(error instanceof Error ? error : new RemoteApplyConflict('Invalid Habit baseline.')); return;
+          }
+          const h = habits.getAll(), p = policies.getAll(), c = checkins.getAll(), tz = prefs.get('tracking');
+          let ready = 0;
+          const finish = () => {
+            if (++ready !== 4) return;
+            const localZone: unknown = tz.result?.trackingTimezone;
+            if (localZone && localZone !== backup.trackingTimezone) {
+              stop(new RemoteApplyConflict('Habit tracking timezone differs across devices.')); return;
+            }
+            if (h.result.length || p.result.length || c.result.length) {
+              const local = { habits: h.result, policies: p.result, checkins: c.result,
+                trackingTimezone: backup.trackingTimezone };
+              const sort = (rows: Array<{id:string}>) => [...rows].sort((a,b)=>a.id.localeCompare(b.id));
+              if (JSON.stringify({
+                habits: sort(local.habits), policies: sort(local.policies), checkins: sort(local.checkins)
+              }) !== JSON.stringify({
+                habits: sort(backup.habits as Array<{id:string}>),
+                policies: sort(backup.policies as Array<{id:string}>),
+                checkins: sort(backup.checkins as Array<{id:string}>)
+              })) {
+                stop(new RemoteApplyConflict('Habit baseline requires a manual merge.')); return;
+              }
+              next(); return;
+            }
+            for (const row of backup.habits) habits.add(row);
+            for (const row of backup.policies) policies.add(row);
+            for (const row of backup.checkins) checkins.add(row);
+            prefs.put({ id: 'tracking', trackingTimezone: backup.trackingTimezone });
+            next();
+          };
+          h.onsuccess=finish; p.onsuccess=finish; c.onsuccess=finish; tz.onsuccess=finish;
+          return;
+        }
+        if (event.kind === 'upsert') {
+          try {
+            const habit = data.habit as HabitDefinition;
+            if (!habit || habit.id !== event.entityId) throw new RemoteApplyConflict('Habit ID mismatch.');
+            enforceValid(validateHabit(habit));
+            if (data.policy != null) {
+              const policy = data.policy as GoalPolicy;
+              if (policy.habitId !== habit.id) throw new RemoteApplyConflict('Policy owner mismatch.');
+              enforceValid(validateGoalPolicy(policy, habit.direction));
+            }
+            const tombstone = tombstones.get(event.entityId);
+            tombstone.onsuccess = () => {
+              if (tombstone.result) { conflict('Deleted Habit cannot be resurrected.'); return; }
+              const current = habits.get(event.entityId);
+              current.onsuccess = () => {
+                const previous: unknown = current.result;
+                if (previous === undefined && data.before != null) {
+                  conflict('Missing prior Habit revision.'); return;
+                }
+                if (previous !== undefined && JSON.stringify(previous) !== JSON.stringify(habit) &&
+                    JSON.stringify(previous) !== JSON.stringify(data.before)) {
+                  conflict('Concurrent Habit edit requires manual resolution.'); return;
+                }
+                if (previous === undefined) habits.add(habit);
+                else if (JSON.stringify(previous) !== JSON.stringify(habit)) habits.put(habit);
+                if (data.policy != null) {
+                  const policy = data.policy as GoalPolicy;
+                  const existingPolicy = policies.get(policy.id);
+                  existingPolicy.onsuccess = () => {
+                    if (existingPolicy.result && JSON.stringify(existingPolicy.result) !== JSON.stringify(policy)) {
+                      conflict('Conflicting Habit policy ID.'); return;
+                    }
+                    if (!existingPolicy.result) policies.add(policy);
+                    next();
+                  };
+                } else next();
+              };
+            };
+          } catch (error) { stop(error instanceof Error ? error : new RemoteApplyConflict('Invalid Habit edit.')); }
+          return;
+        }
+        if (event.kind === 'command') {
+          const id = data.habitId, date = data.localDate;
+          if (typeof id !== 'string' || !isLocalDate(date as string) ||
+              event.entityId !== id + ':' + date) {
+            stop(new RemoteApplyConflict('Invalid remote check-in identity.')); return;
+          }
+          const getHabit = habits.get(id);
+          getHabit.onsuccess = () => {
+            if (!getHabit.result) { conflict('Check-in references missing Habit.'); return; }
+            const req = policies.index('habitId').getAll(id);
+            req.onsuccess = () => {
+              try {
+                const policy = resolveEffectivePolicy(id, date as LocalDate, req.result as GoalPolicy[]);
+                const existing = checkins.get(event.entityId);
+                existing.onsuccess = () => {
+                  const before = existing.result ?? null;
+                  const after = data.after ?? null;
+                  if (JSON.stringify(before) !== JSON.stringify(data.before ?? null) &&
+                      JSON.stringify(before) !== JSON.stringify(after)) {
+                    conflict('Concurrent Habit check-in requires manual resolution.'); return;
+                  }
+                  if (after !== null) {
+                    const checkin = after as HabitCheckin;
+                    enforceValid(validateCheckin(checkin, policy));
+                    if (checkin.habitId !== id || checkin.localDate !== date) {
+                      conflict('Check-in identity mismatch.'); return;
+                    }
+                    checkins.put({ ...checkin, id: event.entityId });
+                  } else checkins.delete(event.entityId);
+                  next();
+                };
+              } catch (error) { stop(error instanceof Error ? error : new RemoteApplyConflict('Invalid remote check-in.')); }
+            };
+          };
+          return;
+        }
+        if (event.kind === 'delete' && data.id === event.entityId) {
+          habits.delete(event.entityId);
+          tombstones.put({ id: event.entityId, sequence: event.sequence });
+          for (const store of [policies, checkins]) {
+            const req = store.index('habitId').openKeyCursor(IDBKeyRange.only(event.entityId));
+            req.onsuccess = () => {
+              const cursor = req.result;
+              if (!cursor) return;
+              store.delete(cursor.primaryKey);
+              cursor.continue();
+            };
+          }
+          next(); return;
+        }
+        stop(new RemoteApplyConflict('Unsupported Habit remote event.'));
+      }, () => done(undefined), fail);
+    }
+  ));
+  broadcastChange();
+}
