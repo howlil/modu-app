@@ -77,6 +77,29 @@ describe('M5 — IndexedDB content authority',()=>{
     expect((await learningPersistence.planStored(profile,{now:900000})).plan.newCount).toBe(2);
     expect((await learningPersistence.get('s1'))?.session.attempts).toHaveLength(1);
   });
+  it('fences a recommended start after another tab edits or archives the Island',async()=>{
+    await learningPersistence.createProfile(profile);
+    const first=await learningPersistence.saveIsland(profile.id,draft,null);
+    const plan=await learningPersistence.planStored(profile,{now:1000});
+    const planned=plan.islands[0];
+    const edited=await learningPersistence.saveIsland(profile.id,{
+      ...draft,title:'Updated elsewhere'
+    },first.island.revision);
+    const requested={type:'start' as const,sessionId:'stale-start',profileId:profile.id,
+      mode:'recall' as const,island:planned};
+    await expect(learningPersistence.execute(requested,null,undefined,planned.revision))
+      .rejects.toMatchObject({code:'conflict'});
+    expect(await learningPersistence.get('stale-start')).toBe(null);
+    const fresh=await learningPersistence.planStored(profile,{now:1000});
+    const created=await learningPersistence.execute({...requested,
+      sessionId:'fresh-start',island:fresh.islands[0]},null,undefined,edited.island.revision);
+    expect(created.session.items).toHaveLength(2);
+    const archived=await learningPersistence.setArchived(profile.id,'shopping',edited.island.revision,true);
+    await expect(learningPersistence.execute({...requested,sessionId:'archived-start',
+      island:archived.island},null,undefined,archived.island.revision))
+      .rejects.toMatchObject({code:'conflict'});
+    expect(await learningPersistence.get('archived-start')).toBe(null);
+  });
   it('rejects stale concurrent Island saves without overwriting prior content',async()=>{
     await learningPersistence.createProfile(profile);
     const first=await learningPersistence.saveIsland(profile.id,draft,null);
