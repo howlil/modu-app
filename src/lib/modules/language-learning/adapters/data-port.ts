@@ -1,12 +1,18 @@
-import type { ModuleDataPort } from "#lib/platform/data/contracts.ts";
+import type { RestorableDataPort } from "#lib/platform/data/contracts.ts";
 import { learningPersistence } from "./persistence.ts";
 
-/** Reuse the module's validated v1–v3 backup and transaction semantics. */
 async function snapshot(): Promise<unknown> {
   return JSON.parse(await learningPersistence.exportBackup()) as unknown;
 }
 
-export const learningDataPort: ModuleDataPort = {
+function encodedBackup(value: unknown): string {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Invalid Language Learning backup.");
+  }
+  return JSON.stringify(value);
+}
+
+export const learningDataPort: RestorableDataPort = {
   moduleId: "language-learning",
   backupVersion: 3,
   async inspect() {
@@ -26,5 +32,12 @@ export const learningDataPort: ModuleDataPort = {
     const recordCount = counters.reduce((sum, collection) => sum + collection.length, 0);
     return { moduleId: "language-learning", backupVersion: 3, recordCount, state: recordCount ? "ready" : "empty" };
   },
-  exportBackup: snapshot
+  exportBackup: snapshot,
+  async validateBackup(data) {
+    const stats = learningPersistence.validateBackup(encodedBackup(data));
+    return { moduleId: "language-learning", recordCount: stats.records, warnings: [] };
+  },
+  async restoreBackup(data) {
+    await learningPersistence.importBackup(encodedBackup(data));
+  }
 };
