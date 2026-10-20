@@ -2,8 +2,8 @@
   import { onMount } from "svelte";
   import { Button } from "#lib/components/ui/button/index.js";
   import { Cloud, RefreshCw, Smartphone, Laptop, Copy,
-    ShieldCheck, AlertTriangle, Plus, ChevronRight } from "lucide-svelte";
-  import { qrcodegen } from "#lib/platform/data/qrcodegen.ts";
+    AlertTriangle, Plus, ChevronRight } from "lucide-svelte";
+  import PairingInvitePanel from "./PairingInvitePanel.svelte";
   import { createPairingLink, readPairingFragment, encodePairingCode,
     createPairingInvite, inspectPairingInvite, approvePairingInvite,
     listPairedDevices, revokePairedDevice, recoverSpace, decodeRecoveryCode } from "#lib/platform/data/pairing-client.ts";
@@ -21,6 +21,7 @@
   let identity = $state<StoredDeviceIdentity | null>(null);
   let available = $state(false);
   let loaded = $state(false);
+  let siteOrigin = $state("");
   let busy = $state(false);
   let consent = $state(false);
   let mode = $state<"overview" | "join" | "recover">("overview");
@@ -41,16 +42,7 @@
   let devices = $state<Array<{deviceId:string;name:string;addedAt:number;revoked:boolean}>>([]);
   let advanced = $state(false);
 
-  const pairingLink = $derived(inviteCode ? createPairingLink("https://modu.howlil.site", inviteCode) : "");
-  const qr = $derived(pairingLink ? qrcodegen.QrCode.encodeText(pairingLink, qrcodegen.QrCode.Ecc.MEDIUM) : null);
-  const qrCells = $derived.by(() => {
-    if (!qr) return [] as Array<{x:number;y:number}>;
-    const result: Array<{x:number;y:number}> = [];
-    for (let y=0;y<qr.size;y++) for (let x=0;x<qr.size;x++) {
-      if (qr.getModule(x,y)) result.push({x,y});
-    }
-    return result;
-  });
+  const pairingLink = $derived(inviteCode && siteOrigin ? createPairingLink(siteOrigin, inviteCode) : "");
 
   async function action(task: () => Promise<void>) {
     if (busy) return;
@@ -209,6 +201,7 @@
   onMount(() => {
     let active = true;
     deviceName = defaultDeviceLabel();
+    siteOrigin = location.origin;
     const raw = location.hash;
     if (raw.includes("pair=")) {
       // Clear the secret from the visible URL/history before any network call.
@@ -302,37 +295,15 @@
           <Plus class="size-3.5"/> Connect another device
         </Button>
       {:else}
-        <div class="mt-3 space-y-3 rounded-lg border border-border p-3">
-          <p class="text-ui font-medium">Scan this QR code with your phone</p>
-          <p class="text-meta text-muted-foreground">Or copy the link to open it on another device. Expires after 5 minutes.</p>
-          {#if qr}
-            <svg role="img" aria-label="Scan this private device pairing QR code" viewBox={"0 0 " + (qr.size+8) + " " + (qr.size+8)}
-              class="size-48 rounded-lg border border-border bg-white p-2" shape-rendering="crispEdges">
-              <rect width={qr.size+8} height={qr.size+8} fill="white"/>
-              {#each qrCells as cell (cell.x + ":" + cell.y)}
-                <rect x={cell.x+4} y={cell.y+4} width="1" height="1" fill="#252525"/>
-              {/each}
-            </svg>
-          {/if}
-          <div class="flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" class="rounded-full shadow-none" onclick={() => copy(pairingLink)}>
-              <Copy class="size-3.5"/> Copy link
-            </Button>
-            <Button size="sm" variant="ghost" class="rounded-full" onclick={() => {inviteCode="";invitationId="";}}>Cancel</Button>
-          </div>
-          {#if pendingConfirmation}
-            <div class="space-y-2 border-t border-border pt-3">
-              <p class="text-ui font-medium">{pendingName} wants to connect</p>
-              <p class="text-meta text-muted-foreground">Compare this code with the code on your phone:</p>
-              <p class="font-mono text-title font-semibold tracking-widest">{pendingConfirmation}</p>
-              <Button class="rounded-full shadow-none" disabled={busy} onclick={approve}>
-                <ShieldCheck class="size-4"/> Codes match — Approve
-              </Button>
-            </div>
-          {:else}
-            <p class="text-meta text-muted-foreground" role="status">Waiting for the new device…</p>
-          {/if}
-        </div>
+        <PairingInvitePanel
+          link={pairingLink}
+          deviceName={pendingName}
+          confirmation={pendingConfirmation}
+          {busy}
+          onCopy={() => void copy(pairingLink)}
+          onCancel={() => {inviteCode="";invitationId="";}}
+          onApprove={() => void approve()}
+        />
       {/if}
     </div>
   {:else if mode === "join"}
