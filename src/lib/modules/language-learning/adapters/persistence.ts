@@ -20,7 +20,7 @@ import { STARTER_ISLAND } from './starter-content.ts';
 import {projectLearningProgress,type LearningProgress} from '../core/progress.ts';
 import {
   OUTBOX_STORE, SYNC_META_STORE, ensureOutboxStores, queueLocalMutation,
-  resetCaptureAfterRestore, readOutbox, acknowledgeOutbox, initializeCaptureWithBaseline
+  resetCaptureAfterRestore, readOutbox, acknowledgeOutbox, initializeCaptureWithBaseline, activateCaptureFromRemote
 } from '#lib/platform/data/outbox.ts';
 import {
   INBOX_STORE, TOMBSTONE_STORE, ensureInboxStores,
@@ -410,6 +410,12 @@ async function ensureCatalogInitialized():Promise<void> {
 
 /** No server endpoint. This browser origin owns the canonical practice history. */
 export const learningPersistence = {
+  async beginRemoteSyncCapture(deviceId: string): Promise<void> {
+    return transaction<void>([SYNC_META_STORE, OUTBOX_STORE], 'readwrite', (tx, complete) => {
+      activateCaptureFromRemote(tx, deviceId);
+      complete(undefined);
+    });
+  },
   readRemoteCursor: async (): Promise<number> => {
     const db = await openDatabase();
     try { return await readInboxCursor(db); } finally { db.close(); }
