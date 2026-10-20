@@ -147,7 +147,11 @@ export async function loadFocusSessions() {
 }
 
 export async function clearFocusSessions() {
-  if (typeof indexedDB !== 'undefined') await reconcileFocusFallbackForSync();
+  if (typeof indexedDB !== 'undefined' &&
+      typeof localStorage !== 'undefined' &&
+      localStorage.getItem(CAPTURE_ACTIVE_KEY) === '1') {
+    await reconcileFocusFallbackForSync();
+  }
   let database: IDBDatabase;
   try { database = await openDatabase(); }
   catch {
