@@ -179,7 +179,7 @@ export async function acknowledgeOutbox(
  * not re-export an old baseline or mutate domain records.
  */
 export function activateCaptureFromRemote(
-  tx: IDBTransaction, deviceId: string
+  tx: IDBTransaction, deviceId: string, moduleId: ModuleDataId
 ): void {
   if (typeof deviceId !== "string" || !/^[a-zA-Z0-9_-]{8,128}$/.test(deviceId)) {
     throw new Error("Invalid device identity for remote capture.");
@@ -197,10 +197,17 @@ export function activateCaptureFromRemote(
       if (!Number.isSafeInteger(cursor.result?.sequence) || cursor.result.sequence < 1) {
         tx.abort(); return;
       }
-      const pending = tx.objectStore(OUTBOX_STORE).count();
-      pending.onsuccess = () => {
-        if (pending.result !== 0) { tx.abort(); return; }
-        meta.put({ key: CAPTURE_KEY, enabled: true, deviceId } satisfies CaptureMetadata);
+      const inbox = tx.objectStore("sync_inbox").getAll();
+      inbox.onsuccess = () => {
+        const imported = Array.isArray(inbox.result) && inbox.result.some((item: {
+          moduleId?: string; kind?: string; deviceId?: string
+        }) => item.moduleId === moduleId && item.kind === "baseline" && item.deviceId !== deviceId);
+        if (!imported) { tx.abort(); return; }
+        const pending = tx.objectStore(OUTBOX_STORE).count();
+        pending.onsuccess = () => {
+          if (pending.result !== 0) { tx.abort(); return; }
+          meta.put({ key: CAPTURE_KEY, enabled: true, deviceId } satisfies CaptureMetadata);
+        };
       };
     };
   };
