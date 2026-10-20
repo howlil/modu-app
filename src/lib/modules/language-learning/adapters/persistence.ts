@@ -37,6 +37,7 @@ const PROFILES = 'profiles';
 const CATALOGS = 'catalogs';
 const BACKUP_FORMAT = 'modu-language-learning';
 const MAX_BACKUP_LENGTH = 256 * 1024 * 1024;
+const MAX_CATALOG_LENGTH = 32 * 1024 * 1024;
 
 interface SessionRow {
   id: string;
@@ -465,8 +466,8 @@ export const learningPersistence = {
   },
   /** Import only new Island IDs, atomically. Never silently replace authored materials. */
   async importCatalog(profileId:string,text:string):Promise<number> {
-    if(!text || new Blob([text]).size>2*1024*1024)
-      throw new LearningPersistenceError('invalid','Catalog import exceeds 2 MiB.');
+    if(!text || new Blob([text]).size>MAX_CATALOG_LENGTH)
+      throw new LearningPersistenceError('invalid','Catalog import exceeds 32 MiB.');
     let raw:unknown;
     try{raw=JSON.parse(text);}catch{throw new LearningPersistenceError('invalid','Invalid catalog JSON.');}
     if(!raw||typeof raw!=='object'||Array.isArray(raw))
@@ -511,12 +512,16 @@ export const learningPersistence = {
   },
   async exportCatalog(profileId:string):Promise<string> {
     const content=await this.catalog(profileId,true);
-    return JSON.stringify({format:'modu-language-catalog',version:1,
+    const encoded=JSON.stringify({format:'modu-language-catalog',version:1,
       islands:content.map(x=>({
         ...x.island,
         sentences:x.island.sentences.map(s=>({id:s.id,prompt:s.prompt,answer:s.answer})),
         vocabulary:x.vocabulary.map(v=>({id:v.id,sentenceId:v.sentenceId,term:v.term,meaning:v.meaning}))
       }))});
+    if(new Blob([encoded]).size>MAX_CATALOG_LENGTH)
+      throw new LearningPersistenceError('quota',
+        'Catalog exceeds the 32 MiB template export limit. Use full learning backup.');
+    return encoded;
   },
   latest(): Promise<BrowserPractice | null> {
     return transaction<BrowserPractice | null>([SESSIONS, META], 'readonly', (tx, complete, fail) => {
