@@ -1,16 +1,20 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { Download, Database, RefreshCw, HardDrive, CloudOff, ArrowLeft } from "lucide-svelte";
+  import { Download, Upload, Database, RefreshCw, HardDrive, CloudOff, ArrowLeft } from "lucide-svelte";
   import { Button } from "#lib/components/ui/button/index.js";
   import { globalDataPorts } from "#lib/platform/data/registry.ts";
   import { createGlobalBackup, encodeGlobalBackup, inspectGlobalData } from "#lib/platform/data/backup.ts";
   import type { DataInspection } from "#lib/platform/data/contracts.ts";
+  import { prepareGlobalRestore, commitGlobalRestore, type PreparedGlobalRestore } from "#lib/platform/data/restore.ts";
 
   let summaries = $state<DataInspection[]>([]);
   let busy = $state(false);
   let error = $state("");
   let notice = $state("");
   let loaded = $state(false);
+  let backupInput = $state<HTMLInputElement | undefined>();
+  let restorePreview = $state<PreparedGlobalRestore | null>(null);
+  let restoreConfirmed = $state(false);
 
   async function refresh() {
     if (busy) return;
@@ -52,6 +56,34 @@
     } finally {
       busy = false;
     }
+  }
+
+  async function selectRestoreFile(event: Event) {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file || busy) return;
+    busy = true; error = ""; notice = "";
+    restorePreview = null; restoreConfirmed = false;
+    try {
+      if (file.size > 300 * 1024 * 1024) throw new Error("Backup exceeds 300 MiB.");
+      restorePreview = await prepareGlobalRestore(await file.text(), globalDataPorts);
+    } catch (cause) {
+      error = cause instanceof Error ? cause.message : "Cannot validate this backup.";
+    } finally { input.value = ""; busy = false; }
+  }
+
+  async function restoreBackup() {
+    if (busy || !restorePreview || !restoreConfirmed) return;
+    busy = true; error = ""; notice = "";
+    try {
+      await commitGlobalRestore(restorePreview, globalDataPorts);
+      restorePreview = null;
+      notice = "Restore completed. Reloading saved modules.";
+      window.location.reload();
+    } catch (cause) {
+      error = cause instanceof Error ? cause.message : "Restore failed.";
+      restoreConfirmed = false;
+    } finally { busy = false; }
   }
 
   onMount(() => { void refresh(); });
