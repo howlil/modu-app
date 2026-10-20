@@ -35,7 +35,7 @@ export class SyncTransport {
     }
   }
 
-  private async send(method: "GET" | "POST", relative: string, body = ""): Promise<Response> {
+  private async send(method: "GET" | "POST" | "DELETE", relative: string, body = ""): Promise<Response> {
     const url = new URL(relative, location.origin);
     if (url.origin !== location.origin) throw new Error("Cross-origin sync is not supported.");
     const timestamp = Date.now();
@@ -57,6 +57,16 @@ export class SyncTransport {
     });
     if (!response.ok) throw new Error("Sync transport error (" + response.status + ").");
     return response;
+  }
+
+  /** Signed control operations. Enrollment requires explicit user approval. */
+  async control<T>(method: "GET" | "POST" | "DELETE", action: string, payload?: unknown): Promise<T> {
+    if (!/^(?:pairings|pairings\/[0-9a-f-]{36}(?:\/approve)?|devices|devices\/[a-zA-Z0-9_-]{8,128})$/.test(action)) {
+      throw new Error("Invalid pairing control route.");
+    }
+    const route = "/api/sync/spaces/" + this.device.spaceId + "/" + action;
+    const body = method === "POST" ? JSON.stringify(payload ?? {}) : "";
+    return await (await this.send(method, route, body)).json() as T;
   }
 
   async push(operations: readonly PendingSyncOperation[]): Promise<SyncPushReply> {
