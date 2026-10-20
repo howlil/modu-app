@@ -541,6 +541,10 @@ export const learningPersistence = {
           existingRows.onsuccess=()=>{
             try{
               const existing=(existingRows.result as unknown[]).map(decodeCatalogRow);
+              const existingIds=new Set(existing.map(x=>x.island.id));
+              if(entries.some(x=>existingIds.has(x.island.id)))
+                throw new LearningPersistenceError('conflict',
+                  'Imported Island already exists; nothing was imported.');
               catalogKeys(profile,[
                 ...existing.filter(x=>!x.archived).map(x=>x.island),
                 ...entries.map(x=>x.island)
