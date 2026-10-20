@@ -15,6 +15,9 @@ vi.mock("../../src/lib/shared/focus-sessions/repository.ts",()=>({
 vi.mock("../../src/lib/modules/habit-tracker/adapters/persistence.ts",()=>({
   subscribeHabitChanges:(cb:()=>void)=>{signals.habit=cb;return()=>{signals.habit=null;};}
 }));
+vi.mock("../../src/lib/modules/language-learning/adapters/persistence.ts",()=>({
+  subscribeLearningChanges:(_cb:()=>void)=>()=>{}
+}));
 
 beforeEach(()=>{
   vi.useFakeTimers();
