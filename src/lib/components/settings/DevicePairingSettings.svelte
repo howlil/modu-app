@@ -192,13 +192,18 @@
       </div>
       <div class="break-all text-meta text-muted-foreground">Space: <code>{identity.spaceId}</code></div>
       {#if identity.status === "pending"}
-        {#if myConfirmation}
-          <p class="text-meta">Verify on your existing browser: <strong class="tabular-nums">{myConfirmation}</strong></p>
-          <Button variant="outline" size="sm" class="rounded-full shadow-none" disabled={busy || !pairingCodeInput} onclick={checkJoin}>
-            <RefreshCw class="size-3.5"/> Check approval
+        {#if identity.enrollmentKind === "join"}
+          {#if myConfirmation}
+            <p class="text-meta">Verify on the existing device: <strong class="tabular-nums">{myConfirmation}</strong></p>
+          {/if}
+          <label class="block text-meta">Paste the original invitation again to verify approval
+            <textarea class="mt-1 min-h-16 w-full rounded-lg border border-border bg-background p-3 font-mono text-meta" bind:value={pairingCodeInput}></textarea>
+          </label>
+          <Button variant="outline" size="sm" class="rounded-full shadow-none" disabled={busy || !pairingCodeInput.trim()} onclick={checkJoin}>
+            <RefreshCw class="size-3.5"/> Verify approval
           </Button>
         {:else}
-          <p class="text-meta text-muted-foreground">If this browser created the space, resume its local capture. No data will be uploaded.</p>
+          <p class="text-meta text-muted-foreground">Resume local capture for this original device. No data will be uploaded.</p>
           <Button size="sm" class="rounded-full shadow-none" disabled={busy} onclick={finishOwnerSetup}>Complete local setup</Button>
         {/if}
       {:else}
