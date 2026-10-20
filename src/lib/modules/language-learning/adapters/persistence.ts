@@ -277,7 +277,7 @@ function asBackup(text: string): {records: StoredPractice[]; attempts: PracticeA
     if(identities.size!==catalogs.length)
       throw new LearningPersistenceError('invalid','Backup repeats an Island identity.');
   } else {
-    profiles=[starterProfile];
+    profiles=profilesFromSessions(records);
     catalogs=[starterContent];
   }
   return {records, attempts, reviews, latestSessionId,profiles,catalogs};
@@ -317,6 +317,19 @@ async function ensureMemoryInitialized(): Promise<void> {
 function failContent(message:string):never {
   throw new LearningPersistenceError('invalid',message);
 }
+/** Backfill explicit language profiles from old M0–M3 immutable session snapshots. */
+function profilesFromSessions(records:readonly StoredPractice[]):LearningProfile[] {
+  const known=new Map<string,LearningProfile>([[starterProfile.id,starterProfile]]);
+  for(const record of records){
+    const id=record.session.profileId;
+    const language=record.session.items[0]?.targetLanguage;
+    const previous=known.get(id);
+    if(!language || (previous && previous.targetLanguage!==language))
+      throw new LearningPersistenceError('corrupt','Historical profile has inconsistent target languages.');
+    if(!previous)known.set(id,decodeLearningProfile({id,targetLanguage:language}));
+  }
+  return [...known.values()];
+}
 type CatalogRow = {key:string;profileId:string;content:ContentIsland};
 function catalogKey(profileId:string,islandId:string):string {
   return JSON.stringify([profileId,islandId]);
@@ -338,25 +351,42 @@ const starterContent:ContentIsland={
 /** One-time non-destructive seed, serialized with all content writers.
  * The marker prevents user-empty catalogs from silently reseeding. */
 async function ensureCatalogInitialized():Promise<void> {
-  await transaction<void>([PROFILES,CATALOGS,META],'readwrite',(tx,complete,fail)=>{
+  await transaction<void>([PROFILES,CATALOGS,META,SESSIONS],'readwrite',(tx,complete,fail)=>{
     const marker=tx.objectStore(META).get('catalogSeedV1');
     marker.onsuccess=()=>{
       try {
         if(marker.result?.done===true){complete(undefined);return;}
         const profiles=tx.objectStore(PROFILES);
         const catalogs=tx.objectStore(CATALOGS);
-        const existing=profiles.get(starterProfile.id);
-        existing.onsuccess=()=>{
+        const history=tx.objectStore(SESSIONS).getAll();
+        history.onsuccess=()=>{
           try {
-            if(existing.result===undefined)profiles.add(starterProfile);
-            const row:CatalogRow={key:catalogKey(starterProfile.id,STARTER_ISLAND.id),
-              profileId:starterProfile.id,content:starterContent};
-            const present=catalogs.get(row.key);
-            present.onsuccess=()=>{
+            const records=(history.result as unknown[]).map(decodeSessionRow);
+            if(records.some(x=>x===null))
+              throw new LearningPersistenceError('corrupt','Historical session record is missing.');
+            const candidates=profilesFromSessions(records as StoredPractice[]);
+            const existing=profiles.getAll();
+            existing.onsuccess=()=>{
               try {
-                if(present.result===undefined)catalogs.add(row);
-                tx.objectStore(META).put({key:'catalogSeedV1',done:true});
-                complete(undefined);
+                const known=new Map((existing.result as unknown[])
+                  .map(decodeLearningProfile).map(p=>[p.id,p]));
+                for(const candidate of candidates){
+                  const prior=known.get(candidate.id);
+                  if(prior && prior.targetLanguage!==candidate.targetLanguage)
+                    throw new LearningPersistenceError('corrupt','Stored profile conflicts with historic sessions.');
+                  if(!prior)profiles.add(candidate);
+                }
+                const key=catalogKey(starterProfile.id,STARTER_ISLAND.id);
+                const present=catalogs.get(key);
+                present.onsuccess=()=>{
+                  try {
+                    if(present.result===undefined)catalogs.add({
+                      key,profileId:starterProfile.id,content:starterContent
+                    } satisfies CatalogRow);
+                    tx.objectStore(META).put({key:'catalogSeedV1',done:true});
+                    complete(undefined);
+                  }catch(cause){fail(cause);}
+                };
               }catch(cause){fail(cause);}
             };
           }catch(cause){fail(cause);}
