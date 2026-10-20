@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { Button } from "#lib/components/ui/button/index.js";
-  import { Cloud, CloudCheck, RefreshCw, Smartphone, Laptop, Link2, Copy,
-    ShieldCheck, AlertTriangle, Check, Plus, Download, ChevronRight } from "lucide-svelte";
+  import { Cloud, RefreshCw, Smartphone, Laptop, Copy,
+    ShieldCheck, AlertTriangle, Plus, ChevronRight } from "lucide-svelte";
   import { qrcodegen } from "#lib/platform/data/qrcodegen.ts";
   import { createPairingLink, readPairingFragment, encodePairingCode,
     createPairingInvite, inspectPairingInvite, approvePairingInvite,
@@ -276,7 +276,7 @@
     <div class="mt-4 space-y-3">
       <div class="flex items-start gap-3">
         <div class="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border bg-muted">
-          {#if status.kind === "up-to-date"}<CloudCheck class="size-5 text-emerald-700"/>
+          {#if status.kind === "up-to-date"}<Cloud class="size-5 text-emerald-700"/>
           {:else if status.kind === "needs-review"}<AlertTriangle class="size-5 text-destructive"/>
           {:else}<Cloud class="size-5 text-primary"/>{/if}
         </div>
@@ -408,7 +408,7 @@
   <div class="mt-5 border-t border-border pt-3">
     <button class="flex w-full items-center justify-between py-2 text-ui text-muted-foreground hover:text-foreground"
       aria-expanded={advanced} onclick={() => advanced=!advanced}>
-      <span>Advanced device settings</span><ChevronRight class:rotate-90={advanced} class="size-4 transition-transform"/>
+      <span>Advanced device settings</span><ChevronRight class={advanced ? "size-4 rotate-90 transition-transform" : "size-4 transition-transform"}/>
     </button>
     {#if advanced}
       <div class="space-y-3 pt-2">
