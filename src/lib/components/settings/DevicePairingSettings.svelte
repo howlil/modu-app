@@ -11,6 +11,7 @@
   } from "#lib/platform/data/device-identity.ts";
   import {
     initializeSpace, decodePairingCode, joinWithCode, pollPairing, recoverSpace,
+    encodeRecoveryCode, decodeRecoveryCode,
     createPairingInvite, inspectPairingInvite, approvePairingInvite,
     listPairedDevices, revokePairedDevice, encodePairingCode
   } from "#lib/platform/data/pairing-client.ts";
@@ -19,7 +20,6 @@
   let identity = $state<StoredDeviceIdentity | null>(null);
   let deviceName = $state("This browser");
   let pairingCodeInput = $state("");
-  let recoverySpaceId = $state("");
   let recoveryInput = $state("");
   let recoveryKey = $state("");
   let lastSync = $state<SyncProgress | null>(null);
@@ -111,12 +111,10 @@
   function recoverDevice() {
     void execute(async () => {
       if (identity) throw new Error("This browser already contains device credentials.");
-      if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/.test(recoverySpaceId)) {
-        throw new Error("Enter the sync space ID from your recovery backup.");
-      }
+      const decoded = decodeRecoveryCode(recoveryInput);
       const device = await generateDeviceIdentity(deviceName);
-      const result = await recoverSpace(recoverySpaceId, recoveryInput.trim(), device);
-      await storeDeviceIdentity({ ...device, id: "current", spaceId: recoverySpaceId, status: "paired", enrollmentKind: "recovery" });
+      const result = await recoverSpace(decoded.spaceId, decoded.recoveryKey, device);
+      await storeDeviceIdentity({ ...device, id: "current", spaceId: decoded.spaceId, status: "paired", enrollmentKind: "recovery" });
       await loadIdentity();
       recoveryKey = result.recoveryKey;
       recoveryInput = "";
@@ -268,11 +266,8 @@
         </label>
         <Button size="sm" class="rounded-full" disabled={busy || !pairingCodeInput.trim()} onclick={joinSpace}>Request approval</Button>
       {:else if mode === "recover"}
-        <label class="block text-meta">Sync space ID
-          <input class="mt-1 h-9 w-full rounded-lg border border-border bg-background px-3" bind:value={recoverySpaceId}/>
-        </label>
-        <label class="block text-meta">Recovery key
-          <input type="password" class="mt-1 h-9 w-full rounded-lg border border-border bg-background px-3" bind:value={recoveryInput}/>
+        <label class="block text-meta">Recovery code (space ID and recovery key)
+          <input type="password" class="mt-1 h-9 w-full rounded-lg border border-border bg-background px-3" bind:value={recoveryInput} autocomplete="off"/>
         </label>
         <Button size="sm" class="rounded-full" disabled={busy || !recoveryInput.trim()} onclick={recoverDevice}><KeyRound class="size-3.5"/> Recover access</Button>
       {:else}
@@ -284,8 +279,8 @@
   {#if recoveryKey}
     <div class="mt-4 rounded-lg border border-border bg-muted p-3">
       <p class="text-meta font-medium">Recovery key — shown only once</p>
-      <p class="mt-1 break-all font-mono text-meta">{recoveryKey}</p>
-      <Button variant="outline" size="sm" class="mt-2 rounded-full" onclick={() => copy(recoveryKey)}><Copy class="size-3.5"/> Copy recovery key</Button>
+      <p class="mt-1 break-all font-mono text-meta">{identity ? encodeRecoveryCode(identity.spaceId, recoveryKey) : recoveryKey}</p>
+      <Button variant="outline" size="sm" class="mt-2 rounded-full" onclick={() => { if (identity) copy(encodeRecoveryCode(identity.spaceId, recoveryKey)); }}><Copy class="size-3.5"/> Copy recovery key</Button>
     </div>
   {/if}
   {#if error}<p role="alert" class="mt-3 text-meta text-destructive">{error}</p>{/if}
