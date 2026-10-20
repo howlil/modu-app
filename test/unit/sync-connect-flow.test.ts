@@ -3,7 +3,7 @@ import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { preflightSyncBaseline } from "../../src/lib/platform/data/setup-flow.ts";
 import type { ModuleDataPort } from "../../src/lib/platform/data/contracts.ts";
 import {
-  readDeviceIdentity, readPendingPairing, clearDeviceIdentity, clearPendingPairing
+  readDeviceIdentity, readPendingPairing, readOwnerInvitation, storeOwnerInvitation, clearOwnerInvitation
 } from "../../src/lib/platform/data/device-identity.ts";
 import { requestDeviceJoin, resumeDeviceJoin } from "../../src/lib/platform/data/pairing-flow.ts";
 import { encodePairingCode } from "../../src/lib/platform/data/pairing-client.ts";
@@ -43,6 +43,17 @@ beforeEach(async () => {
   vi.setSystemTime(new Date("2026-10-21T08:00:00Z"));
 });
 afterEach(()=>{vi.unstubAllGlobals();vi.useRealTimers();});
+describe("M3 owner invitation reload", () => {
+  it("retains a short-lived invitation without storing it in localStorage", async () => {
+    const invite = {id:"owner-invitation" as const,code:CODE,
+      invitationId:"00000000-1111-4222-8333-555555555555",
+      expiresAt:Date.now()+300_000};
+    await storeOwnerInvitation(invite);
+    expect(await readOwnerInvitation()).toEqual(invite);
+    await clearOwnerInvitation();
+    expect(await readOwnerInvitation()).toBeNull();
+  });
+});
 describe("M3 pending invitation survives reload and network failure", () => {
   it("persists original signing key and confirmation for pending join", async () => {
     vi.stubGlobal("fetch",vi.fn(async()=>new Response(JSON.stringify({
