@@ -1,0 +1,86 @@
+import type { PendingSyncOperation } from "./outbox.ts";
+import {
+  parseSyncOperation, SYNC_MAX_BATCH, SYNC_MAX_BODY_BYTES, SYNC_MAX_PULL,
+  type SyncPullReply, type SyncPushReply
+} from "./sync-protocol.ts";
+import { signedRequestBytes } from "../../../sync-worker/signature.ts";
+
+export type AuthorizedDevice = {
+  spaceId: string;
+  deviceId: string;
+  privateKey: CryptoKey;
+};
+
+function base64url(bytes: Uint8Array): string {
+  let encoded = "";
+  for (const byte of bytes) encoded += String.fromCharCode(byte);
+  return btoa(encoded).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+/**
+ * M4 explicit transport only: never automatically uploads or acknowledges data.
+ * M5 will supply authenticated device keys from approved pairing.
+ * Pull must be applied through feature-owned transaction/cursor ports first.
+ */
+export class SyncTransport {
+  constructor(
+    private readonly device: AuthorizedDevice,
+    private readonly fetchImpl: typeof fetch = fetch
+  ) {
+    if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/.test(device.spaceId) ||
+        !/^[a-zA-Z0-9_-]{8,128}$/.test(device.deviceId) ||
+        device.privateKey.type !== "private" ||
+        device.privateKey.algorithm.name !== "ECDSA") {
+      throw new Error("Invalid paired device credentials.");
+    }
+  }
+
+  private async send(method: "GET" | "POST", relative: string, body = ""): Promise<Response> {
+    const url = new URL(relative, location.origin);
+    if (url.origin !== location.origin) throw new Error("Cross-origin sync is not supported.");
+    const timestamp = Date.now();
+    const nonce = base64url(crypto.getRandomValues(new Uint8Array(24)));
+    const input = await signedRequestBytes(method, url, timestamp, nonce, body);
+    const signature = new Uint8Array(await crypto.subtle.sign(
+      { name: "ECDSA", hash: "SHA-256" }, this.device.privateKey, input
+    ));
+    const headers: HeadersInit = {
+      "x-modu-device": this.device.deviceId,
+      "x-modu-timestamp": String(timestamp),
+      "x-modu-nonce": nonce,
+      "x-modu-signature": base64url(signature)
+    };
+    if (method === "POST") headers["content-type"] = "application/json";
+    const response = await this.fetchImpl(url.toString(), {
+      method, headers, body: method === "POST" ? body : undefined,
+      cache: "no-store", credentials: "omit"
+    });
+    if (!response.ok) throw new Error("Sync transport error (" + response.status + ").");
+    return response;
+  }
+
+  async push(operations: readonly PendingSyncOperation[]): Promise<SyncPushReply> {
+    if (operations.length < 1 || operations.length > SYNC_MAX_BATCH) {
+      throw new Error("Sync push requires 1–50 operations.");
+    }
+    const wire = operations.map(operation => parseSyncOperation(
+      (({ sequence: _sequence, ...rest }) => rest)(operation), this.device.deviceId
+    ));
+    const body = JSON.stringify({ operations: wire });
+    if (new TextEncoder().encode(body).byteLength > SYNC_MAX_BODY_BYTES) {
+      throw new Error("Sync batch exceeds the payload size limit.");
+    }
+    const route = "/api/sync/spaces/" + this.device.spaceId + "/changes";
+    return await (await this.send("POST", route, body)).json() as SyncPushReply;
+  }
+
+  async pull(after: number, limit = SYNC_MAX_PULL): Promise<SyncPullReply> {
+    if (!Number.isSafeInteger(after) || after < 0 ||
+        !Number.isSafeInteger(limit) || limit < 1 || limit > SYNC_MAX_PULL) {
+      throw new Error("Invalid sync cursor or batch size.");
+    }
+    const route = "/api/sync/spaces/" + this.device.spaceId +
+      "/changes?after=" + after + "&limit=" + limit;
+    return await (await this.send("GET", route)).json() as SyncPullReply;
+  }
+}
