@@ -1,4 +1,4 @@
-import type { RestorableDataPort } from "#lib/platform/data/contracts.ts";
+import type { SyncOutboxPort } from "#lib/platform/data/contracts.ts";
 import { learningPersistence } from "./persistence.ts";
 
 async function snapshot(): Promise<unknown> {
@@ -12,7 +12,7 @@ function encodedBackup(value: unknown): string {
   return JSON.stringify(value);
 }
 
-export const learningDataPort: RestorableDataPort = {
+export const learningDataPort: SyncOutboxPort = {
   moduleId: "language-learning",
   backupVersion: 3,
   async inspect() {
@@ -33,6 +33,9 @@ export const learningDataPort: RestorableDataPort = {
     return { moduleId: "language-learning", backupVersion: 3, recordCount, state: recordCount ? "ready" : "empty" };
   },
   exportBackup: snapshot,
+  readPendingSyncOperations: limit => learningPersistence.readPendingSyncOperations(limit),
+  acknowledgeSyncOperations: ids => learningPersistence.acknowledgeSyncOperations(ids),
+
   async validateBackup(data) {
     const stats = learningPersistence.validateBackup(encodedBackup(data));
     return { moduleId: "language-learning", recordCount: stats.records, warnings: [] };
