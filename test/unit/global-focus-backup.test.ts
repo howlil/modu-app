@@ -38,13 +38,19 @@ afterEach(() => vi.unstubAllGlobals());
 describe("global Pomodoro backup safety", () => {
   it("includes IDB and legacy fallback records without duplicate IDs", async () => {
     const old = session("old", 100000);
-    const common = session("common", 150000);
+    const common = session("common", 200000);
     values.set(FALLBACK_KEY, JSON.stringify([old, common]));
     await saveFocusSession({ ...common, endedAt: 200000 });
     await saveFocusSession(session("new", 300000));
     const saved = await exportFocusSessionsForBackup();
     expect(saved.map(x => x.id)).toEqual(["new", "common", "old"]);
     expect(saved.find(x => x.id === "common")?.endedAt).toBe(200000);
+  });
+
+  it("rejects conflicting copies of the same session in IDB and fallback", async () => {
+    values.set(FALLBACK_KEY, JSON.stringify([session("common", 150000)]));
+    await saveFocusSession(session("common", 200000));
+    await expect(exportFocusSessionsForBackup()).rejects.toThrow("Conflicting Pomodoro records");
   });
 
   it("rejects corrupted fallback instead of silently exporting partial history", async () => {
