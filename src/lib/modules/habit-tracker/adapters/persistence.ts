@@ -21,7 +21,7 @@ const DATABASE = 'modu-habit-tracker';
 const VERSION = 4;
 const CHANGE = 'modu:habit-changed';
 const CHANNEL = 'modu-habit-tracker-changes';
-type StoreName = 'habits' | 'policies' | 'checkins' | 'preferences' | typeof OUTBOX_STORE | typeof SYNC_META_STORE;
+type StoreName = 'habits' | 'policies' | 'checkins' | 'preferences' | typeof OUTBOX_STORE | typeof SYNC_META_STORE | typeof INBOX_STORE | typeof TOMBSTONE_STORE;
 
 export interface HabitSnapshot {
   habits: HabitDefinition[];
@@ -261,7 +261,8 @@ export async function changeHabitTitle(id: string, title: string): Promise<void>
       request.onsuccess = () => {
         if (!request.result) { fail(new HabitStorageError('Habit not found.')); return; }
         try {
-          const updated = renameHabit(request.result as HabitDefinition, title);
+          const previous = request.result as HabitDefinition;
+          const updated = renameHabit(previous, title);
           store.put(updated);
           queueLocalMutation(tx, 'habit-tracker', id, 'upsert', { habit: updated, before: previous });
         }
@@ -535,13 +536,16 @@ export async function applyHabitRemoteChanges(events: readonly SequencedSyncOper
             if (h.result.length || p.result.length || c.result.length) {
               const local = { habits: h.result, policies: p.result, checkins: c.result,
                 trackingTimezone: backup.trackingTimezone };
-              const sort = (rows: Array<{id:string}>) => [...rows].sort((a,b)=>a.id.localeCompare(b.id));
+              const byId = <T extends { id: string }>(rows: readonly T[]) =>
+                [...rows].sort((a,b) => a.id.localeCompare(b.id));
+              const byCheckin = (rows: readonly HabitCheckin[]) =>
+                [...rows].sort((a,b) => (a.habitId + ':' + a.localDate).localeCompare(b.habitId + ':' + b.localDate));
               if (JSON.stringify({
-                habits: sort(local.habits), policies: sort(local.policies), checkins: sort(local.checkins)
+                habits: byId(local.habits), policies: byId(local.policies), checkins: byCheckin(local.checkins)
               }) !== JSON.stringify({
-                habits: sort(backup.habits as Array<{id:string}>),
-                policies: sort(backup.policies as Array<{id:string}>),
-                checkins: sort(backup.checkins as Array<{id:string}>)
+                habits: byId(backup.habits),
+                policies: byId(backup.policies),
+                checkins: byCheckin(backup.checkins)
               })) {
                 stop(new RemoteApplyConflict('Habit baseline requires a manual merge.')); return;
               }
