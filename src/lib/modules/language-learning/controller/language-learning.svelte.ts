@@ -9,6 +9,7 @@ import { checkRecallAnswer, practiceAnswerScope, recallFeedback, type AnswerChec
 import { type IslandDraft, type ContentIsland } from '../core/content.ts';
 import {type LearningProgress} from '../core/progress.ts';
 import {createSpeechPlayback,SpeechPlaybackError} from '../adapters/speech.ts';
+import {canCommitAudioExposure} from '../core/audio-policy.ts';
 import {
   recommendedIsland, type LearningPlan, type LearningProfile
 } from '../core/orchestration.ts';
@@ -76,9 +77,9 @@ export function createLanguageLearningController() {
       audioStatus==='played')shadowConfirmed=done;
   }
   function canRecordExposure(){
-    const scope=audioCurrentScope();
-    return !!scope && scope===audioScope && audioStatus==='played' &&
-      (session?.mode==='listening' || (session?.mode==='shadowing' && shadowConfirmed));
+    return audioStatus==='played' && canCommitAudioExposure({
+      session,completedScope:audioScope,shadowingConfirmed:shadowConfirmed
+    });
   }
   async function refreshProgress(){
     try{
