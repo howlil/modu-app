@@ -177,9 +177,11 @@
           disabled={controller.pending} onclick={controller.refreshPlan}>Retry recommendations</button>
       {/if}
     {/if}
-    <div class="mt-6">
-      <PracticeView {controller} />
-    </div>
+    {#if controller.session?.profileId === controller.profile.id}
+      <div class="mt-6">
+        <PracticeView {controller} />
+      </div>
+    {/if}
     {#if controller.ready}
       <section class="mt-8 border-t border-border pt-4" aria-label="Learning data">
         <div class="flex flex-wrap items-center gap-2">
@@ -198,7 +200,7 @@
         </div>
         <p class="mt-2 text-meta text-muted-foreground">Progress stays in this browser. Export a backup before clearing site data or switching devices.</p>
       </section>
-      {#if controller.error && !controller.session}
+      {#if controller.error && (!controller.session || controller.session.profileId !== controller.profile.id)}
         <p role="alert" class="mt-3 text-ui text-destructive">{controller.error}</p>
       {/if}
     {/if}
