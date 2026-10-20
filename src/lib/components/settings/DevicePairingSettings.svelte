@@ -15,6 +15,7 @@
   import {
     readDeviceIdentity, readPendingPairing, clearPendingPairing, clearDeviceIdentity,
     generateDeviceIdentity, storeDeviceIdentity, notifyDeviceIdentityChanged,
+    readOwnerInvitation, storeOwnerInvitation, clearOwnerInvitation,
     type StoredDeviceIdentity
   } from "#lib/platform/data/device-identity.ts";
 
@@ -59,6 +60,14 @@
   async function loadIdentity() {
     identity = await readDeviceIdentity();
     if (identity) deviceName = identity.name;
+    if (identity?.status === "paired") {
+      const ownerInvite = await readOwnerInvitation();
+      if (ownerInvite && ownerInvite.expiresAt > Date.now()) {
+        inviteCode = ownerInvite.code;
+        invitationId = ownerInvite.invitationId;
+        invitationExpiry = ownerInvite.expiresAt;
+      } else if (ownerInvite) await clearOwnerInvitation();
+    }
     const pending = await readPendingPairing();
     if (pending && identity?.enrollmentKind === "join" && identity.status === "pending") {
       joinCode = pending.invitationCode;
@@ -103,13 +112,21 @@
       invitationId = response.invitationId;
       invitationExpiry = response.expiresAt;
       inviteCode = encodePairingCode(identity.spaceId,response.invitationId,response.secret);
+      await storeOwnerInvitation({
+        id: "owner-invitation", code: inviteCode, invitationId: response.invitationId,
+        expiresAt: response.expiresAt
+      });
       pendingName = ""; pendingConfirmation = "";
     });
   }
   async function inspectInvite() {
     if (!identity || !invitationId || busy) return;
     try {
-      if (Date.now() >= invitationExpiry) { inviteCode = ""; invitationId = ""; return; }
+      if (Date.now() >= invitationExpiry) {
+        inviteCode = ""; invitationId = "";
+        await clearOwnerInvitation();
+        return;
+      }
       const result = await inspectPairingInvite(identity,invitationId);
       if (result.status === "pending-approval") {
         pendingName = result.candidateName ?? "New device";
@@ -125,6 +142,7 @@
       if (!identity || !invitationId || !pendingConfirmation) throw new Error("No verified request is waiting.");
       await approvePairingInvite(identity,invitationId,pendingConfirmation);
       inviteCode = ""; invitationId = ""; pendingName = ""; pendingConfirmation = "";
+      await clearOwnerInvitation();
       devices = (await listPairedDevices(identity)).devices;
       notice = "Device approved. Its initial data sync starts automatically.";
     });
@@ -302,7 +320,7 @@
           confirmation={pendingConfirmation}
           {busy}
           onCopy={() => void copy(pairingLink)}
-          onCancel={() => {inviteCode="";invitationId="";}}
+          onCancel={() => {inviteCode="";invitationId="";void clearOwnerInvitation();}}
           onApprove={() => void approve()}
         />
       {/if}
