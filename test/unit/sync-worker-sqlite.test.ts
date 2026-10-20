@@ -1,7 +1,7 @@
 // @ts-nocheck — Node SQLite integration test runs in Vitest; browser tsconfig intentionally excludes Node types.
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
-import { SyncSpace } from "../../src/sync-worker/sync-space.ts";
+import { SyncSpaceHandler as SyncSpace } from "../../src/sync-worker/sync-space.ts";
 import { SyncJournal, type SyncStorage, type SqlValue } from "../../src/sync-worker/journal.ts";
 import { signedRequestBytes } from "../../src/sync-worker/signature.ts";
 
