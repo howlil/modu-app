@@ -43,7 +43,7 @@ function createStorage(): SyncStorage {
 }
 
 function encode(data: Uint8Array): string {
-  return btoa(String.fromCharCode(...data)).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/g, "");
+  return btoa(String.fromCharCode(...data)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 async function credential() {
   const keys = await crypto.subtle.generateKey(
