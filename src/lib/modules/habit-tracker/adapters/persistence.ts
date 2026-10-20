@@ -382,3 +382,30 @@ export async function setDailyCompleted(id: string, date: LocalDate, complete: b
   if (date !== await currentTrackingDate()) throw new RangeError('M1 boolean check-ins require today.');
   await mutateHabitCheckin(id, date, complete ? { type: 'set', value: 1 } : { type: 'clear' });
 }
+
+/** Restore all related entities atomically inside this feature's IndexedDB. */
+export async function replaceHabitSnapshotForRestore(input: HabitSnapshot): Promise<void> {
+  const snapshot = validateHabitSnapshot(input);
+  if (!snapshot.trackingTimezone) {
+    throw new HabitStorageError('Backup is missing the tracking timezone.');
+  }
+  await withDatabase(db => transaction<void>(
+    db, ['habits', 'policies', 'checkins', 'preferences'], 'readwrite',
+    (tx, set) => {
+      const habits = tx.objectStore('habits');
+      const policies = tx.objectStore('policies');
+      const checkins = tx.objectStore('checkins');
+      const prefs = tx.objectStore('preferences');
+      habits.clear();
+      policies.clear();
+      checkins.clear();
+      prefs.clear();
+      for (const habit of snapshot.habits) habits.add(habit);
+      for (const policy of snapshot.policies) policies.add(policy);
+      for (const checkin of snapshot.checkins) checkins.add(checkin);
+      prefs.put({ id: 'tracking', trackingTimezone: snapshot.trackingTimezone });
+      set(undefined);
+    }
+  ));
+  broadcastChange();
+}
