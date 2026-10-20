@@ -209,3 +209,47 @@ export async function assignFocusSession(sessionId: string, taskId: string | nul
   }
   announceChange();
 }
+
+/**
+ * Strict backup read: merge historical localStorage fallback with authoritative IDB.
+ * Unlike loadFocusSessions(), backup MUST fail on inaccessible or corrupt storage.
+ */
+export async function exportFocusSessionsForBackup(): Promise<FocusActivitySession[]> {
+  let fallback: FocusActivitySession[] = [];
+  if (typeof localStorage !== 'undefined') {
+    const raw = localStorage.getItem(FALLBACK_KEY);
+    if (raw !== null) {
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed) || !parsed.every(isFocusActivitySession)) {
+        throw new Error('Pomodoro fallback history is corrupt. Backup was cancelled.');
+      }
+      fallback = parsed;
+    }
+  }
+
+  const database = await openDatabase();
+  let persisted: FocusActivitySession[];
+  try {
+    persisted = await new Promise<FocusActivitySession[]>((resolve, reject) => {
+      const tx = database.transaction(STORE_NAME, 'readonly');
+      const req = tx.objectStore(STORE_NAME).getAll();
+      let records: FocusActivitySession[] = [];
+      req.onsuccess = () => {
+        if (!Array.isArray(req.result) || !req.result.every(isFocusActivitySession)) {
+          try { tx.abort(); } catch { /* transaction may already be aborted */ }
+          reject(new Error('Pomodoro activity history is corrupt. Backup was cancelled.'));
+        } else {
+          records = req.result;
+        }
+      };
+      tx.oncomplete = () => resolve(records);
+      tx.onabort = () => reject(tx.error ?? new Error('Could not read Pomodoro activity history.'));
+      tx.onerror = () => reject(tx.error ?? new Error('Could not read Pomodoro activity history.'));
+    });
+  } finally {
+    database.close();
+  }
+  const merged = new Map(fallback.map(item => [item.id, item]));
+  for (const item of persisted) merged.set(item.id, item);
+  return [...merged.values()].sort((a, b) => b.endedAt - a.endedAt);
+}
