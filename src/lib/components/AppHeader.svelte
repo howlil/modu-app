@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Github, Heart } from 'lucide-svelte';
+  import { Github, Heart, Settings2 } from 'lucide-svelte';
   import { Button } from "#lib/components/ui/button/index.js";
 
   const FLOATING_THRESHOLD = 72;
@@ -35,6 +35,10 @@
       </a>
 
       <nav class="flex items-center gap-2" aria-label="Project actions">
+        <Button href="/settings/data" variant="outline" size="sm" aria-label="Data and sync settings" class="h-8 rounded-full border-border/[0.75] bg-white/[0.50] px-3 text-meta font-normal shadow-none backdrop-blur-sm hover:bg-white/[0.80] max-[520px]:px-2">
+          <Settings2 class="size-3.5" strokeWidth={1.8} />
+          <span class="max-[520px]:hidden">Data &amp; Sync</span>
+        </Button>
         <Button
           href="https://github.com/sponsors/howlil"
           target="_blank"
