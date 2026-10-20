@@ -21,6 +21,8 @@ jobs:
         run: bun run test
       - name: Build Cloudflare bundle
         run: bun run build
+      - name: Validate SQLite Durable Object Worker bundle
+        run: bunx wrangler deploy --config wrangler.sync.jsonc --dry-run --outdir .wrangler/dry-run-modu-sync
       - name: Set up real Chrome and ChromeDriver
         id: chrome
         uses: browser-actions/setup-chrome@v2
