@@ -146,6 +146,11 @@ export function createLanguageLearningController() {
     try {
       record = await learningPersistence.latest();
       await refreshContent();
+      const restoredProfile=profiles.find(p=>p.id===record?.session.profileId);
+      if(restoredProfile && restoredProfile.id!==profile.id){
+        profile=restoredProfile;
+        await refreshContent();
+      }
       await refreshPlan();
       persistenceStatus = await learningPersistence.persistenceStatus();
       answerDraft = '';
