@@ -8,7 +8,7 @@ type SyncNamespace = {
   idFromName(name: string): unknown;
   get(id: unknown): SyncStub;
 };
-type SyncEnv = { SYNC_SPACE?: SyncNamespace };
+type SyncEnv = { SYNC_SPACE?: SyncNamespace; SYNC_ROLLOUT_ENABLED?: string };
 
 const SPACE_PATTERN =
   /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/;
@@ -24,7 +24,11 @@ async function forward(
       request.headers.get("origin") !== origin) {
     return json({ error: "Invalid request origin." }, { status: 403 });
   }
-  const namespace = (env as unknown as SyncEnv).SYNC_SPACE;
+  const runtime = env as unknown as SyncEnv;
+  if (runtime.SYNC_ROLLOUT_ENABLED !== "true") {
+    return json({ error: "Device sync is not enabled." }, { status: 503 });
+  }
+  const namespace = runtime.SYNC_SPACE;
   if (!namespace?.idFromName || !namespace.get) {
     return json({ error: "Sync is not configured." }, { status: 503 });
   }
