@@ -582,9 +582,9 @@ export const learningPersistence = {
     });
   },
   async execute(command: PracticeCommand, expectedRevision: number | null,
-    expectedEpoch?: string | null): Promise<BrowserPractice> {
+    expectedEpoch?: string | null, expectedCatalogRevision?:number): Promise<BrowserPractice> {
     await ensureMemoryInitialized();
-    return transaction<BrowserPractice>([SESSIONS, ATTEMPTS, META, REVIEWS], 'readwrite', (tx, complete, fail) => {
+    return transaction<BrowserPractice>([SESSIONS, ATTEMPTS, META, REVIEWS, CATALOGS], 'readwrite', (tx, complete, fail) => {
       const sessions = tx.objectStore(SESSIONS);
       const attempts = tx.objectStore(ATTEMPTS);
       const meta = tx.objectStore(META);
@@ -652,6 +652,27 @@ export const learningPersistence = {
                   fail(new LearningPersistenceError('conflict',
                     'Attempt ID belongs to an existing record. Reload saved progress.'));
                 } else commit();
+              };
+            } else if(command.type==='start' && expectedCatalogRevision!==undefined) {
+              const catalog=tx.objectStore(CATALOGS).get(catalogKey(command.profileId,command.island.id));
+              catalog.onsuccess=()=>{
+                try {
+                  if(catalog.result===undefined)
+                    throw new LearningPersistenceError('conflict','Island no longer exists in the catalog.');
+                  const stored=decodeCatalogRow(catalog.result);
+                  const active=stored.island;
+                  if(stored.archived || active.revision!==expectedCatalogRevision ||
+                    active.sourceLanguage!==command.island.sourceLanguage ||
+                    active.targetLanguage!==command.island.targetLanguage ||
+                    command.island.sentences.some(sentence=>{
+                      const current=active.sentences.find(s=>s.id===sentence.id);
+                      return !current || current.revision!==sentence.revision ||
+                        current.prompt!==sentence.prompt || current.answer!==sentence.answer;
+                    })) {
+                    throw new LearningPersistenceError('conflict','Island changed. Refresh recommendations before starting.');
+                  }
+                  commit();
+                }catch(cause){fail(cause);}
               };
             } else commit();
           } catch (cause) { fail(cause); }
