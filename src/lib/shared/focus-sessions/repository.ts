@@ -1,5 +1,5 @@
 import type { FocusActivitySession } from './types.ts';
-import { OUTBOX_STORE, SYNC_META_STORE, ensureOutboxStores, queueLocalMutation, resetCaptureAfterRestore, readOutbox, acknowledgeOutbox, initializeCaptureWithBaseline } from '#lib/platform/data/outbox.ts';
+import { OUTBOX_STORE, SYNC_META_STORE, ensureOutboxStores, queueLocalMutation, resetCaptureAfterRestore, readOutbox, acknowledgeOutbox, initializeCaptureWithBaseline, activateCaptureFromRemote } from '#lib/platform/data/outbox.ts';
 import {
   INBOX_STORE, TOMBSTONE_STORE, ensureInboxStores, resetInboxAfterRestore,
   readInboxCursor, applyIncomingInTransaction, RemoteApplyConflict
@@ -541,5 +541,19 @@ export async function applyFocusRemoteChanges(events: readonly SequencedSyncOper
       tx.onerror = () => reject(reason ?? tx.error ?? new Error('Remote focus storage error.'));
     });
     announceChange();
+  } finally { db.close(); }
+}
+
+export async function beginFocusRemoteCapture(deviceId: string): Promise<void> {
+  const db = await openDatabase();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction([SYNC_META_STORE, OUTBOX_STORE], 'readwrite');
+      activateCaptureFromRemote(tx, deviceId);
+      tx.oncomplete = () => resolve();
+      tx.onabort = () => reject(tx.error ?? new Error('Focus remote activation requires a committed sync cursor.'));
+      tx.onerror = () => reject(tx.error ?? new Error('Focus remote activation failed.'));
+    });
+    if (typeof localStorage !== 'undefined') localStorage.setItem(CAPTURE_ACTIVE_KEY, '1');
   } finally { db.close(); }
 }
