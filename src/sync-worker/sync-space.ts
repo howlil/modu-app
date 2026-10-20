@@ -1,5 +1,5 @@
 import { SyncJournal, type SyncStorage } from "./journal.ts";
-import { PairingRegistry, parseDeviceIdentity, randomSecret, secretDigest } from "./pairing.ts";
+import { PairingRegistry, parseDeviceIdentity, validateImportableDeviceKey, secretDigest } from "./pairing.ts";
 import { readLimitedSyncBody } from "../lib/platform/data/sync-body.ts";
 import { readSignedHeaders, verifyDeviceSignature } from "./signature.ts";
 import {
@@ -60,6 +60,7 @@ export class SyncSpaceHandler {
         if (request.method !== "POST") return response({ error: "Not found." }, 404);
         const data = jsonObject(body);
         const identity = parseDeviceIdentity(data.identity);
+        await validateImportableDeviceKey(identity);
         if (typeof data.recoveryKey !== "string") throw new SyncProtocolError(400, "Recovery key missing.");
         const hash = await secretDigest(data.recoveryKey);
         this.pairing.bootstrap(identity, hash);
@@ -71,6 +72,7 @@ export class SyncSpaceHandler {
       if (request.method === "POST" && action === "recover") {
         const data = jsonObject(body);
         const identity = parseDeviceIdentity(data.identity);
+        await validateImportableDeviceKey(identity);
         if (typeof data.recoveryKey !== "string") throw new SyncProtocolError(400, "Recovery key missing.");
         return response(await this.pairing.recover(identity, data.recoveryKey));
       }
@@ -80,7 +82,9 @@ export class SyncSpaceHandler {
         const data = jsonObject(body);
         if (typeof data.secret !== "string") throw new SyncProtocolError(400, "Invitation secret missing.");
         if (join[2] === "join") {
-          return response(await this.pairing.join(id, data.secret, parseDeviceIdentity(data.identity)));
+          const identity = parseDeviceIdentity(data.identity);
+          await validateImportableDeviceKey(identity);
+          return response(await this.pairing.join(id, data.secret, identity));
         }
         return response(await this.pairing.joinStatus(id, data.secret));
       }
