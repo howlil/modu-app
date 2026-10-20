@@ -179,7 +179,7 @@ async function transaction<T>(
     catch (cause) { fail(cause); }
   });
 }
-function asBackup(text: string): {records: StoredPractice[]; attempts: PracticeAttempt[]; reviews: MemoryState[]; latestSessionId: string | null} {
+function asBackup(text: string): {records: StoredPractice[]; attempts: PracticeAttempt[]; reviews: MemoryState[]; latestSessionId: string | null; profiles: LearningProfile[]; catalogs: ContentIsland[]} {
   if (!text || new Blob([text]).size > MAX_BACKUP_LENGTH) {
     throw new LearningPersistenceError('invalid', 'Backup is empty or exceeds the 256 MiB import limit.');
   }
@@ -190,7 +190,7 @@ function asBackup(text: string): {records: StoredPractice[]; attempts: PracticeA
     throw new LearningPersistenceError('invalid', 'Invalid backup document.');
   }
   const doc = raw as Partial<LearningBackup>;
-  if (doc.format !== BACKUP_FORMAT || (doc.version !== 1 && doc.version !== 2) || !Array.isArray(doc.sessions)) {
+  if (doc.format !== BACKUP_FORMAT || (doc.version !== 1 && doc.version !== 2 && doc.version !== 3) || !Array.isArray(doc.sessions)) {
     throw new LearningPersistenceError('invalid', 'Unsupported backup format or version.');
   }
   const sessionIds = new Set<string>(), attemptIds = new Set<string>();
@@ -256,7 +256,30 @@ function asBackup(text: string): {records: StoredPractice[]; attempts: PracticeA
       throw new LearningPersistenceError('corrupt', 'Backup is missing memory states for rated attempts.');
     }
   }
-  return {records, attempts, reviews, latestSessionId};
+  let profiles:LearningProfile[];
+  let catalogs:ContentIsland[];
+  if(doc.version===3){
+    if(!Array.isArray(doc.profiles)||!Array.isArray(doc.catalogs) ||
+      doc.profiles.length>100 || doc.catalogs.length>1000)
+      throw new LearningPersistenceError('invalid','Version 3 backup is missing profiles or catalog.');
+    profiles=(doc.profiles as unknown[]).map(decodeLearningProfile);
+    const byProfile=new Map(profiles.map(p=>[p.id,p]));
+    if(byProfile.size!==profiles.length)
+      throw new LearningPersistenceError('invalid','Backup contains repeated profile IDs.');
+    catalogs=(doc.catalogs as unknown[]).map(raw=>{
+      const item=validateContentIsland(raw);
+      const profile=byProfile.get(item.profileId);
+      if(!profile)return failContent('Catalog references an unknown profile.');
+      return validateContentIsland(item,profile);
+    });
+    const identities=new Set(catalogs.map(x=>catalogKey(x.profileId,x.island.id)));
+    if(identities.size!==catalogs.length)
+      throw new LearningPersistenceError('invalid','Backup repeats an Island identity.');
+  } else {
+    profiles=[starterProfile];
+    catalogs=[starterContent];
+  }
+  return {records, attempts, reviews, latestSessionId,profiles,catalogs};
 }
 /** Non-destructive v2→v3 migration of M1/M2 history. Readwrite scope serializes
  * this projection against new commits and backup restore in every browser tab. */
@@ -290,6 +313,9 @@ async function ensureMemoryInitialized(): Promise<void> {
 }
 
 
+function failContent(message:string):never {
+  throw new LearningPersistenceError('invalid',message);
+}
 type CatalogRow = {key:string;profileId:string;content:ContentIsland};
 function catalogKey(profileId:string,islandId:string):string {
   return JSON.stringify([profileId,islandId]);
@@ -634,9 +660,10 @@ export const learningPersistence = {
     });
   },
   async exportBackup(): Promise<string> {
+    await ensureCatalogInitialized();
     await ensureMemoryInitialized();
-    const backup = await transaction<{records: StoredPractice[]; latestSessionId: string | null; reviews: MemoryState[]}>(
-      [SESSIONS, META, REVIEWS], 'readonly', (tx, complete, fail) => {
+    const backup = await transaction<{records: StoredPractice[]; latestSessionId: string | null; reviews: MemoryState[];profiles:LearningProfile[];catalogs:ContentIsland[]}>(
+      [SESSIONS, META, REVIEWS, PROFILES, CATALOGS], 'readonly', (tx, complete, fail) => {
         const request = tx.objectStore(SESSIONS).getAll();
         request.onsuccess = () => {
           try {
@@ -656,9 +683,28 @@ export const learningPersistence = {
                 }
                 const reviewRequest = tx.objectStore(REVIEWS).getAll();
                 reviewRequest.onsuccess = () => {
-                  try { complete({records, latestSessionId, reviews:
-                    (reviewRequest.result as unknown[]).map(decodeMemoryState)}); }
-                  catch (cause) { fail(cause); }
+                  try {
+                    const reviews=(reviewRequest.result as unknown[]).map(decodeMemoryState);
+                    const profileReq=tx.objectStore(PROFILES).getAll();
+                    profileReq.onsuccess=()=>{
+                      try {
+                        const profiles=(profileReq.result as unknown[]).map(decodeLearningProfile);
+                        const catalogReq=tx.objectStore(CATALOGS).getAll();
+                        catalogReq.onsuccess=()=>{
+                          try {
+                            const catalogs=(catalogReq.result as unknown[]).map(decodeCatalogRow);
+                            const profilesById=new Map(profiles.map(p=>[p.id,p]));
+                            for(const entry of catalogs){
+                              const profile=profilesById.get(entry.profileId);
+                              if(!profile)throw new LearningPersistenceError('corrupt','Catalog profile is missing.');
+                              validateContentIsland(entry,profile);
+                            }
+                            complete({records,latestSessionId,reviews,profiles,catalogs});
+                          }catch(cause){fail(cause);}
+                        };
+                      }catch(cause){fail(cause);}
+                    };
+                  }catch(cause){fail(cause);}
                 };
               } catch (cause) { fail(cause); }
             };
@@ -667,9 +713,9 @@ export const learningPersistence = {
       }
     );
     const encoded = JSON.stringify({
-      format: BACKUP_FORMAT, version: 2, exportedAt: new Date().toISOString(),
+      format: BACKUP_FORMAT, version: 3, exportedAt: new Date().toISOString(),
       sessions: backup.records, latestSessionId: backup.latestSessionId,
-      reviews: backup.reviews
+      reviews: backup.reviews, profiles: backup.profiles, catalogs: backup.catalogs
     } satisfies LearningBackup);
     if (new Blob([encoded]).size > MAX_BACKUP_LENGTH) {
       throw new LearningPersistenceError('quota', 'Learning history exceeds the backup size limit.');
@@ -678,14 +724,18 @@ export const learningPersistence = {
   },
   async importBackup(text: string): Promise<void> {
     // Validate the entire source before opening the destructive transaction.
-    const {records, attempts, reviews, latestSessionId} = asBackup(text);
-    await transaction<void>([SESSIONS, ATTEMPTS, META, REVIEWS], 'readwrite', (tx, complete) => {
+    const {records, attempts, reviews, latestSessionId,profiles,catalogs} = asBackup(text);
+    await transaction<void>([SESSIONS, ATTEMPTS, META, REVIEWS, PROFILES, CATALOGS], 'readwrite', (tx, complete) => {
       const sessions = tx.objectStore(SESSIONS);
       const journal = tx.objectStore(ATTEMPTS);
       const meta = tx.objectStore(META);
       sessions.clear();
       journal.clear();
       meta.clear();
+      const profileStore=tx.objectStore(PROFILES);
+      const catalogStore=tx.objectStore(CATALOGS);
+      profileStore.clear();
+      catalogStore.clear();
       const reviewStore = tx.objectStore(REVIEWS);
       reviewStore.clear();
       const now = Date.now();
@@ -695,6 +745,11 @@ export const learningPersistence = {
       }
       for (const attempt of attempts) journal.add(attempt);
       for (const state of reviews) reviewStore.add(state);
+      for(const profile of profiles)profileStore.add(profile);
+      for(const content of catalogs)catalogStore.add({
+        key:catalogKey(content.profileId,content.island.id),profileId:content.profileId,content
+      } satisfies CatalogRow);
+      meta.put({key:'catalogSeedV1',done:true});
       meta.put({key:'memoryBootstrapV1', done:true});
       if (latestSessionId !== null) meta.put({key: 'latest', sessionId: latestSessionId});
       meta.put({key: 'epoch', value: crypto.randomUUID()});
