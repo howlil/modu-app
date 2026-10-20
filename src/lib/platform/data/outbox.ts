@@ -172,3 +172,36 @@ export async function acknowledgeOutbox(
     tx.onerror = () => reject(tx.error ?? new Error("Outbox acknowledgement failed."));
   });
 }
+
+/**
+ * Join/recovery browsers must apply the owner journal BEFORE local capture.
+ * This primitive refuses activation until a remote cursor exists; it does
+ * not re-export an old baseline or mutate domain records.
+ */
+export function activateCaptureFromRemote(
+  tx: IDBTransaction, deviceId: string
+): void {
+  if (typeof deviceId !== "string" || !/^[a-zA-Z0-9_-]{8,128}$/.test(deviceId)) {
+    throw new Error("Invalid device identity for remote capture.");
+  }
+  const meta = tx.objectStore(SYNC_META_STORE);
+  const capture = meta.get(CAPTURE_KEY);
+  capture.onsuccess = () => {
+    if (capture.result) {
+      if (capture.result.enabled === true && capture.result.deviceId === deviceId) return;
+      tx.abort();
+      return;
+    }
+    const cursor = meta.get("remote-cursor");
+    cursor.onsuccess = () => {
+      if (!Number.isSafeInteger(cursor.result?.sequence) || cursor.result.sequence < 1) {
+        tx.abort(); return;
+      }
+      const pending = tx.objectStore(OUTBOX_STORE).count();
+      pending.onsuccess = () => {
+        if (pending.result !== 0) { tx.abort(); return; }
+        meta.put({ key: CAPTURE_KEY, enabled: true, deviceId } satisfies CaptureMetadata);
+      };
+    };
+  };
+}
