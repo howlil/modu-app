@@ -71,3 +71,65 @@ export function parsePullQuery(url: URL): { after: number; limit: number } {
   }
   return { after, limit };
 }
+
+/** Never acknowledge M3 outbox rows based on a malformed partial server reply. */
+export function validatePushReply(source: unknown, expectedIds: readonly string[]): SyncPushReply {
+  if (!source || typeof source !== "object" || Array.isArray(source)) {
+    throw new SyncProtocolError(502, "Invalid sync push response.");
+  }
+  const accepted = (source as Record<string, unknown>).accepted;
+  if (!Array.isArray(accepted) || accepted.length !== expectedIds.length) {
+    throw new SyncProtocolError(502, "Incomplete sync acknowledgement.");
+  }
+  const expected = new Set(expectedIds);
+  const unique = new Set<string>();
+  for (const row of accepted) {
+    if (!row || typeof row !== "object" || Array.isArray(row)) {
+      throw new SyncProtocolError(502, "Invalid sync acknowledgement entry.");
+    }
+    const item = row as Record<string, unknown>;
+    if (typeof item.operationId !== "string" || !expected.has(item.operationId) ||
+        unique.has(item.operationId) || !Number.isSafeInteger(item.sequence) ||
+        (item.sequence as number) < 1) {
+      throw new SyncProtocolError(502, "Sync acknowledgement mismatch.");
+    }
+    unique.add(item.operationId);
+  }
+  return { accepted: accepted as SyncPushReply["accepted"] };
+}
+
+/** Return data only after checking strict cursor monotonicity and row identities. */
+export function validatePullReply(source: unknown, after: number, limit: number): SyncPullReply {
+  if (!source || typeof source !== "object" || Array.isArray(source)) {
+    throw new SyncProtocolError(502, "Invalid sync pull response.");
+  }
+  const body = source as Record<string, unknown>;
+  if (!Array.isArray(body.operations) || body.operations.length > limit ||
+      typeof body.hasMore !== "boolean" || !Number.isSafeInteger(body.nextCursor)) {
+    throw new SyncProtocolError(502, "Malformed sync cursor response.");
+  }
+  const operations: SequencedSyncOperation[] = [];
+  let cursor = after;
+  const ids = new Set<string>();
+  for (const item of body.operations) {
+    if (!item || typeof item !== "object" || Array.isArray(item) ||
+        !Number.isSafeInteger((item as Record<string, unknown>).sequence)) {
+      throw new SyncProtocolError(502, "Malformed sync event sequence.");
+    }
+    const row = item as Record<string, unknown>;
+    const sequence = row.sequence as number;
+    if (sequence <= cursor) throw new SyncProtocolError(502, "Non-monotonic sync cursor.");
+    const { sequence: _sequence, ...wire } = row;
+    if (typeof wire.deviceId !== "string") throw new SyncProtocolError(502, "Missing event author.");
+    const decoded = parseSyncOperation(wire, wire.deviceId);
+    if (ids.has(decoded.operationId)) throw new SyncProtocolError(502, "Duplicate sync event.");
+    ids.add(decoded.operationId);
+    operations.push({ ...decoded, sequence });
+    cursor = sequence;
+  }
+  if (body.nextCursor !== cursor) throw new SyncProtocolError(502, "Sync cursor does not match events.");
+  if (body.hasMore && operations.length === 0) {
+    throw new SyncProtocolError(502, "Server reports more data without advancing the cursor.");
+  }
+  return { operations, nextCursor: cursor, hasMore: body.hasMore };
+}
