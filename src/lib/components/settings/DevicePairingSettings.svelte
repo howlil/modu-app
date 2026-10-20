@@ -76,7 +76,8 @@
   }
   async function startOwner() {
     await action(async () => {
-      const result = await enableSyncOnce(deviceName, stage => { setupStage = stage; });
+      const result = await enableSyncOnce(deviceName, stage => { setupStage = stage; },
+        code => { recoveryCode = code; });
       await loadIdentity();
       recoveryCode = result.recoveryCode;
       consent = false;
