@@ -7,6 +7,9 @@
     "binding": "ASSETS",
     "directory": ".svelte-kit/cloudflare"
   },
+  "vars": {
+    "SYNC_ROLLOUT_ENABLED": "true"
+  },
   "durable_objects": {
     "bindings": [
       {
