@@ -1,4 +1,5 @@
 import { SyncJournal, type SyncStorage } from "./journal.ts";
+import { readLimitedSyncBody } from "../lib/platform/data/sync-body.ts";
 import { readSignedHeaders, verifyDeviceSignature } from "./signature.ts";
 import {
   SYNC_MAX_BODY_BYTES, parsePullQuery, parseSyncPush, SyncProtocolError
@@ -45,10 +46,7 @@ export class SyncSpaceHandler {
       if (len && Number(len) > SYNC_MAX_BODY_BYTES) {
         throw new SyncProtocolError(413, "Sync request exceeds the size limit.");
       }
-      const body = request.method === "POST" ? await request.text() : "";
-      if (new TextEncoder().encode(body).byteLength > SYNC_MAX_BODY_BYTES) {
-        throw new SyncProtocolError(413, "Sync request exceeds the size limit.");
-      }
+      const body = request.method === "POST" ? await readLimitedSyncBody(request) : "";
       await verifyDeviceSignature(request, body, publicKey, signed);
       if (request.method === "GET") {
         const { after, limit } = parsePullQuery(url);
