@@ -21,3 +21,13 @@ jobs:
         run: bun run test
       - name: Build Cloudflare bundle
         run: bun run build
+      - name: Set up real Chrome and ChromeDriver
+        id: chrome
+        uses: browser-actions/setup-chrome@v2
+        with:
+          install-chromedriver: true
+      - name: Habit Tracker browser E2E
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+          CHROMEDRIVER_BIN: ${{ steps.chrome.outputs.chromedriver-path }}
+        run: node test/e2e/habit-tracker-browser.mjs
