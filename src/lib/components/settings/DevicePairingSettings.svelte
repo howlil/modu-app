@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { SyncTransport } from "#lib/platform/data/sync-transport.ts";
   import { syncNow, type SyncProgress } from "#lib/platform/data/sync-coordinator.ts";
+  import { explainSyncFailure } from "#lib/platform/data/sync-errors.ts";
   import { Button } from "#lib/components/ui/button/index.js";
   import { globalDataPorts } from "#lib/platform/data/registry.ts";
   import { requireNoOtherModuTabs } from "#lib/platform/data/peer-tabs.ts";
@@ -64,7 +65,11 @@
   function runManualSync() {
     void execute(async () => {
       if (!identity) throw new Error("Device is not paired.");
-      lastSync = await syncNow(identity);
+      try {
+        lastSync = await syncNow(identity);
+      } catch (cause) {
+        throw new Error(explainSyncFailure(cause));
+      }
       notice = "Sync completed: " + lastSync.pushed + " uploaded, " + lastSync.pulled +
         " received. Local and remote cursors are committed.";
     });
@@ -118,7 +123,7 @@
       await loadIdentity();
       recoveryKey = result.recoveryKey;
       recoveryInput = "";
-      notice = "Recovery authorized. Your previous recovery key is no longer valid.";
+      notice = "Recovery complete. All previous devices and invitations have been revoked. Save the NEW recovery code now.";
     });
   }
   function copy(text: string) {
@@ -266,6 +271,7 @@
         </label>
         <Button size="sm" class="rounded-full" disabled={busy || !pairingCodeInput.trim()} onclick={joinSpace}>Request approval</Button>
       {:else if mode === "recover"}
+        <p class="text-meta text-muted-foreground">Recovery revokes access from every previously authorized device and invalidates active invitations.</p>
         <label class="block text-meta">Recovery code (space ID and recovery key)
           <input type="password" class="mt-1 h-9 w-full rounded-lg border border-border bg-background px-3" bind:value={recoveryInput} autocomplete="off"/>
         </label>
