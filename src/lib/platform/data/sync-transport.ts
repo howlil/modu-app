@@ -22,6 +22,43 @@ function base64url(bytes: Uint8Array): string {
  * M5 will supply authenticated device keys from approved pairing.
  * Pull must be applied through feature-owned transaction/cursor ports first.
  */
+const MAX_RESPONSE_BYTES = 1024 * 1024;
+
+/** Streaming reply limit; the Content-Length header is not a trust boundary. */
+export async function readBoundedSyncJson(response: Response): Promise<unknown> {
+  const declared = response.headers.get("content-length");
+  if (declared && Number(declared) > MAX_RESPONSE_BYTES) {
+    throw new Error("Sync response exceeds the supported size limit.");
+  }
+  if (!response.body) throw new Error("Sync response was empty.");
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > MAX_RESPONSE_BYTES) {
+        await reader.cancel("Response too large.");
+        throw new Error("Sync response exceeds the supported size limit.");
+      }
+      chunks.push(value);
+    }
+  } finally { reader.releaseLock(); }
+  const payload = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    payload.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(payload)) as unknown;
+  } catch {
+    throw new Error("Sync service returned invalid JSON.");
+  }
+}
+
 export class SyncTransport {
   constructor(
     private readonly device: AuthorizedDevice,
@@ -66,7 +103,7 @@ export class SyncTransport {
     }
     const route = "/api/sync/spaces/" + this.device.spaceId + "/" + action;
     const body = method === "POST" ? JSON.stringify(payload ?? {}) : "";
-    return await (await this.send(method, route, body)).json() as T;
+    return await readBoundedSyncJson(await this.send(method, route, body)) as T;
   }
 
   async push(operations: readonly PendingSyncOperation[]): Promise<SyncPushReply> {
@@ -81,7 +118,7 @@ export class SyncTransport {
       throw new Error("Sync batch exceeds the payload size limit.");
     }
     const route = "/api/sync/spaces/" + this.device.spaceId + "/changes";
-    const result: unknown = await (await this.send("POST", route, body)).json();
+    const result: unknown = await readBoundedSyncJson(await this.send("POST", route, body));
     return validatePushReply(result, wire.map(x => x.operationId));
   }
 
@@ -92,7 +129,7 @@ export class SyncTransport {
     }
     const route = "/api/sync/spaces/" + this.device.spaceId +
       "/changes?after=" + after + "&limit=" + limit;
-    const result: unknown = await (await this.send("GET", route)).json();
+    const result: unknown = await readBoundedSyncJson(await this.send("GET", route));
     return validatePullReply(result, after, limit);
   }
 }
