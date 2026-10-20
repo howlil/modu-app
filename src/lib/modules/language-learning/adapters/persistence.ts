@@ -18,6 +18,15 @@ import {
 } from '../core/content.ts';
 import { STARTER_ISLAND } from './starter-content.ts';
 import {projectLearningProgress,type LearningProgress} from '../core/progress.ts';
+import {
+  OUTBOX_STORE, SYNC_META_STORE, ensureOutboxStores, queueLocalMutation,
+  resetCaptureAfterRestore, readOutbox, acknowledgeOutbox, initializeCaptureWithBaseline, activateCaptureFromRemote
+} from '#lib/platform/data/outbox.ts';
+import {
+  INBOX_STORE, TOMBSTONE_STORE, ensureInboxStores,
+  resetInboxAfterRestore, readInboxCursor, applyIncomingInTransaction, RemoteApplyConflict
+} from '#lib/platform/data/inbox.ts';
+import type { SequencedSyncOperation } from '#lib/platform/data/sync-protocol.ts';
 
 /** Browser-local, single-learner storage. All authoritative writes use one IDB transaction. */
 export class LearningPersistenceError extends Error {
@@ -29,7 +38,7 @@ export class LearningPersistenceError extends Error {
   }
 }
 const DB_NAME = 'modu-language-learning';
-const DB_VERSION = 4;
+const DB_VERSION = 6;
 const SESSIONS = 'sessions';
 const ATTEMPTS = 'attempts';
 const META = 'meta';
@@ -125,6 +134,8 @@ function openDatabase(): Promise<IDBDatabase> {
         const catalog=db.createObjectStore(CATALOGS,{keyPath:'key'});
         catalog.createIndex('profileId','profileId',{unique:false});
       }
+      ensureOutboxStores(db);
+      ensureInboxStores(db);
     };
     request.onblocked = () => {
       cancelled = true;
@@ -399,6 +410,243 @@ async function ensureCatalogInitialized():Promise<void> {
 
 /** No server endpoint. This browser origin owns the canonical practice history. */
 export const learningPersistence = {
+  async beginRemoteSyncCapture(deviceId: string): Promise<void> {
+    return transaction<void>([SYNC_META_STORE, OUTBOX_STORE, INBOX_STORE], 'readwrite', (tx, complete) => {
+      activateCaptureFromRemote(tx, deviceId, "language-learning");
+      complete(undefined);
+    });
+  },
+  readRemoteCursor: async (): Promise<number> => {
+    const db = await openDatabase();
+    try { return await readInboxCursor(db); } finally { db.close(); }
+  },
+  async applyRemoteChanges(events: readonly SequencedSyncOperation[]): Promise<void> {
+    if (!events.length) return;
+    return transaction<void>(
+      [SESSIONS, ATTEMPTS, META, REVIEWS, PROFILES, CATALOGS,
+        OUTBOX_STORE, SYNC_META_STORE, INBOX_STORE, TOMBSTONE_STORE],
+      'readwrite', (tx, complete, fail) => {
+        const sessions = tx.objectStore(SESSIONS);
+        const attempts = tx.objectStore(ATTEMPTS);
+        const meta = tx.objectStore(META);
+        const reviews = tx.objectStore(REVIEWS);
+        const profiles = tx.objectStore(PROFILES);
+        const catalogs = tx.objectStore(CATALOGS);
+        const tombstones = tx.objectStore(TOMBSTONE_STORE);
+        const reject = (message: string) => fail(new RemoteApplyConflict(message));
+        applyIncomingInTransaction(tx, 'language-learning', events, (event, next, stop) => {
+          const payload = event.payload;
+          if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+            reject('Invalid Learning remote payload.'); return;
+          }
+          const data = payload as Record<string, unknown>;
+          if (event.kind === 'baseline') {
+            let backup: ReturnType<typeof asBackup>;
+            try { backup = asBackup(JSON.stringify(payload)); }
+            catch (cause) { stop(cause instanceof Error ? cause : new RemoteApplyConflict('Invalid Learning baseline.')); return; }
+            const rows = sessions.getAll(), attemptsReq = attempts.getAll(),
+              currentProfiles = profiles.getAll(), currentCatalog = catalogs.getAll();
+            let ready = 0;
+            const applyBaseline = () => {
+              if (++ready !== 4) return;
+              if (rows.result.length || attemptsReq.result.length) {
+                reject('Existing Learning history requires explicit merge, not replacement.'); return;
+              }
+              try {
+                const storedProfiles = (currentProfiles.result as unknown[]).map(decodeLearningProfile);
+                const storedCatalog = (currentCatalog.result as unknown[]).map(decodeCatalogRow);
+                const starterOnly = storedCatalog.every(item =>
+                  item.profileId === starterContent.profileId &&
+                  item.island.id === starterContent.island.id &&
+                  JSON.stringify(item) === JSON.stringify(starterContent)
+                ) && storedProfiles.every(item => item.id === starterProfile.id);
+                if (!starterOnly) {
+                  reject('Custom Learning profiles/catalog require manual merge.'); return;
+                }
+                sessions.clear(); attempts.clear(); reviews.clear(); profiles.clear(); catalogs.clear();
+                const now = Date.now();
+                for (let i = 0; i < backup.records.length; i++) {
+                  const item = backup.records[i];
+                  sessions.add({ id: item.session.id, record: item, updatedAt: now + i } satisfies SessionRow);
+                }
+                for (const attempt of backup.attempts) attempts.add(attempt);
+                for (const memory of backup.reviews) reviews.add(memory);
+                for (const profile of backup.profiles) profiles.add(profile);
+                for (const content of backup.catalogs) {
+                  catalogs.add({ key: catalogKey(content.profileId, content.island.id),
+                    profileId: content.profileId, content } satisfies CatalogRow);
+                }
+                meta.put({ key: 'catalogSeedV1', done: true });
+                meta.put({ key: 'memoryBootstrapV1', done: true });
+                if (backup.latestSessionId) meta.put({ key: 'latest', sessionId: backup.latestSessionId });
+                meta.put({ key: 'epoch', value: crypto.randomUUID() });
+                next();
+              } catch (cause) { stop(cause instanceof Error ? cause : new RemoteApplyConflict('Learning baseline failed.')); }
+            };
+            rows.onsuccess = applyBaseline;
+            attemptsReq.onsuccess = applyBaseline;
+            currentProfiles.onsuccess = applyBaseline;
+            currentCatalog.onsuccess = applyBaseline;
+            return;
+          }
+          if (event.kind === 'upsert' && data.profile) {
+            let incoming: LearningProfile;
+            try {
+              incoming = decodeLearningProfile(data.profile);
+              if (incoming.id !== event.entityId) throw new RemoteApplyConflict('Profile ID mismatch.');
+            } catch (cause) { stop(cause instanceof Error ? cause : new RemoteApplyConflict('Invalid profile.')); return; }
+            const existing = profiles.get(incoming.id);
+            existing.onsuccess = () => {
+              if (existing.result && JSON.stringify(existing.result) !== JSON.stringify(incoming)) {
+                reject('Concurrent language profile changes.'); return;
+              }
+              if (!existing.result) profiles.add(incoming);
+              next();
+            };
+            return;
+          }
+          if (event.kind === 'upsert' && data.content) {
+            let content: ContentIsland;
+            try {
+              content = validateContentIsland(data.content);
+              if (catalogKey(content.profileId, content.island.id) !== event.entityId) {
+                throw new RemoteApplyConflict('Catalog entity identity mismatch.');
+              }
+            } catch (cause) { stop(cause instanceof Error ? cause : new RemoteApplyConflict('Invalid catalog content.')); return; }
+            const target = catalogs.get(event.entityId);
+            target.onsuccess = () => {
+              try {
+                const existing = target.result ? decodeCatalogRow(target.result) : null;
+                const unchanged = existing && JSON.stringify(existing) === JSON.stringify(content);
+                if (!unchanged && (existing?.island.revision ?? null) !==
+                    (event.baseRevision === null ? null : Number(event.baseRevision))) {
+                  throw new RemoteApplyConflict('Concurrent catalog revision.');
+                }
+                if (!unchanged) catalogs.put({
+                  key: event.entityId, profileId: content.profileId, content
+                } satisfies CatalogRow);
+                next();
+              } catch (cause) { stop(cause instanceof Error ? cause : new RemoteApplyConflict('Catalog merge failed.')); }
+            };
+            return;
+          }
+          if (event.kind === 'command' && data.command) {
+            const command = data.command as PracticeCommand;
+            const read = sessions.get(command.sessionId);
+            read.onsuccess = () => {
+              try {
+                const prior = decodeSessionRow(read.result);
+                const expected = event.baseRevision === null ? null : Number(event.baseRevision);
+                if ((prior?.revision ?? null) !== expected) {
+                  throw new RemoteApplyConflict('Concurrent practice revision.');
+                }
+                const applied = applyPracticeCommand(prior, command);
+                if (!applied.changed || JSON.stringify(applied.next.session) !== JSON.stringify(data.session) ||
+                    JSON.stringify(applied.attempt ?? null) !== JSON.stringify(data.attempt ?? null)) {
+                  throw new RemoteApplyConflict('Practice event differs from domain evaluation.');
+                }
+                const persist = (memory: MemoryState | null) => {
+                  try {
+                    const currentEpoch = meta.get('epoch');
+                    currentEpoch.onsuccess = () => {
+                      try {
+                        const epoch: unknown = currentEpoch.result?.value ?? null;
+                        sessions.put({ id: applied.next.session.id,
+                          updatedAt: Date.now(), record: applied.next } satisfies SessionRow);
+                        if (applied.attempt) attempts.add(applied.attempt);
+                        if (memory) reviews.put(memory);
+                        if (epoch === null) meta.put({ key: 'epoch', value: crypto.randomUUID() });
+                        meta.put({ key: 'latest', sessionId: applied.next.session.id });
+                        next();
+                      } catch (cause) { stop(cause instanceof Error ? cause : new RemoteApplyConflict('Practice persistence error.')); }
+                    };
+                  } catch (cause) { stop(cause instanceof Error ? cause : new RemoteApplyConflict('Practice persistence error.')); }
+                };
+                if (applied.attempt?.evidence.kind === 'recall') {
+                  const key = memoryKey({ profileId: applied.attempt.profileId,
+                    islandId: applied.next.session.islandId,
+                    sentenceId: applied.attempt.sentenceId,
+                    sentenceRevision: applied.attempt.sentenceRevision });
+                  const before = reviews.get(key);
+                  before.onsuccess = () => {
+                    try {
+                      const state = before.result === undefined ? null : decodeMemoryState(before.result);
+                      persist(scheduleRatedAttempt(state, applied.attempt!, applied.next.session.islandId));
+                    } catch (cause) { stop(cause instanceof Error ? cause : new RemoteApplyConflict('Invalid SRS projection.')); }
+                  };
+                } else persist(null);
+              } catch (cause) { stop(cause instanceof Error ? cause : new RemoteApplyConflict('Invalid remote practice command.')); }
+            };
+            return;
+          }
+          // Unknown or destructive Learning events are never silently accepted.
+          stop(new RemoteApplyConflict('Unsupported Learning remote operation.'));
+        }, () => complete(undefined), fail);
+      }
+    );
+  },
+  async beginSyncCapture(deviceId: string): Promise<void> {
+    await ensureCatalogInitialized();
+    await ensureMemoryInitialized();
+    return transaction<void>(
+      [SESSIONS, META, REVIEWS, PROFILES, CATALOGS, OUTBOX_STORE, SYNC_META_STORE],
+      'readwrite', (tx, complete, fail) => {
+        const sessions = tx.objectStore(SESSIONS).getAll();
+        const reviews = tx.objectStore(REVIEWS).getAll();
+        const profiles = tx.objectStore(PROFILES).getAll();
+        const catalogs = tx.objectStore(CATALOGS).getAll();
+        const latest = tx.objectStore(META).get('latest');
+        let remaining = 5;
+        const ready = () => {
+          remaining--;
+          if (remaining !== 0) return;
+          try {
+            const records = (sessions.result as unknown[]).map(row => {
+              const decoded = decodeSessionRow(row);
+              if (!decoded) throw new LearningPersistenceError('corrupt', 'Invalid session in sync baseline.');
+              return decoded;
+            });
+            const states = (reviews.result as unknown[]).map(decodeMemoryState);
+            const identities = (profiles.result as unknown[]).map(decodeLearningProfile);
+            const islands = (catalogs.result as unknown[]).map(decodeCatalogRow);
+            const pointer: unknown = latest.result?.sessionId ?? null;
+            if (pointer !== null &&
+                (typeof pointer !== 'string' || !records.some(row => row.session.id === pointer))) {
+              throw new LearningPersistenceError('corrupt', 'Invalid latest session pointer in sync baseline.');
+            }
+            const backup: LearningBackup = {
+              format: BACKUP_FORMAT, version: 3, exportedAt: new Date().toISOString(),
+              sessions: records, latestSessionId: pointer as string | null,
+              reviews: states, profiles: identities, catalogs: islands
+            };
+            // Same module-specific referential and evidence checks as manual restore.
+            asBackup(JSON.stringify(backup));
+            initializeCaptureWithBaseline(tx, 'language-learning', deviceId, backup);
+            complete(undefined);
+          } catch (cause) { fail(cause); }
+        };
+        sessions.onsuccess = ready;
+        reviews.onsuccess = ready;
+        profiles.onsuccess = ready;
+        catalogs.onsuccess = ready;
+        latest.onsuccess = ready;
+      }
+    );
+  },
+  async readPendingSyncOperations(limit = 100) {
+    const db = await openDatabase();
+    try { return await readOutbox(db, 'language-learning', limit); }
+    finally { db.close(); }
+  },
+  async acknowledgeSyncOperations(operationIds: readonly string[]) {
+    const db = await openDatabase();
+    try { await acknowledgeOutbox(db, operationIds); }
+    finally { db.close(); }
+  },
+  validateBackup(text: string) {
+    const result = asBackup(text);
+    return { records: result.records.length + result.reviews.length + result.profiles.length + result.catalogs.length };
+  },
   async profiles():Promise<LearningProfile[]> {
     await ensureCatalogInitialized();
     return transaction<LearningProfile[]>([PROFILES],'readonly',(tx,complete,fail)=>{
@@ -414,13 +662,14 @@ export const learningPersistence = {
     try{checked=decodeLearningProfile(profile);}
     catch(cause){throw translateError(cause);}
     await ensureCatalogInitialized();
-    return transaction<LearningProfile>([PROFILES],'readwrite',(tx,complete,fail)=>{
+    return transaction<LearningProfile>([PROFILES,OUTBOX_STORE,SYNC_META_STORE],'readwrite',(tx,complete,fail)=>{
       const store=tx.objectStore(PROFILES);
       const req=store.get(checked.id);
       req.onsuccess=()=>{
         try{
           if(req.result!==undefined)throw new LearningPersistenceError('conflict','Language profile already exists.');
           store.add(checked);
+          queueLocalMutation(tx, 'language-learning', checked.id, 'upsert', { profile: checked });
           complete(checked);
         }catch(cause){fail(cause);}
       };
@@ -450,7 +699,7 @@ export const learningPersistence = {
     if(expectedRevision!==null && (!Number.isSafeInteger(expectedRevision)||expectedRevision<1))
       throw new LearningPersistenceError('invalid','Expected Island revision is invalid.');
     await ensureCatalogInitialized();
-    return transaction<ContentIsland>([PROFILES,CATALOGS],'readwrite',(tx,complete,fail)=>{
+    return transaction<ContentIsland>([PROFILES,CATALOGS,OUTBOX_STORE,SYNC_META_STORE],'readwrite',(tx,complete,fail)=>{
       const profiles=tx.objectStore(PROFILES);
       const catalogs=tx.objectStore(CATALOGS);
       const profileReq=profiles.get(profileId);
@@ -476,6 +725,7 @@ export const learningPersistence = {
                   catalog.push(updated);
                   catalogKeys(profile,catalog.filter(x=>!x.archived).map(x=>x.island));
                   catalogs.put({key,profileId:profile.id,content:updated} satisfies CatalogRow);
+                  queueLocalMutation(tx, 'language-learning', key, 'upsert', { content: updated }, expectedRevision === null ? null : String(expectedRevision));
                   complete(updated);
                 }catch(cause){fail(cause);}
               };
@@ -487,7 +737,7 @@ export const learningPersistence = {
   },
   async setArchived(profileId:string,islandId:string,expectedRevision:number,archived:boolean):Promise<ContentIsland> {
     await ensureCatalogInitialized();
-    return transaction<ContentIsland>([CATALOGS],'readwrite',(tx,complete,fail)=>{
+    return transaction<ContentIsland>([CATALOGS,OUTBOX_STORE,SYNC_META_STORE],'readwrite',(tx,complete,fail)=>{
       const store=tx.objectStore(CATALOGS);
       const key=catalogKey(profileId,islandId);
       const req=store.get(key);
@@ -506,7 +756,10 @@ export const learningPersistence = {
               current.push(next);
               catalogKeys({id:profileId,targetLanguage:next.island.targetLanguage},
                 current.filter(x=>!x.archived).map(x=>x.island));
-              if(next!==existing)store.put({key,profileId,content:next} satisfies CatalogRow);
+              if(next!==existing) {
+                store.put({key,profileId,content:next} satisfies CatalogRow);
+                queueLocalMutation(tx, 'language-learning', key, 'upsert', { content: next }, String(expectedRevision));
+              }
               complete(next);
             }catch(cause){fail(cause);}
           };
@@ -528,7 +781,7 @@ export const learningPersistence = {
       throw new LearningPersistenceError('invalid','Unsupported catalog document.');
     // Drafts are validated against the authoritative profile inside the transaction.
     await ensureCatalogInitialized();
-    return transaction<number>([PROFILES,CATALOGS],'readwrite',(tx,complete,fail)=>{
+    return transaction<number>([PROFILES,CATALOGS,OUTBOX_STORE,SYNC_META_STORE],'readwrite',(tx,complete,fail)=>{
       const req=tx.objectStore(PROFILES).get(profileId);
       req.onsuccess=()=>{
         try{
@@ -568,6 +821,7 @@ export const learningPersistence = {
                   if(check.result!==undefined)
                     throw new LearningPersistenceError('conflict','Imported Island already exists; nothing was imported.');
                   store.add({key,profileId,content:entry} satisfies CatalogRow);
+                  queueLocalMutation(tx, 'language-learning', key, 'upsert', { content: entry });
                   next();
                 }catch(cause){fail(cause);}
               };
@@ -657,7 +911,7 @@ export const learningPersistence = {
   async execute(command: PracticeCommand, expectedRevision: number | null,
     expectedEpoch?: string | null, expectedCatalogRevision?:number): Promise<BrowserPractice> {
     await ensureMemoryInitialized();
-    return transaction<BrowserPractice>([SESSIONS, ATTEMPTS, META, REVIEWS, CATALOGS], 'readwrite', (tx, complete, fail) => {
+    return transaction<BrowserPractice>([SESSIONS, ATTEMPTS, META, REVIEWS, CATALOGS, OUTBOX_STORE, SYNC_META_STORE], 'readwrite', (tx, complete, fail) => {
       const sessions = tx.objectStore(SESSIONS);
       const attempts = tx.objectStore(ATTEMPTS);
       const meta = tx.objectStore(META);
@@ -699,6 +953,9 @@ export const learningPersistence = {
                   sessions.put(row);
                   if (attempt) attempts.add(attempt);
                   if (memory) tx.objectStore(REVIEWS).put(memory);
+                  queueLocalMutation(tx, 'language-learning', next.session.id, 'command', {
+                    command, attempt, session: next.session
+                  }, expectedRevision === null ? null : String(expectedRevision));
                   if (epoch === null) meta.put({key: 'epoch', value: effectiveEpoch});
                   meta.put({key: 'latest', sessionId: next.session.id});
                   complete({...next, storageEpoch: effectiveEpoch});
@@ -819,7 +1076,7 @@ export const learningPersistence = {
   async importBackup(text: string): Promise<void> {
     // Validate the entire source before opening the destructive transaction.
     const {records, attempts, reviews, latestSessionId,profiles,catalogs} = asBackup(text);
-    await transaction<void>([SESSIONS, ATTEMPTS, META, REVIEWS, PROFILES, CATALOGS], 'readwrite', (tx, complete) => {
+    await transaction<void>([SESSIONS, ATTEMPTS, META, REVIEWS, PROFILES, CATALOGS, OUTBOX_STORE, SYNC_META_STORE, INBOX_STORE, TOMBSTONE_STORE], 'readwrite', (tx, complete) => {
       const sessions = tx.objectStore(SESSIONS);
       const journal = tx.objectStore(ATTEMPTS);
       const meta = tx.objectStore(META);
@@ -847,6 +1104,8 @@ export const learningPersistence = {
       meta.put({key:'memoryBootstrapV1', done:true});
       if (latestSessionId !== null) meta.put({key: 'latest', sessionId: latestSessionId});
       meta.put({key: 'epoch', value: crypto.randomUUID()});
+      resetCaptureAfterRestore(tx);
+      resetInboxAfterRestore(tx);
       complete(undefined);
     });
   },

@@ -1,4 +1,13 @@
 import type { GoalPolicy, HabitCheckin, HabitDefinition, LocalDate } from '../core/types.ts';
+import {
+  OUTBOX_STORE, SYNC_META_STORE, ensureOutboxStores, queueLocalMutation,
+  resetCaptureAfterRestore, readOutbox, acknowledgeOutbox, initializeCaptureWithBaseline, activateCaptureFromRemote
+} from '#lib/platform/data/outbox.ts';
+import {
+  INBOX_STORE, TOMBSTONE_STORE, ensureInboxStores,
+  resetInboxAfterRestore, readInboxCursor, applyIncomingInTransaction, RemoteApplyConflict
+} from '#lib/platform/data/inbox.ts';
+import type { SequencedSyncOperation } from '#lib/platform/data/sync-protocol.ts';
 import { isLocalDate, resolveEffectivePolicy } from '../core/scheduling.ts';
 import {
   archiveHabit, booleanCheckin, makeDailyBooleanHabit, renameHabit, restoreHabit
@@ -9,10 +18,10 @@ import { applyCheckinCommand, makeConfiguredDailyHabit, type CheckinCommand, typ
 import { createPolicyRevision, type PolicyRevisionInput } from '../core/policy.ts';
 
 const DATABASE = 'modu-habit-tracker';
-const VERSION = 2;
+const VERSION = 4;
 const CHANGE = 'modu:habit-changed';
 const CHANNEL = 'modu-habit-tracker-changes';
-type StoreName = 'habits' | 'policies' | 'checkins' | 'preferences';
+type StoreName = 'habits' | 'policies' | 'checkins' | 'preferences' | typeof OUTBOX_STORE | typeof SYNC_META_STORE | typeof INBOX_STORE | typeof TOMBSTONE_STORE;
 
 export interface HabitSnapshot {
   habits: HabitDefinition[];
@@ -49,6 +58,8 @@ function openDatabase(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains('preferences')) {
         db.createObjectStore('preferences', { keyPath: 'id' });
       }
+      ensureOutboxStores(db);
+      ensureInboxStores(db);
     };
     request.onsuccess = () => {
       // An upgrade can eventually proceed after onblocked already rejected.
@@ -233,9 +244,10 @@ export async function createConfiguredHabit(input: HabitSetup, date: LocalDate):
   const id = crypto.randomUUID();
   const { habit, policy } = makeConfiguredDailyHabit(id, input, date);
   await withDatabase(db => transaction<void>(
-    db, ['habits', 'policies'], 'readwrite', tx => {
+    db, ['habits', 'policies', OUTBOX_STORE, SYNC_META_STORE], 'readwrite', tx => {
       tx.objectStore('habits').add(habit);
       tx.objectStore('policies').add(policy);
+      queueLocalMutation(tx, 'habit-tracker', id, 'upsert', { habit, policy });
     }
   ));
   broadcastChange();
@@ -243,12 +255,17 @@ export async function createConfiguredHabit(input: HabitSetup, date: LocalDate):
 
 export async function changeHabitTitle(id: string, title: string): Promise<void> {
   await withDatabase(db => transaction<void>(
-    db, ['habits'], 'readwrite', (tx, _set, fail) => {
+    db, ['habits', OUTBOX_STORE, SYNC_META_STORE], 'readwrite', (tx, _set, fail) => {
       const store = tx.objectStore('habits');
       const request = store.get(id);
       request.onsuccess = () => {
         if (!request.result) { fail(new HabitStorageError('Habit not found.')); return; }
-        try { store.put(renameHabit(request.result as HabitDefinition, title)); }
+        try {
+          const previous = request.result as HabitDefinition;
+          const updated = renameHabit(previous, title);
+          store.put(updated);
+          queueLocalMutation(tx, 'habit-tracker', id, 'upsert', { habit: updated, before: previous });
+        }
         catch (error) { fail(error as Error); }
       };
     }
@@ -271,7 +288,7 @@ export async function updateHabitConfiguration(
     throw new RangeError('The local date changed. Reopen the editor before saving.');
   }
   await withDatabase(db => transaction<void>(
-    db, ['habits', 'policies'], 'readwrite', (tx, _set, fail) => {
+    db, ['habits', 'policies', OUTBOX_STORE, SYNC_META_STORE], 'readwrite', (tx, _set, fail) => {
       const habitStore = tx.objectStore('habits');
       const policyStore = tx.objectStore('policies');
       const getHabit = habitStore.get(id);
@@ -287,6 +304,9 @@ export async function updateHabitConfiguration(
             ) : null;
             if (renamed.title !== habit.title) habitStore.put(renamed);
             if (revision) policyStore.add(revision);
+            if (renamed.title !== habit.title || revision) {
+              queueLocalMutation(tx, 'habit-tracker', id, 'upsert', { habit: renamed, policy: revision, before: habit });
+            }
           } catch (error) { fail(error as Error); }
         };
       };
@@ -300,14 +320,16 @@ export async function setHabitArchived(id: string, archive: boolean, date: Local
     throw new RangeError('The tracking date has changed. Refresh before changing archive status.');
   }
   await withDatabase(db => transaction<void>(
-    db, ['habits'], 'readwrite', (tx, _set, fail) => {
+    db, ['habits', OUTBOX_STORE, SYNC_META_STORE], 'readwrite', (tx, _set, fail) => {
       const store = tx.objectStore('habits');
       const request = store.get(id);
       request.onsuccess = () => {
         if (!request.result) { fail(new HabitStorageError('Habit not found.')); return; }
         try {
           const previous = request.result as HabitDefinition;
-          store.put(archive ? archiveHabit(previous, date) : restoreHabit(previous, date));
+          const updated = archive ? archiveHabit(previous, date) : restoreHabit(previous, date);
+          store.put(updated);
+          queueLocalMutation(tx, 'habit-tracker', id, 'upsert', { habit: updated, before: request.result });
         } catch (error) { fail(error as Error); }
       };
     }
@@ -317,8 +339,9 @@ export async function setHabitArchived(id: string, archive: boolean, date: Local
 
 export async function deleteHabit(id: string): Promise<void> {
   await withDatabase(db => transaction<void>(
-    db, ['habits', 'policies', 'checkins'], 'readwrite', tx => {
+    db, ['habits', 'policies', 'checkins', OUTBOX_STORE, SYNC_META_STORE], 'readwrite', tx => {
       tx.objectStore('habits').delete(id);
+      queueLocalMutation(tx, 'habit-tracker', id, 'delete', { id });
       for (const name of ['policies', 'checkins'] as const) {
         const store = tx.objectStore(name);
         const request = store.index('habitId').openKeyCursor(IDBKeyRange.only(id));
@@ -346,7 +369,7 @@ export async function mutateHabitCheckin(
     throw new RangeError('Cannot record progress for a future or invalid date.');
   }
   await withDatabase(db => transaction<void>(
-    db, ['habits', 'policies', 'checkins'], 'readwrite', (tx, _set, fail) => {
+    db, ['habits', 'policies', 'checkins', OUTBOX_STORE, SYNC_META_STORE], 'readwrite', (tx, _set, fail) => {
       const habitRequest = tx.objectStore('habits').get(id);
       habitRequest.onsuccess = () => {
         const habit = habitRequest.result as HabitDefinition | undefined;
@@ -365,8 +388,12 @@ export async function mutateHabitCheckin(
                 const current = currentRequest.result as HabitCheckin | undefined;
                 if (current) enforceValid(validateCheckin(current, policy));
                 const next = applyCheckinCommand(habit, policy, current, date, command);
-                if (next) store.put({ ...next, recordedAt: new Date().toISOString(), id: id + ':' + date });
+                const persisted = next ? { ...next, recordedAt: new Date().toISOString(), id: id + ':' + date } : null;
+                if (persisted) store.put(persisted);
                 else store.delete(id + ':' + date);
+                queueLocalMutation(tx, 'habit-tracker', id + ':' + date, 'command', {
+                  command, before: current ?? null, after: persisted, habitId: id, localDate: date
+                });
               } catch (error) { fail(error as Error); }
             };
           } catch (error) { fail(error as Error); }
@@ -381,4 +408,262 @@ export async function mutateHabitCheckin(
 export async function setDailyCompleted(id: string, date: LocalDate, complete: boolean): Promise<void> {
   if (date !== await currentTrackingDate()) throw new RangeError('M1 boolean check-ins require today.');
   await mutateHabitCheckin(id, date, complete ? { type: 'set', value: 1 } : { type: 'clear' });
+}
+
+/** Restore all related entities atomically inside this feature's IndexedDB. */
+export async function replaceHabitSnapshotForRestore(input: HabitSnapshot): Promise<void> {
+  const snapshot = validateHabitSnapshot(input);
+  if (!snapshot.trackingTimezone) {
+    throw new HabitStorageError('Backup is missing the tracking timezone.');
+  }
+  await withDatabase(db => transaction<void>(
+    db, ['habits', 'policies', 'checkins', 'preferences', OUTBOX_STORE, SYNC_META_STORE, INBOX_STORE, TOMBSTONE_STORE], 'readwrite',
+    (tx, set) => {
+      const habits = tx.objectStore('habits');
+      const policies = tx.objectStore('policies');
+      const checkins = tx.objectStore('checkins');
+      const prefs = tx.objectStore('preferences');
+      habits.clear();
+      policies.clear();
+      checkins.clear();
+      prefs.clear();
+      for (const habit of snapshot.habits) habits.add(habit);
+      for (const policy of snapshot.policies) policies.add(policy);
+      for (const checkin of snapshot.checkins) checkins.add(checkin);
+      prefs.put({ id: 'tracking', trackingTimezone: snapshot.trackingTimezone });
+      resetCaptureAfterRestore(tx);
+      resetInboxAfterRestore(tx);
+      set(undefined);
+    }
+  ));
+  broadcastChange();
+}
+
+/** Public feature-owned transport boundary. No other module opens this database. */
+export function readHabitPendingSyncOperations(limit = 100) {
+  return withDatabase(db => readOutbox(db, 'habit-tracker', limit));
+}
+export function acknowledgeHabitSyncOperations(operationIds: readonly string[]) {
+  return withDatabase(db => acknowledgeOutbox(db, operationIds));
+}
+
+/**
+ * Sync enrollment MUST snapshot existing feature state and enable capture in
+ * one write transaction. The global coordinator is not allowed to construct
+ * this baseline from a prior, potentially stale UI snapshot.
+ */
+export async function beginHabitSyncCapture(deviceId: string): Promise<void> {
+  await loadHabitSnapshot(); // seed pinned timezone for a fresh database
+  await withDatabase(db => transaction<void>(
+    db, ['habits', 'policies', 'checkins', 'preferences', OUTBOX_STORE, SYNC_META_STORE],
+    'readwrite',
+    (tx, set, fail) => {
+      const result: HabitSnapshot = { habits: [], policies: [], checkins: [] };
+      let completed = 0;
+      const ready = () => {
+        completed++;
+        if (completed !== 4) return;
+        try {
+          validateHabitSnapshot(result);
+          initializeCaptureWithBaseline(tx, 'habit-tracker', deviceId, result);
+          set(undefined);
+        } catch (cause) { fail(cause instanceof Error ? cause : new HabitStorageError('Invalid Habit baseline.')); }
+      };
+      const habits = tx.objectStore('habits').getAll();
+      habits.onsuccess = () => { result.habits = habits.result; ready(); };
+      const policies = tx.objectStore('policies').getAll();
+      policies.onsuccess = () => { result.policies = policies.result; ready(); };
+      const checkins = tx.objectStore('checkins').getAll();
+      checkins.onsuccess = () => { result.checkins = checkins.result; ready(); };
+      const timezone = tx.objectStore('preferences').get('tracking');
+      timezone.onsuccess = () => {
+        const value: unknown = timezone.result?.trackingTimezone;
+        if (typeof value !== 'string' || !isSupportedTimezone(value)) {
+          fail(new HabitStorageError('Cannot sync without a valid pinned tracking timezone.')); return;
+        }
+        result.trackingTimezone = value;
+        ready();
+      };
+    }
+  ));
+}
+
+/**
+ * Apply sequenced remote operations without ever bypassing Habit domain validation.
+ * Entity mutations, tombstones, operation receipts, and cursor advance share
+ * a single transaction. Any divergent prior state aborts the WHOLE batch.
+ */
+export function readHabitRemoteCursor(): Promise<number> {
+  return withDatabase(readInboxCursor);
+}
+export async function applyHabitRemoteChanges(events: readonly SequencedSyncOperation[]): Promise<void> {
+  if (!events.length) return;
+  await withDatabase(db => transaction<void>(
+    db, ['habits', 'policies', 'checkins', 'preferences',
+      OUTBOX_STORE, SYNC_META_STORE, INBOX_STORE, TOMBSTONE_STORE],
+    'readwrite', (tx, done, fail) => {
+      const habits = tx.objectStore('habits');
+      const policies = tx.objectStore('policies');
+      const checkins = tx.objectStore('checkins');
+      const prefs = tx.objectStore('preferences');
+      const tombstones = tx.objectStore(TOMBSTONE_STORE);
+      const conflict = (reason: string) => fail(new RemoteApplyConflict(reason));
+      applyIncomingInTransaction(tx, 'habit-tracker', events, (event, next, stop) => {
+        const payload = event.payload;
+        if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+          stop(new RemoteApplyConflict('Invalid Habit remote event.')); return;
+        }
+        const data = payload as Record<string, unknown>;
+        if (event.kind === 'baseline') {
+          let backup: HabitSnapshot;
+          try {
+            if (!Array.isArray(data.habits) || !Array.isArray(data.policies) ||
+                !Array.isArray(data.checkins) || typeof data.trackingTimezone !== 'string') {
+              throw new RemoteApplyConflict('Incomplete Habit baseline.');
+            }
+            backup = validateHabitSnapshot(data as unknown as HabitSnapshot);
+          } catch (error) {
+            stop(error instanceof Error ? error : new RemoteApplyConflict('Invalid Habit baseline.')); return;
+          }
+          const h = habits.getAll(), p = policies.getAll(), c = checkins.getAll(), tz = prefs.get('tracking');
+          let ready = 0;
+          const finish = () => {
+            if (++ready !== 4) return;
+            const localZone: unknown = tz.result?.trackingTimezone;
+            if (localZone && localZone !== backup.trackingTimezone) {
+              stop(new RemoteApplyConflict('Habit tracking timezone differs across devices.')); return;
+            }
+            if (h.result.length || p.result.length || c.result.length) {
+              const local = { habits: h.result, policies: p.result, checkins: c.result,
+                trackingTimezone: backup.trackingTimezone };
+              const byId = <T extends { id: string }>(rows: readonly T[]) =>
+                [...rows].sort((a,b) => a.id.localeCompare(b.id));
+              const byCheckin = (rows: readonly HabitCheckin[]) =>
+                [...rows].sort((a,b) => (a.habitId + ':' + a.localDate).localeCompare(b.habitId + ':' + b.localDate));
+              if (JSON.stringify({
+                habits: byId(local.habits), policies: byId(local.policies), checkins: byCheckin(local.checkins)
+              }) !== JSON.stringify({
+                habits: byId(backup.habits),
+                policies: byId(backup.policies),
+                checkins: byCheckin(backup.checkins)
+              })) {
+                stop(new RemoteApplyConflict('Habit baseline requires a manual merge.')); return;
+              }
+              next(); return;
+            }
+            for (const row of backup.habits) habits.add(row);
+            for (const row of backup.policies) policies.add(row);
+            for (const row of backup.checkins) checkins.add(row);
+            prefs.put({ id: 'tracking', trackingTimezone: backup.trackingTimezone });
+            next();
+          };
+          h.onsuccess=finish; p.onsuccess=finish; c.onsuccess=finish; tz.onsuccess=finish;
+          return;
+        }
+        if (event.kind === 'upsert') {
+          try {
+            const habit = data.habit as HabitDefinition;
+            if (!habit || habit.id !== event.entityId) throw new RemoteApplyConflict('Habit ID mismatch.');
+            enforceValid(validateHabit(habit));
+            if (data.policy != null) {
+              const policy = data.policy as GoalPolicy;
+              if (policy.habitId !== habit.id) throw new RemoteApplyConflict('Policy owner mismatch.');
+              enforceValid(validateGoalPolicy(policy, habit.direction));
+            }
+            const tombstone = tombstones.get(event.entityId);
+            tombstone.onsuccess = () => {
+              if (tombstone.result) { conflict('Deleted Habit cannot be resurrected.'); return; }
+              const current = habits.get(event.entityId);
+              current.onsuccess = () => {
+                const previous: unknown = current.result;
+                if (previous === undefined && data.before != null) {
+                  conflict('Missing prior Habit revision.'); return;
+                }
+                if (previous !== undefined && JSON.stringify(previous) !== JSON.stringify(habit) &&
+                    JSON.stringify(previous) !== JSON.stringify(data.before)) {
+                  conflict('Concurrent Habit edit requires manual resolution.'); return;
+                }
+                if (previous === undefined) habits.add(habit);
+                else if (JSON.stringify(previous) !== JSON.stringify(habit)) habits.put(habit);
+                if (data.policy != null) {
+                  const policy = data.policy as GoalPolicy;
+                  const existingPolicy = policies.get(policy.id);
+                  existingPolicy.onsuccess = () => {
+                    if (existingPolicy.result && JSON.stringify(existingPolicy.result) !== JSON.stringify(policy)) {
+                      conflict('Conflicting Habit policy ID.'); return;
+                    }
+                    if (!existingPolicy.result) policies.add(policy);
+                    next();
+                  };
+                } else next();
+              };
+            };
+          } catch (error) { stop(error instanceof Error ? error : new RemoteApplyConflict('Invalid Habit edit.')); }
+          return;
+        }
+        if (event.kind === 'command') {
+          const id = data.habitId, date = data.localDate;
+          if (typeof id !== 'string' || !isLocalDate(date as string) ||
+              event.entityId !== id + ':' + date) {
+            stop(new RemoteApplyConflict('Invalid remote check-in identity.')); return;
+          }
+          const getHabit = habits.get(id);
+          getHabit.onsuccess = () => {
+            if (!getHabit.result) { conflict('Check-in references missing Habit.'); return; }
+            const req = policies.index('habitId').getAll(id);
+            req.onsuccess = () => {
+              try {
+                const policy = resolveEffectivePolicy(id, date as LocalDate, req.result as GoalPolicy[]);
+                const existing = checkins.get(event.entityId);
+                existing.onsuccess = () => {
+                  const before = existing.result ?? null;
+                  const after = data.after ?? null;
+                  if (JSON.stringify(before) !== JSON.stringify(data.before ?? null) &&
+                      JSON.stringify(before) !== JSON.stringify(after)) {
+                    conflict('Concurrent Habit check-in requires manual resolution.'); return;
+                  }
+                  if (after !== null) {
+                    const checkin = after as HabitCheckin;
+                    enforceValid(validateCheckin(checkin, policy));
+                    if (checkin.habitId !== id || checkin.localDate !== date) {
+                      conflict('Check-in identity mismatch.'); return;
+                    }
+                    checkins.put({ ...checkin, id: event.entityId });
+                  } else checkins.delete(event.entityId);
+                  next();
+                };
+              } catch (error) { stop(error instanceof Error ? error : new RemoteApplyConflict('Invalid remote check-in.')); }
+            };
+          };
+          return;
+        }
+        if (event.kind === 'delete' && data.id === event.entityId) {
+          habits.delete(event.entityId);
+          tombstones.put({ id: event.entityId, sequence: event.sequence });
+          for (const store of [policies, checkins]) {
+            const req = store.index('habitId').openKeyCursor(IDBKeyRange.only(event.entityId));
+            req.onsuccess = () => {
+              const cursor = req.result;
+              if (!cursor) return;
+              store.delete(cursor.primaryKey);
+              cursor.continue();
+            };
+          }
+          next(); return;
+        }
+        stop(new RemoteApplyConflict('Unsupported Habit remote event.'));
+      }, () => done(undefined), fail);
+    }
+  ));
+  broadcastChange();
+}
+
+/** Activate capture only after validated inbound journal is committed. */
+export async function beginHabitRemoteCapture(deviceId: string): Promise<void> {
+  await withDatabase(db => transaction<void>(
+    db, [SYNC_META_STORE, OUTBOX_STORE, INBOX_STORE], 'readwrite', (tx, complete) => {
+      activateCaptureFromRemote(tx, deviceId, "habit-tracker");
+      complete(undefined);
+    }
+  ));
 }

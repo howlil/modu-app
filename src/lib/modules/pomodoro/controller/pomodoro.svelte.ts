@@ -132,6 +132,7 @@ export function createPomodoroController() {
   let dailyGoalHours = $state(8);
   let goalSchedule = $state<GoalSchedule>('weekdays');
   let activitySessions = $state<FocusActivitySession[]>([]);
+  let activitySaveError = $state('');
   let legacyHistory = $state<LegacyFocusSession[]>([]);
   let settingsPanel = $state<SettingsPanel>('main');
   let blockedSitesDialogOpen = $state(false);
@@ -548,8 +549,20 @@ export function createPomodoroController() {
 
     sessionStartedAt = null;
     focusAccounting = emptyFocusAccounting();
+    const previous = activitySessions.find(item => item.id === session.id) ?? null;
+    activitySaveError = '';
     activitySessions = [session, ...activitySessions.filter((item) => item.id !== session.id)].sort((a, b) => b.endedAt - a.endedAt);
-    void saveFocusSession(session);
+    void saveFocusSession(session).catch(() => {
+      // A failed durable transaction must never leave an unsaved session
+      // looking like persisted activity. Preserve any previously saved row.
+      if (activitySessions.some(item => item.id === session.id && item.endedAt === session.endedAt)) {
+        activitySessions = [
+          ...activitySessions.filter(item => item.id !== session.id),
+          ...(previous ? [previous] : [])
+        ].sort((a, b) => b.endedAt - a.endedAt);
+      }
+      activitySaveError = 'This focus session could not be saved to browser storage. Review available storage and retry.';
+    });
     persist();
   }
 
@@ -1096,6 +1109,7 @@ export function createPomodoroController() {
     get dailyGoalHours() { return dailyGoalHours; },
     get goalSchedule() { return goalSchedule; },
     get activitySessions() { return activitySessions; },
+    get activitySaveError() { return activitySaveError; },
     get settingsPanel() { return settingsPanel; },
     get blockedSitesDialogOpen() { return blockedSitesDialogOpen; },
     set blockedSitesDialogOpen(value: boolean) { blockedSitesDialogOpen = value; },

@@ -70,7 +70,7 @@ describe('Habit Tracker M5 — actual IndexedDB adapter with fake-indexeddb tran
     expect(evaluateDailyOutcome(first.habits[0], first.policies[0], first.checkins[0],
       TODAY, TODAY)).toBe('MET');
     const db = await openRaw();
-    expect(db.version).toBe(2);
+    expect(db.version).toBe(4);
     expect([...db.objectStoreNames]).toContain('preferences');
     db.close();
   });
@@ -110,7 +110,7 @@ describe('Habit Tracker M5 — actual IndexedDB adapter with fake-indexeddb tran
       checkins: [{ habitId: 'legacy', value: 1 }]
     });
     const db = await openRaw();
-    expect(db.version).toBe(2);
+    expect(db.version).toBe(4);
     db.close();
     expect((await loadHabitSnapshot()).checkins).toEqual(result.checkins);
   });
@@ -234,7 +234,7 @@ describe('Habit Tracker M5 — actual IndexedDB adapter with fake-indexeddb tran
     const restored = await loadHabitSnapshot();
     expect(restored.trackingTimezone).toBeTruthy();
     const latest = await openRaw();
-    expect(latest.version).toBe(2);
+    expect(latest.version).toBe(4);
     latest.close();
   });
 

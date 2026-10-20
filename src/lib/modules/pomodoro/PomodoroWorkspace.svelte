@@ -39,6 +39,11 @@
   </div>
 
   <div class="mx-auto w-full max-w-[860px] min-w-0">
+    {#if controller.activitySaveError}
+      <p role="alert" class="mb-4 rounded-xl border border-destructive/30 bg-card px-4 py-3 text-ui text-destructive">
+        {controller.activitySaveError}
+      </p>
+    {/if}
     {#if controller.activeView === 'timer'}
       <TimerView {controller} />
     {:else if controller.activeView === 'activity'}
