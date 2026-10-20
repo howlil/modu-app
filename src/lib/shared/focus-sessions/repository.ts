@@ -1,9 +1,14 @@
 import type { FocusActivitySession } from './types.ts';
 import { OUTBOX_STORE, SYNC_META_STORE, ensureOutboxStores, queueLocalMutation, resetCaptureAfterRestore, readOutbox, acknowledgeOutbox, initializeCaptureWithBaseline } from '#lib/platform/data/outbox.ts';
+import {
+  INBOX_STORE, TOMBSTONE_STORE, ensureInboxStores, resetInboxAfterRestore,
+  readInboxCursor, applyIncomingInTransaction, RemoteApplyConflict
+} from '#lib/platform/data/inbox.ts';
+import type { SequencedSyncOperation } from '#lib/platform/data/sync-protocol.ts';
 
 const DB_NAME = 'module-pomodoro-activity';
 const STORE_NAME = 'sessions';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const FALLBACK_KEY = 'module-pomodoro-activity-fallback';
 const CAPTURE_ACTIVE_KEY = 'modu-pomodoro-sync-active';
 
@@ -23,6 +28,7 @@ function openDatabase() {
         store.createIndex('endedAt', 'endedAt');
       }
       ensureOutboxStores(database);
+      ensureInboxStores(database);
     };
 
     request.onsuccess = () => {
@@ -302,11 +308,12 @@ export async function replaceFocusSessionsForRestore(sessions: readonly FocusAct
   const db = await openDatabase();
   try {
     await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction([STORE_NAME, OUTBOX_STORE, SYNC_META_STORE], 'readwrite');
+      const tx = db.transaction([STORE_NAME, OUTBOX_STORE, SYNC_META_STORE, INBOX_STORE, TOMBSTONE_STORE], 'readwrite');
       const store = tx.objectStore(STORE_NAME);
       store.clear();
       for (const session of sessions) store.add(session);
       resetCaptureAfterRestore(tx);
+      resetInboxAfterRestore(tx);
       tx.oncomplete = () => resolve();
       tx.onabort = () => reject(tx.error ?? new Error('Pomodoro history restore aborted.'));
       tx.onerror = () => reject(tx.error ?? new Error('Pomodoro history restore failed.'));
@@ -439,6 +446,100 @@ async function beginFocusSyncCaptureLocked(deviceId: string): Promise<void> {
       tx.onerror = () => reject(tx.error ?? new Error('Pomodoro baseline storage failed.'));
     });
     if (typeof localStorage !== 'undefined') localStorage.removeItem(FALLBACK_KEY);
+    announceChange();
+  } finally { db.close(); }
+}
+
+/** Remote focus events are applied with replay proof + cursor in the same IDB transaction. */
+export async function readFocusRemoteCursor(): Promise<number> {
+  const db = await openDatabase();
+  try { return await readInboxCursor(db); } finally { db.close(); }
+}
+export async function applyFocusRemoteChanges(events: readonly SequencedSyncOperation[]): Promise<void> {
+  if (!events.length) return;
+  const db = await openDatabase();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(
+        [STORE_NAME, OUTBOX_STORE, SYNC_META_STORE, INBOX_STORE, TOMBSTONE_STORE], 'readwrite'
+      );
+      const store = tx.objectStore(STORE_NAME);
+      const tombstones = tx.objectStore(TOMBSTONE_STORE);
+      let reason: Error | null = null;
+      const fail = (cause: Error) => {
+        reason = cause;
+        try { tx.abort(); } catch { reject(cause); }
+      };
+      applyIncomingInTransaction(tx, 'pomodoro', events, (event, next, stop) => {
+        const payload = event.payload;
+        if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+          stop(new RemoteApplyConflict('Invalid Pomodoro sync payload.')); return;
+        }
+        const data = payload as Record<string, unknown>;
+        if (event.kind === 'baseline') {
+          const sessions: unknown = data.sessions;
+          if (!Array.isArray(sessions) || !sessions.every(isFocusActivitySession) ||
+              new Set(sessions.map(x => x.id)).size !== sessions.length) {
+            stop(new RemoteApplyConflict('Invalid Pomodoro baseline.')); return;
+          }
+          const req = store.getAll();
+          req.onsuccess = () => {
+            const existing = req.result as FocusActivitySession[];
+            const sorted = (items: FocusActivitySession[]) =>
+              JSON.stringify([...items].sort((a,b)=>a.id.localeCompare(b.id)));
+            if (existing.length && sorted(existing) !== sorted(sessions)) {
+              stop(new RemoteApplyConflict('Pomodoro baseline conflicts with local history.')); return;
+            }
+            if (!existing.length) for (const item of sessions) store.add(item);
+            next();
+          };
+          return;
+        }
+        if (event.kind === 'upsert') {
+          if (!isFocusActivitySession(data.session)) {
+            stop(new RemoteApplyConflict('Invalid remote focus session.')); return;
+          }
+          const session = data.session;
+          if (session.id !== event.entityId) {
+            stop(new RemoteApplyConflict('Remote session ID mismatch.')); return;
+          }
+          const tomb = tombstones.get(session.id);
+          tomb.onsuccess = () => {
+            if (tomb.result) { stop(new RemoteApplyConflict('Deleted focus session cannot be resurrected.')); return; }
+            const get = store.get(session.id);
+            get.onsuccess = () => {
+              if (get.result && JSON.stringify(get.result) !== JSON.stringify(session)) {
+                stop(new RemoteApplyConflict('Immutable focus session collision.')); return;
+              }
+              if (!get.result) store.add(session);
+              next();
+            };
+          };
+          return;
+        }
+        if (event.kind === 'command' && data.action === 'assign-task') {
+          if (data.taskId !== null && typeof data.taskId !== 'string') {
+            stop(new RemoteApplyConflict('Invalid remote focus assignment.')); return;
+          }
+          const read = store.get(event.entityId);
+          read.onsuccess = () => {
+            if (!read.result) { stop(new RemoteApplyConflict('Assignment references missing focus session.')); return; }
+            store.put({ ...read.result, taskId: data.taskId });
+            next();
+          };
+          return;
+        }
+        if (event.kind === 'delete' && data.sessionId === event.entityId) {
+          store.delete(event.entityId);
+          tombstones.put({ id: event.entityId, sequence: event.sequence });
+          next(); return;
+        }
+        stop(new RemoteApplyConflict('Unsupported Pomodoro sync event.'));
+      }, () => {}, fail);
+      tx.oncomplete = () => resolve();
+      tx.onabort = () => reject(reason ?? tx.error ?? new RemoteApplyConflict('Atomic remote focus apply aborted.'));
+      tx.onerror = () => reject(reason ?? tx.error ?? new Error('Remote focus storage error.'));
+    });
     announceChange();
   } finally { db.close(); }
 }
