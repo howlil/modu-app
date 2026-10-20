@@ -14,10 +14,11 @@ export const learningDataPort: ModuleDataPort = {
     if (!data || typeof data !== "object" || !("sessions" in data) || !Array.isArray(data.sessions)) {
       throw new Error("Learning data backup is invalid.");
     }
+    const record = data as Record<string, unknown>;
     const counters = [data.sessions];
     for (const field of ["profiles", "catalogs", "reviews"] as const) {
       if (field in data) {
-        const collection = data[field];
+        const collection = record[field];
         if (!Array.isArray(collection)) throw new Error("Invalid Language Learning " + field + " collection.");
         counters.push(collection);
       }
