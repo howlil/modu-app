@@ -1,11 +1,12 @@
 import {
   currentSentence, summarizePractice,
+  type LanguageIsland,
   type PracticeMode, type RecallRating, type PracticeSession
 } from '../core/learning.ts';
 import type { PracticeCommand, StoredPractice } from '../core/persistence.ts';
 import { learningPersistence, LearningPersistenceError } from '../adapters/persistence.ts';
 import { checkRecallAnswer, practiceAnswerScope, recallFeedback, type AnswerCheck } from '../core/evaluation.ts';
-import { STARTER_ISLAND } from '../adapters/starter-content.ts';
+import { type IslandDraft, type ContentIsland } from '../core/content.ts';
 import {
   recommendedIsland, type LearningPlan, type LearningProfile
 } from '../core/orchestration.ts';
@@ -19,7 +20,11 @@ export function createLanguageLearningController() {
   let error = $state('');
   let plan = $state<LearningPlan | null>(null);
   let planError = $state('');
-  const profile: LearningProfile = { id: 'starter-id-en', targetLanguage: 'en' };
+  let profile = $state<LearningProfile>({id:'starter-id-en',targetLanguage:'en'});
+  let profiles = $state<LearningProfile[]>([]);
+  let catalogs = $state<ContentIsland[]>([]);
+  let currentIslands = $state<LanguageIsland[]>([]);
+  let editing = $state<ContentIsland | null | undefined>(undefined);
   let answerDraft = $state('');
   let persistenceStatus = $state<'granted' | 'not-granted' | 'unavailable'>('unavailable');
   let answerDraftScope = $state<string | null>(null);
@@ -47,18 +52,91 @@ export function createLanguageLearningController() {
     }
   }
 
+  async function refreshContent() {
+    profiles = await learningPersistence.profiles();
+    if(!profiles.some(p=>p.id===profile.id))profile=profiles[0]??profile;
+    catalogs = profiles.some(p=>p.id===profile.id)
+      ? await learningPersistence.catalog(profile.id,true) : [];
+  }
   async function refreshPlan(): Promise<LearningPlan | null> {
     try {
-      const next = await learningPersistence.plan(profile, [STARTER_ISLAND],
+      const result = await learningPersistence.planStored(profile,
         {now: Date.now(), maxItems: 10, maxNew: 3});
-      plan = next;
+      plan = result.plan;
+      currentIslands = result.islands;
       planError = '';
-      return next;
+      return plan;
     } catch (cause) {
       plan = null;
+      currentIslands = [];
       planError = cause instanceof Error ? cause.message : 'Unable to plan learning.';
       return null;
     }
+  }
+  async function selectProfile(id:string) {
+    if(pending || session?.status==='active' || session?.status==='paused')return;
+    const chosen=profiles.find(p=>p.id===id);
+    if(!chosen)return;
+    profile=chosen;
+    editing=undefined;
+    try{await refreshContent();await refreshPlan();}
+    catch(cause){planError=cause instanceof Error?cause.message:'Unable to load profile.';}
+  }
+  async function createProfile(language:string) {
+    if(pending||!ready||session?.status==='active'||session?.status==='paused')return;
+    pending=true;
+    try {
+      const value={id:crypto.randomUUID(),targetLanguage:language.trim()};
+      const saved=await learningPersistence.createProfile(value);
+      profile=saved;
+      await refreshContent();
+      await refreshPlan();
+      error='';
+      editing=undefined;
+    } catch(cause){error=cause instanceof Error?cause.message:'Unable to create profile.';}
+    finally{pending=false;}
+  }
+  function beginNewIsland() {editing=null;}
+  function editIsland(id:string) {editing=catalogs.find(x=>x.island.id===id);}
+  function cancelEditor() {editing=undefined;}
+  async function saveIsland(draft:IslandDraft) {
+    if(pending||!ready)return;
+    pending=true;
+    try {
+      await learningPersistence.saveIsland(profile.id,draft,editing?.island.revision??null);
+      editing=undefined;
+      await refreshContent();
+      await refreshPlan();
+      error='';
+    } catch(cause){error=cause instanceof Error?cause.message:'Unable to save Island.';}
+    finally{pending=false;}
+  }
+  async function archiveContent(item:ContentIsland,archived:boolean) {
+    if(pending||!ready)return;
+    pending=true;
+    try {
+      await learningPersistence.setArchived(profile.id,item.island.id,item.island.revision,archived);
+      editing=undefined;
+      await refreshContent();
+      await refreshPlan();
+      error='';
+    }catch(cause){error=cause instanceof Error?cause.message:'Unable to archive Island.';}
+    finally{pending=false;}
+  }
+  async function exportCatalog():Promise<string|null> {
+    try{return await learningPersistence.exportCatalog(profile.id);}
+    catch(cause){error=cause instanceof Error?cause.message:'Unable to export catalog.';return null;}
+  }
+  async function importCatalog(text:string) {
+    if(pending||!ready)return;
+    pending=true;
+    try{
+      await learningPersistence.importCatalog(profile.id,text);
+      await refreshContent();
+      await refreshPlan();
+      error='';
+    }catch(cause){error=cause instanceof Error?cause.message:'Unable to import catalog.';}
+    finally{pending=false;}
   }
 
   async function load() {
@@ -67,6 +145,7 @@ export function createLanguageLearningController() {
     pending = true;
     try {
       record = await learningPersistence.latest();
+      await refreshContent();
       await refreshPlan();
       persistenceStatus = await learningPersistence.persistenceStatus();
       answerDraft = '';
@@ -108,8 +187,10 @@ export function createLanguageLearningController() {
   }
   function start(mode: PracticeMode = 'recall') {
     if (pending || !ready || retryCommand) return;
-    send({type: 'start', sessionId: crypto.randomUUID(), profileId: 'starter-id-en',
-      island: STARTER_ISLAND, mode});
+    const island=currentIslands[0];
+    if(!island){planError='Add an Island before practicing.';return;}
+    send({type: 'start', sessionId: crypto.randomUUID(), profileId: profile.id,
+      island, mode});
   }
   async function startRecommended() {
     if (!ready || pending || retryCommand ||
@@ -119,7 +200,7 @@ export function createLanguageLearningController() {
     try {
       const latest = await refreshPlan();
       if (!latest || !latest.tasks.length) return;
-      selected = recommendedIsland(latest, [STARTER_ISLAND]);
+      selected = recommendedIsland(latest, currentIslands);
     } catch (cause) {
       planError = cause instanceof Error ? cause.message : 'Learning recommendation became outdated.';
       return;
@@ -168,6 +249,7 @@ export function createLanguageLearningController() {
     try {
       await learningPersistence.importBackup(text);
       record = await learningPersistence.latest();
+      await refreshContent();
       await refreshPlan();
       answerDraft = '';
       answerDraftScope = practiceAnswerScope(record?.session ?? null);
@@ -193,6 +275,12 @@ export function createLanguageLearningController() {
     get ready() { return ready; },
     get error() { return error; },
     get plan() { return plan; },
+    get profile() { return profile; },
+    get profiles() { return profiles; },
+    get catalogs() { return catalogs; },
+    get editing() { return editing; },
+    selectProfile, createProfile, beginNewIsland, editIsland, cancelEditor,
+    saveIsland, archiveContent, exportCatalog, importCatalog,
     get planError() { return planError; },
     get canRetry() { return !!retryCommand; },
     get persistenceStatus() { return persistenceStatus; },
