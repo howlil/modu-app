@@ -270,6 +270,8 @@ describe("M5 pairing and recovery in real SQLite", () => {
     const owner = await credential();
     const initial = encode(crypto.getRandomValues(new Uint8Array(32)));
     await bootstrap(space, owner, initial);
+    const pending = await space.fetch(await signed(owner.privateKey, "POST", base + "/pairings", "{}"));
+    const pendingInvite = (await pending.json()) as { invitationId: string; secret: string };
     const laptop = await credential();
     const candidate = { deviceId: "device-recovery-0002", name: "Restored browser",
       publicKey: JSON.parse(laptop.jwk) };
@@ -280,6 +282,14 @@ describe("M5 pairing and recovery in real SQLite", () => {
     expect(first.status).toBe(200);
     const rotated = (await first.json()) as { recoveryKey: string };
     expect(rotated.recoveryKey).not.toBe(initial);
+    expect((await space.fetch(await signed(owner.privateKey, "GET", base + "/devices"))).status).toBe(401);
+    const invalidatedInvite = await space.fetch(new Request(
+      base + "/pairings/" + pendingInvite.invitationId + "/status", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ secret: pendingInvite.secret })
+      }
+    ));
+    expect(invalidatedInvite.status).toBe(404);
     const repeated = await space.fetch(new Request(base + "/recover", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ identity: { ...candidate, deviceId: "device-recovery-0003" }, recoveryKey: initial })
