@@ -47,7 +47,8 @@ export async function resumeOwnerSetup(
   return result;
 }
 export async function enableSyncOnce(
-  deviceName: string, stage: (stage: SetupStage) => void
+  deviceName: string, stage: (stage: SetupStage) => void,
+  onRecoveryCode: (code: string) => void = () => {}
 ): Promise<{ recoveryCode: string; progress: SyncProgress }> {
   if (await readDeviceIdentity()) throw new Error("This browser already has a sync identity.");
   stage("checking");
