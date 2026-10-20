@@ -6,7 +6,7 @@ import { SyncProtocolError } from "#lib/platform/data/sync-protocol.ts";
 import type { RateLimiter } from "#lib/server/feature-request-security.ts";
 
 type Namespace = { idFromName(space: string): unknown; get(id: unknown): { fetch(req: Request): Promise<Response> } };
-type Runtime = { SYNC_SPACE?: Namespace; SYNC_PAIRING_IP_LIMITER?: RateLimiter };
+type Runtime = { SYNC_SPACE?: Namespace; SYNC_PAIRING_IP_LIMITER?: RateLimiter; SYNC_ROLLOUT_ENABLED?: string };
 export const POST: RequestHandler = async ({ request, url }) => {
   if (request.headers.get("origin") !== url.origin) {
     return json({ error: "Invalid request origin." }, { status: 403 });
@@ -15,6 +15,9 @@ export const POST: RequestHandler = async ({ request, url }) => {
     return json({ error: "Expected JSON." }, { status: 415 });
   }
   const runtime = env as unknown as Runtime;
+  if (runtime.SYNC_ROLLOUT_ENABLED !== "true") {
+    return json({ error: "Device sync is not enabled." }, { status: 503 });
+  }
   if (!runtime.SYNC_SPACE?.idFromName || !runtime.SYNC_SPACE.get || !runtime.SYNC_PAIRING_IP_LIMITER) {
     return json({ error: "Device pairing is not configured." }, { status: 503 });
   }
