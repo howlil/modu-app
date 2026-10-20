@@ -34,6 +34,7 @@ function openDatabase(): Promise<IDBDatabase> {
       reject(new HabitStorageError('IndexedDB is unavailable in this browser.')); return;
     }
     const request = indexedDB.open(DATABASE, VERSION);
+    let blocked = false;
     request.onupgradeneeded = () => {
       const db = request.result;
       if (!db.objectStoreNames.contains('habits')) db.createObjectStore('habits', { keyPath: 'id' });
@@ -50,11 +51,17 @@ function openDatabase(): Promise<IDBDatabase> {
       }
     };
     request.onsuccess = () => {
+      // An upgrade can eventually proceed after onblocked already rejected.
+      // Close that late connection instead of leaking it into another tab.
+      if (blocked) { request.result.close(); return; }
       request.result.onversionchange = () => request.result.close();
       resolve(request.result);
     };
     request.onerror = () => reject(new HabitStorageError('Unable to open the Habit Tracker database.'));
-    request.onblocked = () => reject(new HabitStorageError('Close other tabs that are blocking database access, then retry.'));
+    request.onblocked = () => {
+      blocked = true;
+      reject(new HabitStorageError('Close other tabs that are blocking database access, then retry.'));
+    };
   });
 }
 

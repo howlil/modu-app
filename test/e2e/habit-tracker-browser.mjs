@@ -160,7 +160,26 @@ async function run() {
   await clickButton('History');
   await waitUntil('Corrected Count survives second reload',
     'Boolean(document.body.textContent.includes("Browser smoke") && document.body.textContent.includes("2 / 3"))');
-  process.stdout.write('Habit Tracker Chrome smoke passed: create → increment → reload → correction → insights → reload.\n');
+
+  const firstTab = await driver('GET', withSession('/window'));
+  const secondTab = await driver('POST', withSession('/window/new'), { type: 'tab' });
+  await driver('POST', withSession('/window'), { handle: secondTab.handle });
+  await navigate(SITE + '/habit');
+  await waitUntil('Second tab loads persisted habits',
+    'Boolean(document.body.textContent.includes("Browser smoke") && !document.body.textContent.includes("Loading habits"))');
+  await clickButton('New habit');
+  await waitUntil('Second tab create editor appears',
+    'Boolean(document.querySelector("dialog[open] #habit-title"))');
+  await typeValue('#habit-title', 'Created in second tab');
+  await clickButton('Create habit');
+  await waitUntil('Second tab commits its new habit',
+    'Boolean(document.body.textContent.includes("Created in second tab") && !document.querySelector("dialog[open]"))');
+
+  await driver('POST', withSession('/window'), { handle: firstTab });
+  await clickButton('Today');
+  await waitUntil('First tab sees second tab mutation',
+    'Boolean(document.body.textContent.includes("Created in second tab") && document.body.textContent.includes("Browser smoke"))');
+  process.stdout.write('Habit Tracker Chrome smoke passed: create → increment → reload → correction → insights → cross-tab visibility.\n');
 }
 
 let failure = null;

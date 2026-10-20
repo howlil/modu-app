@@ -222,6 +222,22 @@ describe('Habit Tracker M5 — actual IndexedDB adapter with fake-indexeddb tran
     expect(id).toBeTruthy();
   });
 
+  it('rejects a blocked schema upgrade and recovers after the older tab closes', async () => {
+    const legacyConnection = await openRaw(1);
+    legacyConnection.onversionchange = () => {
+      // Deliberately simulate an uncooperative tab that keeps v1 open.
+    };
+    await expect(loadHabitSnapshot()).rejects.toThrow('Close other tabs');
+    legacyConnection.close();
+    // Late success of the rejected open request must close its connection.
+    await new Promise(resolve => setTimeout(resolve, 10));
+    const restored = await loadHabitSnapshot();
+    expect(restored.trackingTimezone).toBeTruthy();
+    const latest = await openRaw();
+    expect(latest.version).toBe(2);
+    latest.close();
+  });
+
   it('fails cleanly when IndexedDB is inaccessible', async () => {
     await loadHabitSnapshot();
     vi.stubGlobal('indexedDB', undefined);
