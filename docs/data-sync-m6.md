@@ -39,6 +39,8 @@ CI gates: `bun run check`, `bun run test`, `bun run build`, `wrangler deploy --c
 ## Operational boundaries and quotas
 
 - Data remains **local-first**. Upload only after user opts into a sync space and clicks **Sync now**. No background upload.
+- **Kill switch:** public SvelteKit enrollment/pairing/journal routes require the operator-controlled Worker environment variable `SYNC_ROLLOUT_ENABLED="true"`. It is **absent / disabled by default**. `GET /api/sync/status` exposes only a boolean; the Data & Sync UI hides cloud pairing/sync when unavailable.
+- Turning the flag off never clears browser outbox, already-persisted SQLite data, or browser credentials. Do not enable on production until all release blockers below pass.
 - Cloudflare Durable Object SQLite is the remote append-only authoritative journal, **not** the browser's authoritative module storage.
 - New devices need explicit signed approval. Recovery grants a new device and revokes all former devices.
 - Local browser private signing keys are WebCrypto non-extractable and stored in IndexedDB. They are not a substitute for encrypted sync payloads.
