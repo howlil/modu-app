@@ -178,9 +178,12 @@ export function createInsightSnapshot(
   }
   let currentStreak = 0;
   let longestStreak = 0;
-  for (const entries of byHabit.values()) {
+  const activeIds = new Set(relevant.filter(h => h.status === 'ACTIVE').map(h => h.id));
+  for (const [habitId, entries] of byHabit.entries()) {
     const streak = calculateStreak(entries.map(p => p.outcome));
-    currentStreak = Math.max(currentStreak, streak.current);
+    // A paused/archived habit can keep its historic best, but has no
+    // ongoing streak until the habit is active again.
+    if (activeIds.has(habitId)) currentStreak = Math.max(currentStreak, streak.current);
     longestStreak = Math.max(longestStreak, streak.longest);
   }
   return {

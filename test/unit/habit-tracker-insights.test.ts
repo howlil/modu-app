@@ -162,6 +162,15 @@ describe('M4 period insights and streak boundaries', () => {
     expect(snapshot.met).toBe(2);
   });
 
+  it('keeps archived historical streaks but does not call them current', () => {
+    const a = make('a');
+    const archived = archiveHabit(a.habit, '2026-10-20');
+    const view = createInsightSnapshot([archived], [a.policy],
+      [done('a', '2026-10-19'), done('a', '2026-10-20')], '2026-10-21');
+    expect(view.longestStreak).toBe(2);
+    expect(view.currentStreak).toBe(0);
+  });
+
   it('keeps an explicit skipped day outside the completion rate denominator', () => {
     const a = make('a');
     const records: HabitCheckin[] = [
