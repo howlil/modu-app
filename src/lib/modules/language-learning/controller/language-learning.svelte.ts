@@ -7,6 +7,8 @@ import type { PracticeCommand, StoredPractice } from '../core/persistence.ts';
 import { learningPersistence, LearningPersistenceError } from '../adapters/persistence.ts';
 import { checkRecallAnswer, practiceAnswerScope, recallFeedback, type AnswerCheck } from '../core/evaluation.ts';
 import { type IslandDraft, type ContentIsland } from '../core/content.ts';
+import {type LearningProgress} from '../core/progress.ts';
+import {createSpeechPlayback,SpeechPlaybackError} from '../adapters/speech.ts';
 import {
   recommendedIsland, type LearningPlan, type LearningProfile
 } from '../core/orchestration.ts';
@@ -20,6 +22,70 @@ export function createLanguageLearningController() {
   let error = $state('');
   let plan = $state<LearningPlan | null>(null);
   let planError = $state('');
+  let progress = $state<LearningProgress | null>(null);
+  let progressError = $state('');
+  let audioStatus = $state<'idle'|'playing'|'played'|'error'>('idle');
+  let audioError = $state('');
+  let audioScope: string | null = null;
+  let shadowConfirmed = $state(false);
+  const speech=createSpeechPlayback();
+  let disposed=false;
+  function clearAudio(){
+    speech.stop();
+    audioScope=null;
+    audioStatus='idle';
+    audioError='';
+    shadowConfirmed=false;
+  }
+  function dispose(){disposed=true;speech.dispose();}
+  function audioCurrentScope(){
+    const s=session;
+    return s?.mode !== 'recall' && s?.status==='active'
+      ? practiceAnswerScope(s) : null;
+  }
+  async function playAudio(){
+    if(disposed || pending || retryCommand || !ready)return;
+    const scope=audioCurrentScope();
+    const s=session;
+    const item=s?currentSentence(s):null;
+    if(!scope || !item)return;
+    clearAudio();
+    audioScope=scope;
+    audioStatus='playing';
+    try{
+      await speech.play(item.answer,item.targetLanguage);
+      if(disposed || audioScope!==scope || audioCurrentScope()!==scope)return;
+      audioStatus='played';
+    }catch(cause){
+      if(disposed || audioScope!==scope)return;
+      if(cause instanceof SpeechPlaybackError && cause.code==='cancelled'){
+        audioStatus='idle';
+        return;
+      }
+      audioStatus='error';
+      audioError=cause instanceof Error ? cause.message : 'Audio playback unavailable.';
+    }
+  }
+  function stopAudio(){clearAudio();}
+  function confirmShadowing(done:boolean){
+    if(session?.mode==='shadowing' && audioCurrentScope()===audioScope &&
+      audioStatus==='played')shadowConfirmed=done;
+  }
+  function canRecordExposure(){
+    const scope=audioCurrentScope();
+    return !!scope && scope===audioScope && audioStatus==='played' &&
+      (session?.mode==='listening' || (session?.mode==='shadowing' && shadowConfirmed));
+  }
+  async function refreshProgress(){
+    try{
+      progress=await learningPersistence.progress(profile,Date.now());
+      progressError='';
+    }catch(cause){
+      progress=null;
+      progressError=cause instanceof Error?cause.message:'Unable to load progress.';
+    }
+  }
+
   let profile = $state<LearningProfile>({id:'starter-id-en',targetLanguage:'en'});
   let profiles = $state<LearningProfile[]>([]);
   let catalogs = $state<ContentIsland[]>([]);
@@ -79,7 +145,7 @@ export function createLanguageLearningController() {
     if(!chosen)return;
     profile=chosen;
     editing=undefined;
-    try{await refreshContent();await refreshPlan();}
+    try{clearAudio();await refreshContent();await refreshPlan();await refreshProgress();}
     catch(cause){planError=cause instanceof Error?cause.message:'Unable to load profile.';}
   }
   async function createProfile(language:string) {
@@ -91,6 +157,7 @@ export function createLanguageLearningController() {
       profile=saved;
       await refreshContent();
       await refreshPlan();
+      await refreshProgress();
       error='';
       editing=undefined;
     } catch(cause){error=cause instanceof Error?cause.message:'Unable to create profile.';}
@@ -107,6 +174,7 @@ export function createLanguageLearningController() {
       editing=undefined;
       await refreshContent();
       await refreshPlan();
+      await refreshProgress();
       error='';
     } catch(cause){error=cause instanceof Error?cause.message:'Unable to save Island.';}
     finally{pending=false;}
@@ -144,6 +212,7 @@ export function createLanguageLearningController() {
     loading = true;
     pending = true;
     try {
+      clearAudio();
       record = await learningPersistence.latest();
       await refreshContent();
       const restoredProfile=profiles.find(p=>p.id===record?.session.profileId);
@@ -152,6 +221,7 @@ export function createLanguageLearningController() {
         await refreshContent();
       }
       await refreshPlan();
+      await refreshProgress();
       persistenceStatus = await learningPersistence.persistenceStatus();
       answerDraft = '';
       answerDraftScope = practiceAnswerScope(record?.session ?? null);
@@ -178,6 +248,7 @@ export function createLanguageLearningController() {
       record = saved;
       retryCommand = null;
       await refreshPlan();
+      await refreshProgress();
     } catch (cause) {
       if (cause instanceof LearningPersistenceError && cause.code === 'conflict') {
         retryCommand = null;
@@ -189,14 +260,18 @@ export function createLanguageLearningController() {
     } finally { pending = false; }
   }
   function send(command: PracticeCommand) {
+    if(command.type==='pause' || command.type==='abandon' ||
+      command.type==='attempt' || command.type==='start')clearAudio();
     void execute(command, command.type === 'start' ? null : (record?.revision ?? null), record?.storageEpoch ?? null);
   }
   function start(mode: PracticeMode = 'recall') {
     if (pending || !ready || retryCommand) return;
     const island=currentIslands[0];
     if(!island){planError='Add an Island before practicing.';return;}
+    clearAudio();
+    const batch={...island,sentences:island.sentences.slice(0,10)};
     void execute({type: 'start', sessionId: crypto.randomUUID(), profileId: profile.id,
-      island, mode},null,record?.storageEpoch??null,island.revision);
+      island:batch, mode},null,record?.storageEpoch??null,island.revision);
   }
   async function startRecommended() {
     if (!ready || pending || retryCommand ||
@@ -214,6 +289,7 @@ export function createLanguageLearningController() {
       pending = false;
     }
     if (!selected) return;
+    clearAudio();
     await execute({type:'start',sessionId:crypto.randomUUID(),profileId:profile.id,
       island:selected,mode:'recall'}, null, record?.storageEpoch ?? null,selected.revision);
   }
@@ -235,7 +311,8 @@ export function createLanguageLearningController() {
   function rate(rating: RecallRating) { attempt({kind:'recall',rating}); }
   function skip() { attempt({kind:'skip'}); }
   function nextExposure() {
-    if (session && session.mode !== 'recall') attempt({kind:'exposure',medium:session.mode});
+    if (!canRecordExposure())return;
+    if(session && session.mode!=='recall')attempt({kind:'exposure',medium:session.mode});
   }
   async function exportBackup(): Promise<string | null> {
     if (pending || !ready) return null;
@@ -257,7 +334,8 @@ export function createLanguageLearningController() {
       record = await learningPersistence.latest();
       await refreshContent();
       await refreshPlan();
-      answerDraft = '';
+      await refreshProgress();
+      answerDraft = ''
       answerDraftScope = practiceAnswerScope(record?.session ?? null);
       retryCommand = null;
       error = '';
@@ -281,6 +359,14 @@ export function createLanguageLearningController() {
     get ready() { return ready; },
     get error() { return error; },
     get plan() { return plan; },
+    get progress(){return progress;},
+    get progressError(){return progressError;},
+    get audioStatus(){return audioStatus;},
+    get audioError(){return audioError;},
+    get audioSupported(){return speech.isSupported();},
+    get shadowConfirmed(){return shadowConfirmed;},
+    get canRecordExposure(){return canRecordExposure();},
+    playAudio,stopAudio,confirmShadowing,refreshProgress,dispose,
     get profile() { return profile; },
     get profiles() { return profiles; },
     get catalogs() { return catalogs; },
