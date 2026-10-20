@@ -64,6 +64,16 @@ describe("M4 opt-in foreground sync lifecycle",()=>{
     expect(syncNow).toHaveBeenCalledTimes(1);
     cleanup();
   });
+  it("pauses permanently oversized requests until an explicit retry",async()=>{
+    vi.mocked(readDeviceIdentity).mockResolvedValue({status:"paired"} as never);
+    vi.mocked(syncNow).mockRejectedValue(new Error("Sync transport error (507)."));
+    const cleanup=startGlobalSyncRuntime();
+    await vi.advanceTimersByTimeAsync(300);
+    expect(readSyncStatus().kind).toBe("blocked");
+    await vi.advanceTimersByTimeAsync(90_000);
+    expect(syncNow).toHaveBeenCalledTimes(1);
+    cleanup();
+  });
   it("surfaces conflicts without blindly scheduling retries",async()=>{
     vi.mocked(readDeviceIdentity).mockResolvedValue({status:"paired"} as never);
     vi.mocked(syncNow).mockRejectedValue(new Error("Concurrent Habit check-in conflict"));
