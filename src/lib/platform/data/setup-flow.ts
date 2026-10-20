@@ -40,10 +40,10 @@ export async function resumeOwnerSetup(
   if (!current || current.deviceId !== identity.deviceId || current.status !== "paired") {
     throw new Error("Device identity changed during setup.");
   }
-  notifyDeviceIdentityChanged();
   stage("uploading");
   const result = await syncNow(current);
   stage("connected");
+  notifyDeviceIdentityChanged();
   return result;
 }
 export async function enableSyncOnce(
