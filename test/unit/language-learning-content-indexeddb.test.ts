@@ -21,6 +21,41 @@ const wipe=()=>new Promise<void>((resolve,reject)=>{
 });
 beforeEach(wipe);
 describe('M5 — IndexedDB content authority',()=>{
+  it('migrates an M3 database and discovers legacy profile identity without erasing sessions',async()=>{
+    await new Promise<void>((resolve,reject)=>{
+      const req=indexedDB.open('modu-language-learning',3);
+      req.onupgradeneeded=()=>{
+        const db=req.result;
+        const sessions=db.createObjectStore('sessions',{keyPath:'id'});
+        sessions.createIndex('updatedAt','updatedAt');
+        db.createObjectStore('attempts',{keyPath:'id'});
+        db.createObjectStore('meta',{keyPath:'key'});
+        const reviews=db.createObjectStore('reviews',{keyPath:'key'});
+        reviews.createIndex('profileDue',['profileId','dueAt']);
+      };
+      req.onerror=()=>reject(req.error);
+      req.onsuccess=()=>{
+        const db=req.result;
+        const tx=db.transaction(['sessions'],'readwrite');
+        const record={schemaVersion:1,revision:1,session:{
+          id:'historic-ja',profileId:'legacy-ja',islandId:'old-island',
+          mode:'recall',status:'active',phase:'prompt',cursor:0,
+          items:[{id:'legacy',revision:1,prompt:'Air',answer:'水',
+            islandId:'old-island',sourceLanguage:'id',targetLanguage:'ja'}],
+          attempts:[]
+        }};
+        tx.objectStore('sessions').add({id:'historic-ja',updatedAt:1000,record});
+        tx.oncomplete=()=>{db.close();resolve();};
+        tx.onabort=()=>{db.close();reject(tx.error);};
+      };
+    });
+    const identities=await learningPersistence.profiles();
+    expect(identities).toContainEqual({id:'legacy-ja',targetLanguage:'ja'});
+    expect((await learningPersistence.get('historic-ja'))?.session.profileId).toBe('legacy-ja');
+    expect(await learningPersistence.catalog('legacy-ja')).toEqual([]);
+    expect((await learningPersistence.planStored({id:'legacy-ja',targetLanguage:'ja'},{now:1000}))
+      .plan.allCaughtUp).toBe(true);
+  });
   it('migrates the starter catalog once without overwriting archived content',async()=>{
     const profiles=await learningPersistence.profiles();
     expect(profiles).toEqual([{id:'starter-id-en',targetLanguage:'en'}]);
