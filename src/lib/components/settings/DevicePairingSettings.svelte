@@ -44,7 +44,7 @@
     if (identity) deviceName = identity.name;
   }
   async function startOwnerCapture() {
-    if (!identity || identity.status !== "pending") throw new Error("No pending setup exists.");
+    if (!identity || identity.status !== "pending" || identity.enrollmentKind !== "owner") throw new Error("Only the original device can resume setup.");
     if (!navigator.locks?.request) throw new Error("Web Locks are required to enroll local data safely.");
     await requireNoOtherModuTabs();
     await navigator.locks.request("modu-global-restore", { mode: "exclusive" }, async () => {
@@ -64,7 +64,7 @@
       for (const module of globalDataPorts) await module.inspect();
       const device = await generateDeviceIdentity(deviceName);
       const result = await initializeSpace(device);
-      await storeDeviceIdentity({ ...device, id: "current", spaceId: result.spaceId, status: "pending" });
+      await storeDeviceIdentity({ ...device, id: "current", spaceId: result.spaceId, status: "pending", enrollmentKind: "owner" });
       await loadIdentity();
       recoveryKey = result.recoveryKey; // intentionally never persisted
       notice = "Copy your recovery key before leaving this page. It is shown only once.";
@@ -77,7 +77,7 @@
       const decoded = decodePairingCode(pairingCodeInput);
       const device = await generateDeviceIdentity(deviceName);
       const result = await joinWithCode(pairingCodeInput, device);
-      await storeDeviceIdentity({ ...device, id: "current", spaceId: decoded.spaceId, status: "pending" });
+      await storeDeviceIdentity({ ...device, id: "current", spaceId: decoded.spaceId, status: "pending", enrollmentKind: "join" });
       await loadIdentity();
       myConfirmation = result.confirmation;
       notice = "Verify the same six-digit code on the existing device and approve there.";
@@ -85,9 +85,12 @@
   }
   function checkJoin() {
     void execute(async () => {
-      if (!identity || identity.status !== "pending") throw new Error("No pairing request is pending.");
+      if (!identity || identity.status !== "pending" || identity.enrollmentKind !== "join") throw new Error("No join approval is pending.");
+      const code = decodePairingCode(pairingCodeInput);
+      if (code.spaceId !== identity.spaceId) throw new Error("Pairing code belongs to another space.");
       const result = await pollPairing(pairingCodeInput);
       if (result.status === "approved") {
+        await new SyncTransport(identity).control("GET", "devices");
         await markDevicePaired();
         await loadIdentity();
         notice = "Device approved. Local data has not been replaced or uploaded.";
@@ -102,7 +105,7 @@
       }
       const device = await generateDeviceIdentity(deviceName);
       const result = await recoverSpace(recoverySpaceId, recoveryInput.trim(), device);
-      await storeDeviceIdentity({ ...device, id: "current", spaceId: recoverySpaceId, status: "paired" });
+      await storeDeviceIdentity({ ...device, id: "current", spaceId: recoverySpaceId, status: "paired", enrollmentKind: "recovery" });
       await loadIdentity();
       recoveryKey = result.recoveryKey;
       recoveryInput = "";
