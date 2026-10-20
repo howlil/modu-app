@@ -33,6 +33,10 @@ export const learningDataPort: SyncOutboxPort = {
     return { moduleId: "language-learning", backupVersion: 3, recordCount, state: recordCount ? "ready" : "empty" };
   },
   exportBackup: snapshot,
+  beginRemoteSyncCapture: deviceId => learningPersistence.beginRemoteSyncCapture(deviceId),
+  readRemoteCursor: () => learningPersistence.readRemoteCursor(),
+  applyRemoteChanges: events => learningPersistence.applyRemoteChanges(events),
+
   beginSyncCapture: deviceId => learningPersistence.beginSyncCapture(deviceId),
   readPendingSyncOperations: limit => learningPersistence.readPendingSyncOperations(limit),
   acknowledgeSyncOperations: ids => learningPersistence.acknowledgeSyncOperations(ids),
