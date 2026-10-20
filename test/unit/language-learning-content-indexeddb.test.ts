@@ -167,6 +167,31 @@ describe('M5 — IndexedDB content authority',()=>{
     const exported=await learningPersistence.exportCatalog(profile.id);
     expect(JSON.parse(exported).islands).toHaveLength(2);
   });
+  it('does not admit more active sentences than the M4 planner can handle',async()=>{
+    await learningPersistence.createProfile(profile);
+    const large=(id:string,count:number):IslandDraft=>({
+      id,title:id,sourceLanguage:'id',targetLanguage:'ja',
+      sentences:Array.from({length:count},(_,i)=>({
+        id:'sentence-'+i,prompt:'prompt-'+i,answer:'answer-'+i
+      })),
+      vocabulary:[]
+    });
+    await learningPersistence.saveIsland(profile.id,large('batch-a',500),null);
+    const second=await learningPersistence.saveIsland(profile.id,large('batch-b',500),null);
+    await expect(learningPersistence.saveIsland(profile.id,large('overflow',1),null))
+      .rejects.toMatchObject({code:'invalid'});
+    expect((await learningPersistence.catalog(profile.id)).length).toBe(2);
+    await learningPersistence.setArchived(profile.id,'batch-b',second.island.revision,true);
+    await learningPersistence.saveIsland(profile.id,large('small',1),null);
+    await expect(learningPersistence.setArchived(profile.id,'batch-b',
+      second.island.revision+1,false)).rejects.toMatchObject({code:'invalid'});
+    expect((await learningPersistence.catalog(profile.id,true)).find(x=>x.island.id==='batch-b')?.archived)
+      .toBe(true);
+    const imported={format:'modu-language-catalog',version:1,islands:[large('new-500',500)]};
+    await expect(learningPersistence.importCatalog(profile.id,JSON.stringify(imported)))
+      .rejects.toMatchObject({code:'invalid'});
+    expect((await learningPersistence.catalog(profile.id,true)).some(x=>x.island.id==='new-500')).toBe(false);
+  });
   it('full v3 backup round-trip restores all language profiles, vocabulary and archive state',async()=>{
     await learningPersistence.createProfile(profile);
     const original=await learningPersistence.saveIsland(profile.id,draft,null);
