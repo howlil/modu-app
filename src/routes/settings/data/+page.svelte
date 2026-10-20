@@ -92,7 +92,7 @@
 
 <svelte:head>
   <title>Data &amp; Sync — Modu</title>
-  <meta name="description" content="Manage local Modu data and export a complete backup." />
+  <meta name="description" content="Manage local Modu data, secure device pairing, backups and manual sync." />
 </svelte:head>
 
 <section class="mx-auto w-full max-w-[760px] px-4 pb-12 pt-8 max-[760px]:px-2.5">
@@ -101,7 +101,7 @@
   </a>
   <header class="mb-6">
     <h1 class="text-page-title font-semibold tracking-[-0.04em]">Data &amp; Sync</h1>
-    <p class="mt-1 text-ui text-muted-foreground">Your local data stays in this browser unless you export it.</p>
+    <p class="mt-1 text-ui text-muted-foreground">Your data stays local by default. Sync now uploads changes only after device authorization.</p>
   </header>
   <div class="overflow-hidden rounded-[16px] border border-border bg-card">
     <section class="flex items-center justify-between gap-3 p-5">
