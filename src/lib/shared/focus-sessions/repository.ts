@@ -1,5 +1,5 @@
 import type { FocusActivitySession } from './types.ts';
-import { OUTBOX_STORE, SYNC_META_STORE, ensureOutboxStores, queueLocalMutation, resetCaptureAfterRestore, readOutbox, acknowledgeOutbox } from '#lib/platform/data/outbox.ts';
+import { OUTBOX_STORE, SYNC_META_STORE, ensureOutboxStores, queueLocalMutation, resetCaptureAfterRestore, readOutbox, acknowledgeOutbox, initializeCaptureWithBaseline } from '#lib/platform/data/outbox.ts';
 
 const DB_NAME = 'module-pomodoro-activity';
 const STORE_NAME = 'sessions';
@@ -316,4 +316,57 @@ export async function acknowledgeFocusSyncOperations(operationIds: readonly stri
   const db = await openDatabase();
   try { await acknowledgeOutbox(db, operationIds); }
   finally { db.close(); }
+}
+
+/**
+ * Atomic initial Pomodoro capture. Historical localStorage fallback is copied
+ * into the authoritative IDB within the same transaction as the baseline.
+ * Running timers / notifications / extension state never enter the outbox.
+ */
+export async function beginFocusSyncCapture(deviceId: string): Promise<void> {
+  let fallback: FocusActivitySession[] = [];
+  if (typeof localStorage !== 'undefined') {
+    const raw = localStorage.getItem(FALLBACK_KEY);
+    if (raw !== null) {
+      const decoded: unknown = JSON.parse(raw);
+      if (!Array.isArray(decoded) || !decoded.every(isFocusActivitySession)) {
+        throw new Error('Cannot pair while Pomodoro fallback history is corrupt.');
+      }
+      fallback = decoded;
+    }
+  }
+  if (new Set(fallback.map(x => x.id)).size !== fallback.length) {
+    throw new Error('Cannot pair while fallback contains duplicate session IDs.');
+  }
+  const db = await openDatabase();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction([STORE_NAME, OUTBOX_STORE, SYNC_META_STORE], 'readwrite');
+      const sessions = tx.objectStore(STORE_NAME);
+      const get = sessions.getAll();
+      get.onsuccess = () => {
+        try {
+          if (!Array.isArray(get.result) || !get.result.every(isFocusActivitySession)) {
+            throw new Error('Cannot pair while Pomodoro activity storage is corrupt.');
+          }
+          const merged = new Map((get.result as FocusActivitySession[]).map(x => [x.id, x]));
+          for (const item of fallback) {
+            const previous = merged.get(item.id);
+            if (previous && JSON.stringify(previous) !== JSON.stringify(item)) {
+              throw new Error('Resolve conflicting fallback and IndexedDB records before pairing.');
+            }
+            if (!previous) sessions.add(item);
+            merged.set(item.id, item);
+          }
+          initializeCaptureWithBaseline(tx, 'pomodoro', deviceId,
+            { sessions: [...merged.values()].sort((a, b) => a.endedAt - b.endedAt) });
+        } catch { tx.abort(); }
+      };
+      tx.oncomplete = () => resolve();
+      tx.onabort = () => reject(tx.error ?? new Error('Pomodoro sync baseline was rejected.'));
+      tx.onerror = () => reject(tx.error ?? new Error('Pomodoro baseline storage failed.'));
+    });
+    if (typeof localStorage !== 'undefined') localStorage.removeItem(FALLBACK_KEY);
+    announceChange();
+  } finally { db.close(); }
 }
