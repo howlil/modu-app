@@ -82,10 +82,14 @@ export function createLanguageLearningController() {
     });
   }
   async function refreshProgress(){
+    const requestedProfile=profile;
     try{
-      progress=await learningPersistence.progress(profile,Date.now());
+      const next=await learningPersistence.progress(requestedProfile,Date.now());
+      if(disposed || profile.id!==requestedProfile.id)return;
+      progress=next;
       progressError='';
     }catch(cause){
+      if(disposed || profile.id!==requestedProfile.id)return;
       progress=null;
       progressError=cause instanceof Error?cause.message:'Unable to load progress.';
     }
@@ -149,6 +153,8 @@ export function createLanguageLearningController() {
     const chosen=profiles.find(p=>p.id===id);
     if(!chosen)return;
     profile=chosen;
+    progress=null;
+    progressError='';
     editing=undefined;
     try{clearAudio();await refreshContent();await refreshPlan();await refreshProgress();}
     catch(cause){planError=cause instanceof Error?cause.message:'Unable to load profile.';}
@@ -160,6 +166,8 @@ export function createLanguageLearningController() {
       const value={id:crypto.randomUUID(),targetLanguage:language.trim()};
       const saved=await learningPersistence.createProfile(value);
       profile=saved;
+      progress=null;
+      progressError='';
       await refreshContent();
       await refreshPlan();
       await refreshProgress();
