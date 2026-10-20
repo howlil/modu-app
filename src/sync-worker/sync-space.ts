@@ -20,7 +20,7 @@ const response = (value: unknown, status = 200): Response =>
  * A guessed space identifier is never sufficient to authenticate.
  * M4 intentionally exposes no enrollment or admin routes.
  */
-export class SyncSpace {
+export class SyncSpaceHandler {
   private readonly journal: SyncJournal;
   constructor(state: SyncSpaceState) {
     this.journal = new SyncJournal(state.storage);
