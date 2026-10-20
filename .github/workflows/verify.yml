@@ -31,3 +31,9 @@ jobs:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
           CHROMEDRIVER_BIN: ${{ steps.chrome.outputs.chromedriver-path }}
         run: node test/e2e/habit-tracker-browser.mjs
+      - name: Global Data & Sync browser E2E
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+          CHROMEDRIVER_BIN: ${{ steps.chrome.outputs.chromedriver-path }}
+        run: node test/e2e/global-data-browser.mjs
+
