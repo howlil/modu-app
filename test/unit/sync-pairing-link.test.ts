@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createPairingLink, readPairingFragment, encodePairingCode } from "../../src/lib/platform/data/pairing-client.ts";
+import { createPairingLink, readPairingFragment, resolvePairingInput, encodePairingCode } from "../../src/lib/platform/data/pairing-client.ts";
 import { qrcodegen } from "../../src/lib/platform/data/qrcodegen.ts";
 const code = encodePairingCode("00000000-1111-4222-8333-444444444444","00000000-1111-4222-8333-555555555555","A".repeat(43));
 describe("safe local QR deep links",()=>{
@@ -9,6 +9,9 @@ describe("safe local QR deep links",()=>{
     expect(url.pathname).toBe("/settings/data");
     expect(url.search).toBe("");
     expect(readPairingFragment(url.hash)).toBe(code);
+    expect(resolvePairingInput(link,"https://modu.howlil.site")).toBe(code);
+    expect(resolvePairingInput(code,"https://modu.howlil.site")).toBe(code);
+    expect(()=>resolvePairingInput(link,"https://evil.example")).toThrow("does not belong");
     expect(readPairingFragment("#other=x")).toBeNull();
     expect(()=>readPairingFragment("#pair=garbage")).toThrow();
   });
