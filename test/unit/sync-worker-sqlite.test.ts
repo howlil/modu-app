@@ -1,3 +1,4 @@
+// @ts-nocheck — Node SQLite integration test runs in Vitest; browser tsconfig intentionally excludes Node types.
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 import { SyncSpace } from "../../src/sync-worker/sync-space.ts";
@@ -42,7 +43,7 @@ function createStorage(): SyncStorage {
 }
 
 function encode(data: Uint8Array): string {
-  return Buffer.from(data).toString("base64url");
+  return btoa(String.fromCharCode(...data)).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/g, "");
 }
 async function credential() {
   const keys = await crypto.subtle.generateKey(
