@@ -1,8 +1,8 @@
-import type { RestorableDataPort } from "#lib/platform/data/contracts.ts";
+import type { SyncOutboxPort } from "#lib/platform/data/contracts.ts";
 import { readPomodoroSnapshot, savePomodoroSnapshot, clearPomodoroSnapshot, type PersistedPomodoroState } from "./persistence.ts";
 import {
   exportFocusSessionsForBackup, replaceFocusSessionsForRestore,
-  isFocusActivitySession
+  isFocusActivitySession, readFocusPendingSyncOperations, acknowledgeFocusSyncOperations
 } from "#lib/shared/focus-sessions/repository.ts";
 import type { FocusActivitySession } from "#lib/shared/focus-sessions/types.ts";
 
@@ -32,7 +32,7 @@ async function snapshot(): Promise<PomodoroBackup> {
   return { format: "modu-pomodoro", version: 1, timer, sessions };
 }
 
-export const pomodoroDataPort: RestorableDataPort = {
+export const pomodoroDataPort: SyncOutboxPort = {
   moduleId: "pomodoro",
   backupVersion: 1,
   async inspect() {
@@ -41,6 +41,9 @@ export const pomodoroDataPort: RestorableDataPort = {
     return { moduleId: "pomodoro", backupVersion: 1, recordCount, state: recordCount ? "ready" : "empty" };
   },
   exportBackup: snapshot,
+  readPendingSyncOperations: readFocusPendingSyncOperations,
+  acknowledgeSyncOperations: acknowledgeFocusSyncOperations,
+
   async validateBackup(data) {
     const parsed = decodeBackup(data);
     return { moduleId: "pomodoro",
