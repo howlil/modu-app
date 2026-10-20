@@ -126,11 +126,16 @@ export async function commitGlobalRestore(
 
 /** Run before the app hydrates, so no controller can write a half-restored state. */
 export async function recoverInterruptedRestore(ports: readonly RestorableDataPort[]): Promise<boolean> {
-  const journal = await readRestoreJournal();
-  if (!journal) { clearRestoreMarker(); return false; }
-  const backup = await prepareGlobalRestore(JSON.stringify(journal.checkpoint), ports);
-  await restoreEach(backup.backup, ports);
-  await deleteRestoreJournal();
-  clearRestoreMarker();
-  return true;
+  if (!navigator.locks?.request) {
+    throw new Error("Interrupted restore needs Web Locks support for safe recovery.");
+  }
+  return navigator.locks.request("modu-global-restore", { mode: "exclusive" }, async () => {
+    const journal = await readRestoreJournal();
+    if (!journal) { clearRestoreMarker(); return false; }
+    const backup = await prepareGlobalRestore(JSON.stringify(journal.checkpoint), ports);
+    await restoreEach(backup.backup, ports);
+    await deleteRestoreJournal();
+    clearRestoreMarker();
+    return true;
+  });
 }
