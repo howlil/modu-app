@@ -9,9 +9,12 @@
     kind==='recall'? 'Recall · '+rating :
     kind==='listening'? 'Listening' :
     kind==='shadowing'? 'Shadowing' : 'Skipped';
-  const formatDate=(ms:number)=>new Date(ms).toLocaleString(undefined,{
+  const validDate=(ms:number)=>Number.isFinite(ms) && ms>=0 &&
+    ms<=8_640_000_000_000_000;
+  const formatISO=(ms:number)=>validDate(ms)?new Date(ms).toISOString():undefined;
+  const formatDate=(ms:number)=>validDate(ms)?new Date(ms).toLocaleString(undefined,{
     year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'
-  });
+  }):'Time unavailable';
 </script>
 
 <section class="mt-6 border-t border-border pt-5" aria-label="Learning progress">
@@ -54,7 +57,7 @@
                 {kindLabel(item.kind,item.rating)} · {item.islandId}
               </p>
             </div>
-            <time class="text-meta text-muted-foreground" datetime={new Date(item.recordedAt).toISOString()}>
+            <time class="text-meta text-muted-foreground" datetime={formatISO(item.recordedAt)}>
               {formatDate(item.recordedAt)}
             </time>
           </li>
