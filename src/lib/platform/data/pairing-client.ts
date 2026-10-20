@@ -56,7 +56,7 @@ export async function joinWithCode(code: string, device: NewDeviceIdentity) {
 }
 export async function pollPairing(code: string) {
   const item = decodePairingCode(code);
-  return invoke<{ status: "awaiting-device" | "pending-approval" | "approved" }>(
+  return invoke<{ status: "awaiting-device" | "pending-approval" | "approved"; confirmation: string | null }>(
     path(item.spaceId, "pairings/" + item.invitationId + "/status"), { secret: item.secret }
   );
 }
