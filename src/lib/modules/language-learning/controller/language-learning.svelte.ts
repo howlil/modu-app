@@ -27,10 +27,12 @@ export function createLanguageLearningController() {
   let audioStatus = $state<'idle'|'playing'|'played'|'error'>('idle');
   let audioError = $state('');
   let audioScope: string | null = null;
+  let audioGeneration=0;
   let shadowConfirmed = $state(false);
   const speech=createSpeechPlayback();
   let disposed=false;
   function clearAudio(){
+    audioGeneration++;
     speech.stop();
     audioScope=null;
     audioStatus='idle';
@@ -50,14 +52,16 @@ export function createLanguageLearningController() {
     const item=s?currentSentence(s):null;
     if(!scope || !item)return;
     clearAudio();
+    const generation=audioGeneration;
     audioScope=scope;
     audioStatus='playing';
     try{
       await speech.play(item.answer,item.targetLanguage);
-      if(disposed || audioScope!==scope || audioCurrentScope()!==scope)return;
+      if(disposed || audioGeneration!==generation || audioScope!==scope ||
+        audioCurrentScope()!==scope)return;
       audioStatus='played';
     }catch(cause){
-      if(disposed || audioScope!==scope)return;
+      if(disposed || audioGeneration!==generation || audioScope!==scope)return;
       if(cause instanceof SpeechPlaybackError && cause.code==='cancelled'){
         audioStatus='idle';
         return;
