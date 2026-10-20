@@ -134,7 +134,7 @@ describe('Language Learning — IndexedDB M1 repository', () => {
     await learningPersistence.execute(makeStart('japanese','ja'),null);
     const backup=await learningPersistence.exportBackup();
     expect(JSON.parse(backup).format).toBe('modu-language-learning');
-    expect(JSON.parse(backup).version).toBe(2);
+    expect(JSON.parse(backup).version).toBe(3);
     expect(backup).toContain('お茶をください');
     await learningPersistence.execute(makeStart('discard-this'),null);
     await learningPersistence.importBackup(backup);
@@ -223,7 +223,7 @@ describe('Language Learning — IndexedDB M1 repository', () => {
     const two=await learningPersistence.execute(reveal('s1'),one.revision);
     await learningPersistence.execute(attempt('s1','rated1'),two.revision);
     const backup=JSON.parse(await learningPersistence.exportBackup());
-    expect(backup.version).toBe(2);
+    expect(backup.version).toBe(3);
     expect(backup.reviews).toHaveLength(1);
     const old={...backup,version:1};
     delete old.reviews;
