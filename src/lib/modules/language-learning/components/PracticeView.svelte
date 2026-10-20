@@ -72,10 +72,50 @@
         {/if}
       {:else}
         <p class="mt-3 text-center text-ui text-muted-foreground">{item.prompt}</p>
-        <p class="mt-2 text-center text-meta text-muted-foreground">Media playback is not part of this milestone.</p>
-        <div class="mt-6 flex justify-center">
-          <button class="rounded-full bg-primary px-5 py-3 text-ui text-primary-foreground" disabled={controller.pending || controller.canRetry} onclick={controller.nextExposure}>Continue</button>
-        </div>
+        <p class="mt-3 text-center text-meta text-muted-foreground">
+          {session.mode === 'listening'
+            ? 'Listen to the reference, then confirm you listened.'
+            : 'Listen first, repeat the sentence aloud, then confirm your practice.'}
+        </p>
+        {#if !controller.audioSupported}
+          <p class="mt-4 text-center text-ui text-muted-foreground" role="status">
+            Speech playback is not supported in this browser. You can skip this sentence.
+          </p>
+        {:else}
+          <div class="mt-5 flex flex-wrap justify-center gap-2">
+            <button class="rounded-full border border-border px-5 py-3 text-ui disabled:opacity-50"
+              disabled={controller.pending || controller.canRetry || controller.audioStatus === 'playing'}
+              onclick={controller.playAudio}>
+              {controller.audioStatus === 'played' ? 'Replay audio' : 'Play audio'}
+            </button>
+            {#if controller.audioStatus === 'playing'}
+              <button class="rounded-full border border-border px-5 py-3 text-ui"
+                onclick={controller.stopAudio}>Stop playback</button>
+            {/if}
+          </div>
+          {#if controller.audioStatus === 'playing'}
+            <p class="mt-3 text-center text-meta text-muted-foreground" role="status">Playing reference audio…</p>
+          {:else if controller.audioStatus === 'error'}
+            <p class="mt-3 text-center text-ui text-destructive" role="alert">{controller.audioError}</p>
+          {:else if controller.audioStatus === 'played'}
+            <p class="mt-3 text-center text-meta text-muted-foreground" role="status">Reference playback completed.</p>
+          {/if}
+          {#if session.mode === 'shadowing' && controller.audioStatus === 'played'}
+            <label class="mt-4 flex items-start justify-center gap-3 text-ui">
+              <input type="checkbox" checked={controller.shadowConfirmed}
+                disabled={controller.pending || controller.canRetry}
+                onchange={(event)=>controller.confirmShadowing(event.currentTarget.checked)} />
+              <span>I repeated this sentence aloud.</span>
+            </label>
+          {/if}
+          <div class="mt-5 flex justify-center">
+            <button class="rounded-full bg-primary px-5 py-3 text-ui text-primary-foreground disabled:opacity-50"
+              disabled={controller.pending || controller.canRetry || !controller.canRecordExposure}
+              onclick={controller.nextExposure}>
+              {session.mode === 'listening' ? 'Mark listened' : 'Finish shadowing'}
+            </button>
+          </div>
+        {/if}
       {/if}
       <div class="mt-5 flex justify-between">
         <button class="rounded-full px-3 py-2 text-meta text-muted-foreground hover:bg-muted" disabled={controller.pending || controller.canRetry} onclick={controller.abandon}>End session</button>
