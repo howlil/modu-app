@@ -158,12 +158,13 @@ export function createLanguageLearningController() {
       error = cause instanceof Error ? cause.message : 'Learning storage could not be loaded.';
     } finally { pending = false; loading = false; }
   }
-  async function execute(command: PracticeCommand, expectedRevision: number | null, expectedEpoch: string | null) {
+  async function execute(command: PracticeCommand, expectedRevision: number | null, expectedEpoch: string | null,
+    expectedCatalogRevision?:number) {
     if (!ready || pending) return;
     pending = true;
     error = '';
     try {
-      const saved = await learningPersistence.execute(command, expectedRevision, expectedEpoch);
+      const saved = await learningPersistence.execute(command, expectedRevision, expectedEpoch,expectedCatalogRevision);
       const nextScope = practiceAnswerScope(saved.session);
       if (answerDraftScope !== nextScope) {
         answerDraft = '';
@@ -189,8 +190,8 @@ export function createLanguageLearningController() {
     if (pending || !ready || retryCommand) return;
     const island=currentIslands[0];
     if(!island){planError='Add an Island before practicing.';return;}
-    send({type: 'start', sessionId: crypto.randomUUID(), profileId: profile.id,
-      island, mode});
+    void execute({type: 'start', sessionId: crypto.randomUUID(), profileId: profile.id,
+      island, mode},null,record?.storageEpoch??null,island.revision);
   }
   async function startRecommended() {
     if (!ready || pending || retryCommand ||
@@ -209,7 +210,7 @@ export function createLanguageLearningController() {
     }
     if (!selected) return;
     await execute({type:'start',sessionId:crypto.randomUUID(),profileId:profile.id,
-      island:selected,mode:'recall'}, null, record?.storageEpoch ?? null);
+      island:selected,mode:'recall'}, null, record?.storageEpoch ?? null,selected.revision);
   }
 
   function act(type: 'reveal' | 'pause' | 'resume' | 'abandon') {
