@@ -113,6 +113,35 @@ describe("M3 per-module atomic outbox", () => {
     expect(localStorage.getItem("module-pomodoro-activity-fallback")).toBeNull();
   });
 
+  it("reconciles a paired focus session saved via localStorage fallback exactly once", async () => {
+    await saveFocusSession(session("initial"));
+    await beginFocusSyncCapture("paired-focus");
+    const actualIndexedDb = indexedDB;
+    vi.stubGlobal("indexedDB", undefined);
+    await saveFocusSession(session("offline"));
+    expect(localStorage.getItem("module-pomodoro-activity-fallback")).toBeTruthy();
+    vi.stubGlobal("indexedDB", actualIndexedDb);
+    const first = await readFocusPendingSyncOperations();
+    expect(first.map(x => x.kind)).toEqual(["baseline", "upsert"]);
+    expect(first[1].entityId).toBe("offline");
+    expect((await readFocusPendingSyncOperations()).map(x => x.operationId))
+      .toEqual(first.map(x => x.operationId));
+    expect(localStorage.getItem("module-pomodoro-activity-fallback")).toBeNull();
+    expect((await exportFocusSessionsForBackup()).map(x => x.id).sort())
+      .toEqual(["initial", "offline"]);
+  });
+
+  it("refuses destructive focus history clear when a paired database is unavailable", async () => {
+    await saveFocusSession(session("protected"));
+    await beginFocusSyncCapture("paired-focus");
+    const actualIndexedDb = indexedDB;
+    vi.stubGlobal("indexedDB", undefined);
+    const { clearFocusSessions } = await import("../../src/lib/shared/focus-sessions/repository.ts");
+    await expect(clearFocusSessions()).rejects.toThrow("Cannot clear synchronized");
+    vi.stubGlobal("indexedDB", actualIndexedDb);
+    expect((await exportFocusSessionsForBackup()).map(x => x.id)).toEqual(["protected"]);
+  });
+
   it("baselines the validated Learning profile and catalog before further writes", async () => {
     await learningPersistence.profiles();
     await learningPersistence.createProfile({ id: "spanish", targetLanguage: "es" });
