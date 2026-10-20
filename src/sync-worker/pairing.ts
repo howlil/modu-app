@@ -28,6 +28,15 @@ export function parsePublicJwk(value: unknown): string {
   }
   return JSON.stringify({ kty: "EC", crv: "P-256", x: key.x, y: key.y, ext: true });
 }
+/** Structural JWK checks alone cannot verify that an EC point lies on P-256. */
+export async function validateImportableDeviceKey(identity: { publicKey: string }): Promise<void> {
+  try {
+    await crypto.subtle.importKey("jwk", JSON.parse(identity.publicKey) as JsonWebKey,
+      { name: "ECDSA", namedCurve: "P-256" }, false, ["verify"]);
+  } catch {
+    throw new SyncProtocolError(400, "Device public key is not a valid P-256 point.");
+  }
+}
 export function parseDeviceIdentity(raw: unknown): { deviceId: string; name: string; publicKey: string } {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new SyncProtocolError(400, "Invalid device identity.");
   const row = raw as Record<string, unknown>;
