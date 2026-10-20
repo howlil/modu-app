@@ -8,6 +8,11 @@ import {
 } from "./recovery-journal.ts";
 
 const MAX_IMPORT_SIZE = 300 * 1024 * 1024;
+export const RESTORE_PENDING_KEY = "modu:global-restore-pending";
+
+function clearRestoreMarker(): void {
+  try { localStorage.removeItem(RESTORE_PENDING_KEY); } catch { /* browser may deny storage */ }
+}
 
 export type PreparedGlobalRestore = {
   backup: GlobalBackupV1;
@@ -89,14 +94,22 @@ export async function commitGlobalRestore(
   const checkpoint = await createGlobalBackup(ports);
   const recovery = await prepareGlobalRestore(JSON.stringify(checkpoint), ports);
   await createRestoreJournal({ id: "active", createdAt: Date.now(), checkpoint: recovery.backup });
+  try {
+    localStorage.setItem(RESTORE_PENDING_KEY, "1");
+  } catch (cause) {
+    await deleteRestoreJournal();
+    throw new Error("Cannot record restore recovery marker. No module data was changed.", { cause });
+  }
 
   try {
     await restoreEach(target.backup, ports);
     await deleteRestoreJournal();
+    clearRestoreMarker();
   } catch (cause) {
     try {
       await restoreEach(recovery.backup, ports);
       await deleteRestoreJournal();
+      clearRestoreMarker();
     } catch {
       throw new Error("Restore interrupted and automatic rollback failed. Recovery checkpoint retained.");
     }
@@ -112,5 +125,6 @@ export async function recoverInterruptedRestore(ports: readonly RestorableDataPo
   const backup = await prepareGlobalRestore(JSON.stringify(journal.checkpoint), ports);
   await restoreEach(backup.backup, ports);
   await deleteRestoreJournal();
+  clearRestoreMarker();
   return true;
 }
