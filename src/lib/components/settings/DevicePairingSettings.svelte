@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { SyncTransport } from "#lib/platform/data/sync-transport.ts";
+  import { syncNow, type SyncProgress } from "#lib/platform/data/sync-coordinator.ts";
   import { Button } from "#lib/components/ui/button/index.js";
   import { globalDataPorts } from "#lib/platform/data/registry.ts";
   import { requireNoOtherModuTabs } from "#lib/platform/data/peer-tabs.ts";
@@ -21,6 +22,7 @@
   let recoverySpaceId = $state("");
   let recoveryInput = $state("");
   let recoveryKey = $state("");
+  let lastSync = $state<SyncProgress | null>(null);
   let pairingCode = $state("");
   let activeInvitation = $state("");
   let myConfirmation = $state("");
@@ -58,6 +60,14 @@
     });
     await loadIdentity();
     notice = "This browser is authorized. Cross-device data application remains disabled.";
+  }
+  function runManualSync() {
+    void execute(async () => {
+      if (!identity) throw new Error("Device is not paired.");
+      lastSync = await syncNow(identity);
+      notice = "Sync completed: " + lastSync.pushed + " uploaded, " + lastSync.pulled +
+        " received. Local and remote cursors are committed.";
+    });
   }
   function createSpace() {
     void execute(async () => {
@@ -182,7 +192,7 @@
   <div class="flex items-start justify-between gap-3">
     <div>
       <h2 class="text-ui font-medium">Device pairing</h2>
-      <p class="mt-1 text-meta text-muted-foreground">Authorize browsers without an account. Cross-device data merge is not enabled yet.</p>
+      <p class="mt-1 text-meta text-muted-foreground">Authorize browsers without an account. Changes are exchanged only when you click Sync now; conflicts stop syncing without overwriting.</p>
     </div>
     <ShieldCheck class="mt-0.5 size-4 shrink-0 text-muted-foreground" />
   </div>
@@ -212,7 +222,11 @@
         <div class="flex flex-wrap gap-2">
           <Button size="sm" class="rounded-full shadow-none" disabled={busy} onclick={invite}><Link2 class="size-3.5"/> Pair another device</Button>
           <Button variant="outline" size="sm" class="rounded-full shadow-none" disabled={busy} onclick={refreshDevices}><RefreshCw class="size-3.5"/> Devices</Button>
+          <Button variant="outline" size="sm" class="rounded-full shadow-none" disabled={busy} onclick={runManualSync}><RefreshCw class="size-3.5"/> Sync now</Button>
         </div>
+        {#if lastSync}
+          <p class="text-meta text-muted-foreground">Last sync: {lastSync.pushed} uploaded · {lastSync.pulled} received · cursor {lastSync.cursor}</p>
+        {/if}
         {#if pairingCode}
           <div class="rounded-lg bg-muted px-3 py-3">
             <p class="text-meta font-medium">One-time invitation code</p>
