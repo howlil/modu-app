@@ -399,6 +399,10 @@ async function ensureCatalogInitialized():Promise<void> {
 
 /** No server endpoint. This browser origin owns the canonical practice history. */
 export const learningPersistence = {
+  validateBackup(text: string) {
+    const result = asBackup(text);
+    return { records: result.records.length + result.reviews.length + result.profiles.length + result.catalogs.length };
+  },
   async profiles():Promise<LearningProfile[]> {
     await ensureCatalogInitialized();
     return transaction<LearningProfile[]>([PROFILES],'readonly',(tx,complete,fail)=>{
