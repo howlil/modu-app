@@ -40,3 +40,9 @@ export interface RestorableDataPort extends ModuleDataPort {
   validateBackup(data: unknown): Promise<RestorePreview>;
   restoreBackup(data: unknown): Promise<void>;
 }
+
+/** Feature-owned M3 transport port. No network operation belongs in a module. */
+export interface SyncOutboxPort extends RestorableDataPort {
+  readPendingSyncOperations(limit?: number): Promise<import("./outbox.ts").PendingSyncOperation[]>;
+  acknowledgeSyncOperations(operationIds: readonly string[]): Promise<void>;
+}
