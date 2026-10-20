@@ -62,6 +62,7 @@ export async function enableSyncOnce(
     ...device, id: "current", spaceId: created.spaceId, status: "pending",
     enrollmentKind: "owner"
   });
+  onRecoveryCode(created.spaceId + "." + created.recoveryKey);
   const identity = await readDeviceIdentity();
   if (!identity) throw new Error("Device identity was not persisted.");
   const progress = await resumeOwnerSetup(identity, stage);
