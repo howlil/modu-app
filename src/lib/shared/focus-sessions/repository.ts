@@ -14,7 +14,7 @@ function openDatabase() {
     }
 
     const request = indexedDB.open(DB_NAME, DB_VERSION);
-
+    let blocked = false;
     request.onupgradeneeded = () => {
       const database = request.result;
       if (!database.objectStoreNames.contains(STORE_NAME)) {
@@ -24,8 +24,16 @@ function openDatabase() {
       ensureOutboxStores(database);
     };
 
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      if (blocked) { request.result.close(); return; }
+      request.result.onversionchange = () => request.result.close();
+      resolve(request.result);
+    };
     request.onerror = () => reject(request.error ?? new Error('Unable to open activity database'));
+    request.onblocked = () => {
+      blocked = true;
+      reject(new Error('A different Pomodoro tab is blocking the activity database upgrade.'));
+    };
   });
 }
 
@@ -62,55 +70,59 @@ export function isFocusActivitySession(value: unknown): value is FocusActivitySe
   );
 }
 
+/**
+ * Fallback remains available if IndexedDB cannot be opened (legacy local-only).
+ * Never fallback after an opened transaction aborts: that could silently omit
+ * a sync operation, violating durable data + outbox atomicity.
+ */
 export async function saveFocusSession(session: FocusActivitySession) {
-  try {
-    const database = await openDatabase();
-
-    await new Promise<void>((resolve, reject) => {
-      const transaction = database.transaction([STORE_NAME, OUTBOX_STORE, SYNC_META_STORE], 'readwrite');
-      transaction.objectStore(STORE_NAME).put(session);
-      queueLocalMutation(transaction, 'pomodoro', session.id, 'upsert', { session });
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error ?? new Error('Unable to save session'));
-    });
-
-    database.close();
-    announceChange();
-  } catch {
-    const sessions = readFallback().filter((item) => item.id !== session.id);
+  let database: IDBDatabase;
+  try { database = await openDatabase(); }
+  catch {
+    const sessions = readFallback().filter(item => item.id !== session.id);
     sessions.push(session);
     writeFallback(sessions);
     announceChange();
+    return;
   }
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const tx = database.transaction([STORE_NAME, OUTBOX_STORE, SYNC_META_STORE], 'readwrite');
+      tx.objectStore(STORE_NAME).put(session);
+      queueLocalMutation(tx, 'pomodoro', session.id, 'upsert', { session });
+      tx.oncomplete = () => resolve();
+      tx.onabort = () => reject(tx.error ?? new Error('Atomic focus session save aborted.'));
+      tx.onerror = () => reject(tx.error ?? new Error('Atomic focus session save failed.'));
+    });
+    announceChange();
+  } finally { database.close(); }
 }
 
 export async function saveFocusSessions(sessions: FocusActivitySession[]) {
   if (sessions.length === 0) return;
-
-  try {
-    const database = await openDatabase();
-
-    await new Promise<void>((resolve, reject) => {
-      const transaction = database.transaction([STORE_NAME, OUTBOX_STORE, SYNC_META_STORE], 'readwrite');
-      const store = transaction.objectStore(STORE_NAME);
-
-      for (const session of sessions) {
-        store.put(session);
-        queueLocalMutation(transaction, 'pomodoro', session.id, 'upsert', { session });
-      }
-
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error ?? new Error('Unable to save sessions'));
-    });
-
-    database.close();
-    announceChange();
-  } catch {
-    const current = new Map(readFallback().map((session) => [session.id, session]));
+  let database: IDBDatabase;
+  try { database = await openDatabase(); }
+  catch {
+    const current = new Map(readFallback().map(session => [session.id, session]));
     for (const session of sessions) current.set(session.id, session);
     writeFallback([...current.values()]);
     announceChange();
+    return;
   }
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const tx = database.transaction([STORE_NAME, OUTBOX_STORE, SYNC_META_STORE], 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      for (const session of sessions) {
+        store.put(session);
+        queueLocalMutation(tx, 'pomodoro', session.id, 'upsert', { session });
+      }
+      tx.oncomplete = () => resolve();
+      tx.onabort = () => reject(tx.error ?? new Error('Atomic focus sessions save aborted.'));
+      tx.onerror = () => reject(tx.error ?? new Error('Atomic focus sessions save failed.'));
+    });
+    announceChange();
+  } finally { database.close(); }
 }
 
 export async function loadFocusSessions() {
@@ -134,32 +146,32 @@ export async function loadFocusSessions() {
 }
 
 export async function clearFocusSessions() {
+  let database: IDBDatabase;
+  try { database = await openDatabase(); }
+  catch {
+    if (typeof localStorage !== 'undefined') localStorage.removeItem(FALLBACK_KEY);
+    announceChange();
+    return;
+  }
   try {
-    const database = await openDatabase();
-
     await new Promise<void>((resolve, reject) => {
-      const transaction = database.transaction([STORE_NAME, OUTBOX_STORE, SYNC_META_STORE], 'readwrite');
-      const store = transaction.objectStore(STORE_NAME);
+      const tx = database.transaction([STORE_NAME, OUTBOX_STORE, SYNC_META_STORE], 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
       const before = store.getAllKeys();
       before.onsuccess = () => {
         for (const id of before.result) {
-          queueLocalMutation(transaction, 'pomodoro', String(id), 'delete', { sessionId: String(id) });
+          queueLocalMutation(tx, 'pomodoro', String(id), 'delete', { sessionId: String(id) });
         }
         store.clear();
       };
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error ?? new Error('Unable to clear sessions'));
+      tx.oncomplete = () => resolve();
+      tx.onabort = () => reject(tx.error ?? new Error('Atomic focus history clear aborted.'));
+      tx.onerror = () => reject(tx.error ?? new Error('Atomic focus history clear failed.'));
     });
-
-    database.close();
-  } catch {
-    // Fallback is cleared below.
-  }
-
-  if (typeof localStorage !== 'undefined') localStorage.removeItem(FALLBACK_KEY);
-  announceChange();
+    if (typeof localStorage !== 'undefined') localStorage.removeItem(FALLBACK_KEY);
+    announceChange();
+  } finally { database.close(); }
 }
-
 
 const CHANGE_EVENT = 'modu:focus-sessions-changed';
 const CHANNEL_NAME = 'modu-focus-sessions';
@@ -189,40 +201,34 @@ export function subscribeFocusSessions(onChange: () => void): () => void {
 }
 
 export async function assignFocusSession(sessionId: string, taskId: string | null): Promise<void> {
+  let database: IDBDatabase;
+  try { database = await openDatabase(); }
+  catch {
+    const fallback = readFallback();
+    const found = fallback.find(item => item.id === sessionId);
+    if (!found) throw new Error('Focus session not found');
+    found.taskId = taskId;
+    writeFallback(fallback);
+    announceChange();
+    return;
+  }
   try {
-    const database = await openDatabase();
     await new Promise<void>((resolve, reject) => {
-      const transaction = database.transaction([STORE_NAME, OUTBOX_STORE, SYNC_META_STORE], 'readwrite');
-      const store = transaction.objectStore(STORE_NAME);
+      const tx = database.transaction([STORE_NAME, OUTBOX_STORE, SYNC_META_STORE], 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
       const request = store.get(sessionId);
       request.onsuccess = () => {
-        if (!request.result) { transaction.abort(); return; }
+        if (!request.result) { tx.abort(); return; }
         const updated = { ...request.result, taskId } as FocusActivitySession;
         store.put(updated);
-        queueLocalMutation(transaction, 'pomodoro', sessionId, 'command', { action: 'assign-task', taskId });
+        queueLocalMutation(tx, 'pomodoro', sessionId, 'command', { action: 'assign-task', taskId });
       };
-      transaction.oncomplete = () => resolve();
-      transaction.onabort = () => reject(new Error('Focus session not found'));
-      transaction.onerror = () => reject(transaction.error ?? new Error('Unable to assign session'));
+      tx.oncomplete = () => resolve();
+      tx.onabort = () => reject(tx.error ?? new Error('Focus session not found or assignment failed.'));
+      tx.onerror = () => reject(tx.error ?? new Error('Atomic focus session assignment failed.'));
     });
-    database.close();
-  } catch (error) {
-    if (typeof indexedDB !== 'undefined') {
-      // Only use the local fallback if this record actually exists there.
-      const fallback = readFallback();
-      const found = fallback.find((item) => item.id === sessionId);
-      if (!found) throw error;
-      found.taskId = taskId;
-      writeFallback(fallback);
-    } else {
-      const fallback = readFallback();
-      const found = fallback.find((item) => item.id === sessionId);
-      if (!found) throw error;
-      found.taskId = taskId;
-      writeFallback(fallback);
-    }
-  }
-  announceChange();
+    announceChange();
+  } finally { database.close(); }
 }
 
 /**
