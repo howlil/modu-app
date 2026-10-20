@@ -91,7 +91,14 @@ export function initializeCaptureWithBaseline(
   const existing = metadata.get(CAPTURE_KEY);
   existing.onsuccess = () => {
     if (existing.result) {
-      tx.abort(); // cannot silently reinitialize an existing capture generation
+      const config: unknown = existing.result;
+      if (config && typeof config === "object" &&
+          (config as Record<string, unknown>).enabled === true &&
+          (config as Record<string, unknown>).deviceId === deviceId) {
+        // Safe idempotent resume of partially enrolled multi-module setup.
+        return;
+      }
+      tx.abort(); // another device/generation cannot silently take over
       return;
     }
     tx.objectStore(OUTBOX_STORE).add(
