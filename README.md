@@ -4,8 +4,9 @@ Local-first browser utilities built with SvelteKit, Tailwind CSS, shadcn-svelte,
 
 ## Current scope
 
-- Pomodoro
+- Language Learning
 - Habit Tracker
+- Pomodoro
 
 New modules require an end-to-end user workflow and must reuse existing capabilities rather than duplicate them.
 
@@ -16,6 +17,7 @@ src/routes/                   route composition and API entry points
 src/lib/components/ui/        shared shadcn-svelte primitives
 src/lib/modules/pomodoro/     timer rules, activity, preferences, feature views
 src/lib/modules/habit-tracker/ habit management, scheduling and check-ins
+src/lib/modules/language-learning/ language content, recall and progress
 src/lib/shared/focus-sessions/ Pomodoro session repository and legacy task handoff
 src/lib/platform/registry/    tool metadata and availability
 extension/                    independent Chromium permission/enforcement boundary

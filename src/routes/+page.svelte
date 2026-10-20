@@ -12,7 +12,7 @@
 <HomeHero />
 
 <section id="tools" class="px-4 pb-8 pt-2 max-[760px]:px-2.5 max-[700px]:pb-6">
-  <div class="mx-auto grid w-full max-w-[520px] grid-cols-2 gap-3">
+  <div class="mx-auto grid w-full max-w-[820px] grid-cols-2 gap-3 sm:grid-cols-3">
     {#each modules as module}
       <ToolCard {module} />
     {/each}

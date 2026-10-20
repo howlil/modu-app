@@ -7,11 +7,13 @@
   let tileStyle = $derived({
     pomodoro: 'background: linear-gradient(145deg, #9BC2F7 0%, #80AEEF 54%, #709DE5 100%);',
     'habit-tracker': 'background: linear-gradient(145deg, #D4E3FF 0%, #BED4FD 55%, #9CBCFA 100%);',
+    'language-learning': 'background: linear-gradient(145deg, #D9D4FD 0%, #C7BEF8 55%, #B5A9F0 100%);',
   }[module.id]);
 
   let tileClass = $derived({
     pomodoro: 'text-[#163A6B] border-[#6F9FE8]',
     'habit-tracker': 'text-[#17437A] border-[#86A9EA]',
+    'language-learning': 'text-[#423176] border-[#A494DF]',
   }[module.id] ?? 'text-foreground border-border');
 </script>
 
@@ -40,7 +42,22 @@
   </div>
 
 
-  {#if module.id === 'habit-tracker'}
+  {#if module.id === 'language-learning'}
+    <div class="tool-art tool-art--language" aria-hidden="true">
+      <svg class="size-full" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <g transform="rotate(-8 120 120)">
+          <rect x="38" y="52" width="138" height="150" rx="24" fill="#F3EEFF" stroke="#937DD5" stroke-width="4"/>
+          <rect x="52" y="66" width="111" height="121" rx="15" fill="#FFFFFF"/>
+          <path d="M74 97H139M74 118H128M74 139H119" stroke="#AE9ADE" stroke-width="9" stroke-linecap="round"/>
+          <path d="M62 171H152" stroke="#D6CBF2" stroke-width="5" stroke-linecap="round"/>
+          <rect x="127" y="94" width="93" height="90" rx="28" fill="#6F50D5" stroke="#D8C9FF" stroke-width="4"/>
+          <path d="M148 127H196M154 145H188" stroke="white" stroke-width="7" stroke-linecap="round"/>
+          <path d="M151 178L144 198L172 182" fill="#6F50D5"/>
+          <path d="M151 178L144 198L172 182" stroke="#D8C9FF" stroke-width="4" stroke-linejoin="round"/>
+        </g>
+      </svg>
+    </div>
+  {:else if module.id === 'habit-tracker'}
     <div class="tool-art tool-art--habit" aria-hidden="true">
       <svg class="size-full" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
         <g transform="rotate(-8 120 120)">
@@ -95,6 +112,7 @@
 
 
 
+  .tool-art--language { --art-rotation: 5deg; --art-duration: 7.4s; --art-delay: -1s; }
   .tool-art--habit { --art-rotation: -8deg; --art-duration: 8s; --art-delay: -1.5s; }
 
   .tool-art--pomodoro {
