@@ -174,7 +174,8 @@
       // The server may already have approved the device while its first
       // inbound snapshot failed. Reflect durable identity, not stale UI.
       await loadIdentity();
-      if (identity?.status === "paired") mode = "overview";
+      const persisted = await readDeviceIdentity();
+      if (persisted?.status === "paired") mode = "overview";
       error = explainSyncFailure(cause);
     }
   }
