@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { SyncTransport } from "#lib/platform/data/sync-transport.ts";
   import { Button } from "#lib/components/ui/button/index.js";
   import { globalDataPorts } from "#lib/platform/data/registry.ts";
   import { requireNoOtherModuTabs } from "#lib/platform/data/peer-tabs.ts";
