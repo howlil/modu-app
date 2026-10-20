@@ -30,7 +30,7 @@ export class SyncSpaceHandler {
   async fetch(request: Request): Promise<Response> {
     try {
       const url = new URL(request.url);
-      if (!/^\/api\/sync\/spaces\/[0-9a-f]{8}-[0-9a-f-]{27,28}\/changes$/.test(url.pathname) ||
+      if (!/^\/api\/sync\/spaces\/[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\/changes$/.test(url.pathname) ||
           !["GET", "POST"].includes(request.method)) {
         return response({ error: "Not found." }, 404);
       }
