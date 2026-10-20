@@ -150,9 +150,13 @@
   async function beginJoin() {
     await action(async () => {
       const code = resolvePairingInput(joinCode, location.origin);
-      const confirmation = await requestDeviceJoin(code,deviceName);
-      phoneConfirmation = confirmation;
-      await loadIdentity();
+      try {
+        phoneConfirmation = await requestDeviceJoin(code,deviceName);
+      } finally {
+        // The device key is intentionally persisted before the HTTP request.
+        // Even a lost response must leave the UI on the resumable join path.
+        await loadIdentity();
+      }
       mode = "join";
     });
   }
@@ -228,15 +232,18 @@
       catch (cause) {error = explainSyncFailure(cause);}
     }
     void action(async () => {
-      const [response] = await Promise.all([
-        fetch("/api/sync/status",{credentials:"omit",cache:"no-store"}),
-        loadIdentity()
-      ]);
-      if (active && response.ok) {
-        const body: unknown = await response.json();
-        available = !!body && typeof body==="object" && (body as {enabled?:unknown}).enabled===true;
+      try {
+        const [response] = await Promise.all([
+          fetch("/api/sync/status",{credentials:"omit",cache:"no-store"}),
+          loadIdentity()
+        ]);
+        if (active && response.ok) {
+          const body: unknown = await response.json();
+          available = !!body && typeof body==="object" && (body as {enabled?:unknown}).enabled===true;
+        }
+      } finally {
+        loaded = true; // service outage must never trap Settings on loading
       }
-      loaded = true;
     });
     const off = subscribeSyncStatus(next => {status = next;});
     const timer = window.setInterval(() => {
