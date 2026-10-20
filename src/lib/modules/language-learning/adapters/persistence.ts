@@ -410,6 +410,175 @@ async function ensureCatalogInitialized():Promise<void> {
 
 /** No server endpoint. This browser origin owns the canonical practice history. */
 export const learningPersistence = {
+  readRemoteCursor: async (): Promise<number> => {
+    const db = await openDatabase();
+    try { return await readInboxCursor(db); } finally { db.close(); }
+  },
+  async applyRemoteChanges(events: readonly SequencedSyncOperation[]): Promise<void> {
+    if (!events.length) return;
+    return transaction<void>(
+      [SESSIONS, ATTEMPTS, META, REVIEWS, PROFILES, CATALOGS,
+        OUTBOX_STORE, SYNC_META_STORE, INBOX_STORE, TOMBSTONE_STORE],
+      'readwrite', (tx, complete, fail) => {
+        const sessions = tx.objectStore(SESSIONS);
+        const attempts = tx.objectStore(ATTEMPTS);
+        const meta = tx.objectStore(META);
+        const reviews = tx.objectStore(REVIEWS);
+        const profiles = tx.objectStore(PROFILES);
+        const catalogs = tx.objectStore(CATALOGS);
+        const tombstones = tx.objectStore(TOMBSTONE_STORE);
+        const reject = (message: string) => fail(new RemoteApplyConflict(message));
+        applyIncomingInTransaction(tx, 'language-learning', events, (event, next, stop) => {
+          const payload = event.payload;
+          if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+            reject('Invalid Learning remote payload.'); return;
+          }
+          const data = payload as Record<string, unknown>;
+          if (event.kind === 'baseline') {
+            let backup: ReturnType<typeof asBackup>;
+            try { backup = asBackup(JSON.stringify(payload)); }
+            catch (cause) { stop(cause instanceof Error ? cause : new RemoteApplyConflict('Invalid Learning baseline.')); return; }
+            const rows = sessions.getAll(), attemptsReq = attempts.getAll(),
+              currentProfiles = profiles.getAll(), currentCatalog = catalogs.getAll();
+            let ready = 0;
+            const applyBaseline = () => {
+              if (++ready !== 4) return;
+              if (rows.result.length || attemptsReq.result.length) {
+                reject('Existing Learning history requires explicit merge, not replacement.'); return;
+              }
+              try {
+                const storedProfiles = (currentProfiles.result as unknown[]).map(decodeLearningProfile);
+                const storedCatalog = (currentCatalog.result as unknown[]).map(decodeCatalogRow);
+                const starterOnly = storedCatalog.every(item =>
+                  item.profileId === starterContent.profileId &&
+                  item.island.id === starterContent.island.id &&
+                  JSON.stringify(item) === JSON.stringify(starterContent)
+                ) && storedProfiles.every(item => item.id === starterProfile.id);
+                if (!starterOnly) {
+                  reject('Custom Learning profiles/catalog require manual merge.'); return;
+                }
+                sessions.clear(); attempts.clear(); reviews.clear(); profiles.clear(); catalogs.clear();
+                const now = Date.now();
+                for (let i = 0; i < backup.records.length; i++) {
+                  const item = backup.records[i];
+                  sessions.add({ id: item.session.id, record: item, updatedAt: now + i } satisfies SessionRow);
+                }
+                for (const attempt of backup.attempts) attempts.add(attempt);
+                for (const memory of backup.reviews) reviews.add(memory);
+                for (const profile of backup.profiles) profiles.add(profile);
+                for (const content of backup.catalogs) {
+                  catalogs.add({ key: catalogKey(content.profileId, content.island.id),
+                    profileId: content.profileId, content } satisfies CatalogRow);
+                }
+                meta.put({ key: 'catalogSeedV1', done: true });
+                meta.put({ key: 'memoryBootstrapV1', done: true });
+                if (backup.latestSessionId) meta.put({ key: 'latest', sessionId: backup.latestSessionId });
+                meta.put({ key: 'epoch', value: crypto.randomUUID() });
+                next();
+              } catch (cause) { stop(cause instanceof Error ? cause : new RemoteApplyConflict('Learning baseline failed.')); }
+            };
+            rows.onsuccess = applyBaseline;
+            attemptsReq.onsuccess = applyBaseline;
+            currentProfiles.onsuccess = applyBaseline;
+            currentCatalog.onsuccess = applyBaseline;
+            return;
+          }
+          if (event.kind === 'upsert' && data.profile) {
+            let incoming: LearningProfile;
+            try {
+              incoming = decodeLearningProfile(data.profile);
+              if (incoming.id !== event.entityId) throw new RemoteApplyConflict('Profile ID mismatch.');
+            } catch (cause) { stop(cause instanceof Error ? cause : new RemoteApplyConflict('Invalid profile.')); return; }
+            const existing = profiles.get(incoming.id);
+            existing.onsuccess = () => {
+              if (existing.result && JSON.stringify(existing.result) !== JSON.stringify(incoming)) {
+                reject('Concurrent language profile changes.'); return;
+              }
+              if (!existing.result) profiles.add(incoming);
+              next();
+            };
+            return;
+          }
+          if (event.kind === 'upsert' && data.content) {
+            let content: ContentIsland;
+            try {
+              content = validateContentIsland(data.content);
+              if (catalogKey(content.profileId, content.island.id) !== event.entityId) {
+                throw new RemoteApplyConflict('Catalog entity identity mismatch.');
+              }
+            } catch (cause) { stop(cause instanceof Error ? cause : new RemoteApplyConflict('Invalid catalog content.')); return; }
+            const target = catalogs.get(event.entityId);
+            target.onsuccess = () => {
+              try {
+                const existing = target.result ? decodeCatalogRow(target.result) : null;
+                const unchanged = existing && JSON.stringify(existing) === JSON.stringify(content);
+                if (!unchanged && (existing?.island.revision ?? null) !==
+                    (event.baseRevision === null ? null : Number(event.baseRevision))) {
+                  throw new RemoteApplyConflict('Concurrent catalog revision.');
+                }
+                if (!unchanged) catalogs.put({
+                  key: event.entityId, profileId: content.profileId, content
+                } satisfies CatalogRow);
+                next();
+              } catch (cause) { stop(cause instanceof Error ? cause : new RemoteApplyConflict('Catalog merge failed.')); }
+            };
+            return;
+          }
+          if (event.kind === 'command' && data.command) {
+            const command = data.command as PracticeCommand;
+            const read = sessions.get(command.sessionId);
+            read.onsuccess = () => {
+              try {
+                const prior = decodeSessionRow(read.result);
+                const expected = event.baseRevision === null ? null : Number(event.baseRevision);
+                if ((prior?.revision ?? null) !== expected) {
+                  throw new RemoteApplyConflict('Concurrent practice revision.');
+                }
+                const applied = applyPracticeCommand(prior, command);
+                if (!applied.changed || JSON.stringify(applied.next.session) !== JSON.stringify(data.session) ||
+                    JSON.stringify(applied.attempt ?? null) !== JSON.stringify(data.attempt ?? null)) {
+                  throw new RemoteApplyConflict('Practice event differs from domain evaluation.');
+                }
+                const persist = (memory: MemoryState | null) => {
+                  try {
+                    const currentEpoch = meta.get('epoch');
+                    currentEpoch.onsuccess = () => {
+                      try {
+                        const epoch: unknown = currentEpoch.result?.value ?? null;
+                        sessions.put({ id: applied.next.session.id,
+                          updatedAt: Date.now(), record: applied.next } satisfies SessionRow);
+                        if (applied.attempt) attempts.add(applied.attempt);
+                        if (memory) reviews.put(memory);
+                        if (epoch === null) meta.put({ key: 'epoch', value: crypto.randomUUID() });
+                        meta.put({ key: 'latest', sessionId: applied.next.session.id });
+                        next();
+                      } catch (cause) { stop(cause instanceof Error ? cause : new RemoteApplyConflict('Practice persistence error.')); }
+                    };
+                  } catch (cause) { stop(cause instanceof Error ? cause : new RemoteApplyConflict('Practice persistence error.')); }
+                };
+                if (applied.attempt?.evidence.kind === 'recall') {
+                  const key = memoryKey({ profileId: applied.attempt.profileId,
+                    islandId: applied.next.session.islandId,
+                    sentenceId: applied.attempt.sentenceId,
+                    sentenceRevision: applied.attempt.sentenceRevision });
+                  const before = reviews.get(key);
+                  before.onsuccess = () => {
+                    try {
+                      const state = before.result === undefined ? null : decodeMemoryState(before.result);
+                      persist(scheduleRatedAttempt(state, applied.attempt!, applied.next.session.islandId));
+                    } catch (cause) { stop(cause instanceof Error ? cause : new RemoteApplyConflict('Invalid SRS projection.')); }
+                  };
+                } else persist(null);
+              } catch (cause) { stop(cause instanceof Error ? cause : new RemoteApplyConflict('Invalid remote practice command.')); }
+            };
+            return;
+          }
+          // Unknown or destructive Learning events are never silently accepted.
+          stop(new RemoteApplyConflict('Unsupported Learning remote operation.'));
+        }, () => complete(undefined), fail);
+      }
+    );
+  },
   async beginSyncCapture(deviceId: string): Promise<void> {
     await ensureCatalogInitialized();
     await ensureMemoryInitialized();
