@@ -150,7 +150,9 @@ describe('Habit Tracker M5 — actual IndexedDB adapter with fake-indexeddb tran
     expect(updates.filter(x => x.status === 'rejected')).toHaveLength(1);
     const saved = await loadHabitSnapshot();
     expect(saved.policies).toHaveLength(2);
-    expect([4, 6]).toContain(saved.policies[1].target);
+    const future = saved.policies.find(p => p.effectiveFromDate === '2026-10-21');
+    expect(future).toBeDefined();
+    expect([4, 6]).toContain(future!.target);
   });
 
   it('blocks same-day writes after archive while retaining previously committed records', async () => {
