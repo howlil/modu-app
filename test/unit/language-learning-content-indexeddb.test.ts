@@ -59,7 +59,7 @@ describe('M5 — IndexedDB content authority',()=>{
     expect((await learningPersistence.getMemory(profile.id,'shopping','rice',1))?.lastAttemptId).toBe('a1');
     const original=(await learningPersistence.catalog(profile.id))[0];
     const edited=await learningPersistence.saveIsland(profile.id,{
-      ...draft,sentences:[
+      ...draft,confirmRetainedVocabulary:true,sentences:[
         {...draft.sentences[0],answer:'お米を買います。'},
         draft.sentences[1]
       ]
