@@ -293,7 +293,7 @@
         </label>
         <Button size="sm" class="rounded-full" disabled={busy || !recoveryInput.trim()} onclick={recoverDevice}><KeyRound class="size-3.5"/> Recover access</Button>
       {:else}
-        <p class="text-meta text-muted-foreground">Creates a private sync space. Local data stays offline until remote apply is explicitly enabled.</p>
+        <p class="text-meta text-muted-foreground">Sync now sends module data to Cloudflare. Data is not end-to-end encrypted, so the server can read it. Export a backup before your first sync.</p>
         <Button size="sm" class="rounded-full" disabled={busy} onclick={createSpace}>Create sync space</Button>
       {/if}
     </div>
