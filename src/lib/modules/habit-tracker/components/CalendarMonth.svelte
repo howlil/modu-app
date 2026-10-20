@@ -12,8 +12,8 @@
     onSelect: (date: string) => void;
   } = $props();
 
-  let displayedMonth = $state(selectedDate.slice(0, 7));
-  let lastSelectedMonth = $state(selectedDate.slice(0, 7));
+  let displayedMonth = $state('');
+  let lastSelectedMonth = $state('');
   // Date-picker changes can jump to another month; manual month browsing
   // must not be reset simply because the selected date stayed unchanged.
   $effect(() => {
@@ -23,11 +23,12 @@
       displayedMonth = incoming;
     }
   });
-  const cells = $derived(monthGrid(displayedMonth));
+  const cells = $derived(displayedMonth ? monthGrid(displayedMonth) : []);
   const days = $derived(cells.map(date => date ? { date, info: getDay(date) } : null));
-  const monthTitle = $derived(new Date(displayedMonth + '-15T12:00:00Z')
-    .toLocaleDateString(undefined, { month: 'long', year: 'numeric', timeZone: 'UTC' }));
-  const canForward = $derived(displayedMonth < today.slice(0, 7));
+  const monthTitle = $derived(displayedMonth
+    ? new Date(displayedMonth + '-15T12:00:00Z').toLocaleDateString(undefined, { month: 'long', year: 'numeric', timeZone: 'UTC' })
+    : 'Calendar');
+  const canForward = $derived(Boolean(displayedMonth) && displayedMonth < today.slice(0, 7));
 
   function dayClass(info: CalendarDay, selected: boolean): string {
     const base = 'relative flex aspect-square min-h-10 w-full flex-col items-center justify-center rounded-xl text-ui tabular-nums transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary';
@@ -53,7 +54,8 @@
 <section aria-label="Habit calendar" class="rounded-[20px] border border-border bg-card p-4 sm:p-5">
   <div class="flex items-center justify-between gap-3">
     <button type="button" class="flex size-9 items-center justify-center rounded-full hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary"
-      aria-label="Previous month" onclick={() => displayedMonth = shiftMonth(displayedMonth, -1)}>
+      aria-label="Previous month" disabled={!displayedMonth}
+      onclick={() => displayedMonth = shiftMonth(displayedMonth, -1)}>
       <ChevronLeft class="size-4"/>
     </button>
     <h3 class="text-ui font-medium">{monthTitle}</h3>
