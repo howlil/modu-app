@@ -4,6 +4,7 @@ import { explainSyncFailure } from "./sync-errors.ts";
 import { globalDataPorts } from "./registry.ts";
 import { subscribeFocusSessions } from "#lib/shared/focus-sessions/repository.ts";
 import { subscribeHabitChanges } from "#lib/modules/habit-tracker/adapters/persistence.ts";
+import { subscribeLearningChanges } from "#lib/modules/language-learning/adapters/persistence.ts";
 
 export type SyncHealth = "local" | "connecting" | "syncing" | "up-to-date" |
   "offline" | "needs-review" | "revoked" | "error";
@@ -94,6 +95,7 @@ export function startGlobalSyncRuntime(): () => void {
   const visible = () => { if (document.visibilityState === "visible") schedule(100); };
   const unsubscribeFocus = subscribeFocusSessions(changed);
   const unsubscribeHabit = subscribeHabitChanges(changed);
+  const unsubscribeLearning = subscribeLearningChanges(changed);
   window.addEventListener("online", online);
   window.addEventListener("focus", visible);
   window.addEventListener("modu:sync-identity-changed", online);
@@ -102,7 +104,7 @@ export function startGlobalSyncRuntime(): () => void {
   schedule(200);
   return () => {
     disposed = true; cleanTimer(); clearInterval(interval);
-    unsubscribeFocus(); unsubscribeHabit();
+    unsubscribeFocus(); unsubscribeHabit(); unsubscribeLearning();
     window.removeEventListener("online", online);
     window.removeEventListener("focus", visible);
     window.removeEventListener("modu:sync-identity-changed", online);
