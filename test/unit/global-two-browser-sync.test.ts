@@ -45,10 +45,14 @@ async function pullBrowserEvents(server: SequencedSyncOperation[]): Promise<void
     await port.applyRemoteChanges(page);
   }
 }
-afterEach(() => { vi.unstubAllGlobals(); });
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe("M5 two isolated browsers, feature-owned sync replay", () => {
   it("roundtrips focus, Habit and Learning changes through separate IndexedDB instances", async () => {
+    // Domain API intentionally requires "today". Freeze only Date, not IDB
+    // timers, so this test will not break after October 2026.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-20T12:00:00Z"));
     const server: SequencedSyncOperation[] = [];
     useBrowser(0);
     await saveFocusSession(record("focus-a"));
