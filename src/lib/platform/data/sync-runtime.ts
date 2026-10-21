@@ -170,7 +170,7 @@ export function startGlobalSyncRuntime(): () => void {
   // the timer forward or create parallel queued syncs.
   function schedule(delay: number, reason: Trigger): void {
     if (disposed || paused) return;
-    if (busy) {
+    if (busy && reason !== "retry") {
       if (reason === "local") dirtyDuringSync = true;
       return;
     }
