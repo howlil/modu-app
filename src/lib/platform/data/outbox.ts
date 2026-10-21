@@ -9,6 +9,23 @@ export const OUTBOX_STORE = "sync_outbox";
 export const SYNC_META_STORE = "sync_metadata";
 const CAPTURE_KEY = "capture";
 
+/**
+ * The scheduler only observes actual locally queued operations, NOT generic
+ * module refresh notifications (which also fire on inbound remote applies).
+ * Notify after the IDB transaction commits, never from request.onsuccess.
+ */
+export const SYNC_OUTBOX_COMMITTED_EVENT = "modu:sync-outbox-committed";
+const locallyQueuedTransactions = new WeakSet<IDBTransaction>();
+function signalCommittedLocalMutation(tx: IDBTransaction): void {
+  if (locallyQueuedTransactions.has(tx)) return;
+  locallyQueuedTransactions.add(tx);
+  tx.addEventListener("complete", () => {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event(SYNC_OUTBOX_COMMITTED_EVENT));
+    }
+  }, { once: true });
+}
+
 export type SyncOperationKind = "upsert" | "delete" | "command" | "baseline";
 
 export type PendingSyncOperation = {
@@ -72,6 +89,8 @@ export function queueLocalMutation(
     tx.objectStore(OUTBOX_STORE).add(
       newOperation(moduleId, deviceId, entityId, kind, payload, baseRevision)
     );
+    // This fires once only after the entire feature write + outbox commit.
+    signalCommittedLocalMutation(tx);
   };
 }
 
