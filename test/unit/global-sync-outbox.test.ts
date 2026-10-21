@@ -1,7 +1,7 @@
 import "fake-indexeddb/auto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  OUTBOX_STORE, SYNC_META_STORE, initializeCaptureWithBaseline
+  OUTBOX_STORE, SYNC_META_STORE, initializeCaptureWithBaseline, SYNC_OUTBOX_COMMITTED_EVENT
 } from "../../src/lib/platform/data/outbox.ts";
 import {
   loadHabitSnapshot, createConfiguredHabit, changeHabitTitle,
@@ -79,6 +79,44 @@ beforeEach(async () => {
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
+});
+
+describe("Local committed outbox notifications", () => {
+  it("fires once after an actual queued local mutation, never for local-only edits", async () => {
+    const windowTarget = new EventTarget();
+    vi.stubGlobal("window", windowTarget);
+    let notifications = 0;
+    windowTarget.addEventListener(SYNC_OUTBOX_COMMITTED_EVENT, () => { notifications++; });
+    await loadHabitSnapshot();
+    await createConfiguredHabit({
+      title: "Local only", direction: "BUILD", measurement: "COUNT", target: 1
+    }, "2026-10-20");
+    expect(notifications).toBe(0);
+    await beginHabitSyncCapture("paired-habit");
+    expect(notifications).toBe(0); // owner sync explicitly uploads baseline
+    await createConfiguredHabit({
+      title: "Queued", direction: "BUILD", measurement: "COUNT", target: 1
+    }, "2026-10-20");
+    expect(notifications).toBe(1);
+    const habitId = (await loadHabitSnapshot()).habits.find(x => x.title === "Queued")!.id;
+    await changeHabitTitle(habitId, "Queued updated");
+    expect(notifications).toBe(2);
+    expect((await readHabitPendingSyncOperations()).length).toBe(3);
+  });
+
+  it("does not notify when transaction aborts on corrupt capture metadata", async () => {
+    const windowTarget = new EventTarget();
+    vi.stubGlobal("window", windowTarget);
+    let notifications = 0;
+    windowTarget.addEventListener(SYNC_OUTBOX_COMMITTED_EVENT, () => { notifications++; });
+    await loadHabitSnapshot();
+    await beginHabitSyncCapture("paired-habit");
+    await corruptCapture("habit-tracker");
+    await expect(createConfiguredHabit({
+      title: "Rejected", direction: "BUILD", measurement: "COUNT", target: 2
+    }, "2026-10-20")).rejects.toThrow();
+    expect(notifications).toBe(0);
+  });
 });
 
 describe("M3 per-module atomic outbox", () => {

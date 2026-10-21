@@ -255,11 +255,21 @@
       }
     });
     const off = subscribeSyncStatus(next => {status = next;});
-    const timer = window.setInterval(() => {
-      if (!active || busy || !available) return;
-      if (inviteCode) void inspectInvite();
-      if (identity?.status === "pending" && identity.enrollmentKind === "join") void pollJoin();
-    }, 5000);
+    let polling = false;
+    const pollPairing = async () => {
+      // Poll only while the pairing UI is visible. Never overlap slow requests
+      // across interval ticks; a pending invitation needs at most one check.
+      if (!active || busy || polling || !available ||
+          document.visibilityState === "hidden") return;
+      const needsJoin = identity?.status === "pending" && identity.enrollmentKind === "join";
+      if (!inviteCode && !needsJoin) return;
+      polling = true;
+      try {
+        if (inviteCode) await inspectInvite();
+        else if (needsJoin) await pollJoin();
+      } finally { polling = false; }
+    };
+    const timer = window.setInterval(() => { void pollPairing(); }, 5000);
     return () => {active=false;window.clearInterval(timer);off();};
   });
 </script>
