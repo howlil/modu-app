@@ -1,6 +1,7 @@
 import { decodeMoment } from '../core/moments.ts';
 import { decodeOutput } from '../core/outputs.ts';
 import { buildFinalizedSnapshot, decodeFinalizedSnapshot } from '../core/snapshots.ts';
+import { verifyCareerState } from '../core/backup.ts';
 import type { CareerMoment, CareerOutput, FinalizedSnapshot } from '../core/types.ts';
 import { OUTBOX_STORE, SYNC_META_STORE, ensureOutboxStores, queueLocalMutation } from '#lib/platform/data/outbox.ts';
 import { ensureInboxStores } from '#lib/platform/data/inbox.ts';
@@ -279,13 +280,13 @@ export async function exportMomentsBackup(): Promise<string> {
       snapshots = (event.target as IDBRequest<unknown[]>).result;
     };
   }));
-  return JSON.stringify({
-    format: 'modu-career-evidence-local', version: 3,
-    exportedAt: new Date().toISOString(), ...snapshot
-  }, null, 2);
+  // Backups are recovery artifacts: reject orphaned references, future revisions,
+  // or duplicate version numbers before offering a downloadable success file.
+  const checked = verifyCareerState(snapshot.moments, snapshot.outputs, snapshot.snapshots);
+  return JSON.stringify(checked, null, 2);
 }
 
-/** Explicit local export until the feature joins Modu global backup/sync (M6). */
+/** Manual local export remains available alongside Modu Global Data & Sync. */
 export async function downloadLocalBackup(): Promise<void> {
   if (typeof document === 'undefined') throw new CareerStorageError('Download requires a browser.');
   const content = await exportMomentsBackup();
