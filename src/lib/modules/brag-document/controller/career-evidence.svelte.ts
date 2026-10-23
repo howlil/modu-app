@@ -1,4 +1,4 @@
-import type { CareerMoment, MomentEditInput } from '../core/types.ts';
+import type { CareerMoment, MomentEditInput, Period } from '../core/types.ts';
 import { createMoment, filterMoments } from '../core/moments.ts';
 import { applyMomentEdit, setMomentArchived, toMomentEditInput } from '../core/enrichment.ts';
 import {
@@ -22,6 +22,10 @@ export function createCareerEvidenceController() {
   let evidenceDraft = $state('');
   let query = $state('');
   let showArchived = $state(false);
+  let periodMode = $state<'all' | 'year' | 'month'>('all');
+  let periodYear = $state(new Date().getFullYear());
+  let periodMonth = $state((new Date().getFullYear()) + '-' +
+    String(new Date().getMonth() + 1).padStart(2, '0'));
   let error = $state('');
   let notice = $state('');
   let selectedMomentId = $state<string | null>(null);
@@ -36,8 +40,15 @@ export function createCareerEvidenceController() {
   const recentMoments = $derived(filterMoments(moments, '').slice(0, 3));
   const activeCount = $derived(moments.filter(moment => !moment.archivedAt).length);
   const archivedCount = $derived(moments.filter(moment => moment.archivedAt).length);
+  const selectedPeriod = $derived.by((): Period | undefined => {
+    if (periodMode === 'all') return undefined;
+    if (periodMode === 'year') return Number.isSafeInteger(periodYear) && periodYear >= 1 && periodYear <= 9999
+      ? { kind: 'year', year: periodYear } : undefined;
+    const match = /^(\d{4})-(\d{2})$/.exec(periodMonth);
+    return match ? { kind: 'month', year: Number(match[1]), month: Number(match[2]) } : undefined;
+  });
   const visibleMoments = $derived(
-    filterMoments(moments, query, { includeArchived: true })
+    filterMoments(moments, query, { includeArchived: true, period: selectedPeriod })
       .filter(moment => Boolean(moment.archivedAt) === showArchived)
   );
   const selectedMoment = $derived(
@@ -274,6 +285,12 @@ export function createCareerEvidenceController() {
     get archivedCount() { return archivedCount; },
     get showArchived() { return showArchived; },
     set showArchived(next: boolean) { if (!selectedMomentId) showArchived = next; },
+    get periodMode() { return periodMode; },
+    set periodMode(next: 'all' | 'year' | 'month') { periodMode = next; },
+    get periodYear() { return periodYear; },
+    set periodYear(next: number) { periodYear = next; },
+    get periodMonth() { return periodMonth; },
+    set periodMonth(next: string) { periodMonth = next; },
     get selectedMoment() { return selectedMoment; },
     get selectedMomentId() { return selectedMomentId; },
     get editDraft() { return editDraft; },
