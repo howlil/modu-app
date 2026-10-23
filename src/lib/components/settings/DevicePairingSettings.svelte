@@ -209,12 +209,12 @@
     });
   }
   async function disconnectLocalSync() {
-    if (!identity || identity.status !== "paired") return;
+    const previous = identity;
+    if (!previous || previous.status !== "paired") return;
     if (!window.confirm(
       "Disconnect this browser from its sync space? Local data stays here, but the old cloud space and other devices are NOT deleted. Export a global backup first. You can create a NEW sync space afterward."
     )) return;
     await action(async () => {
-      const previous = identity;
       if (!navigator.locks?.request) throw new Error("Web Locks are required for safe disconnection.");
       await navigator.locks.request("modu-global-restore", { mode: "exclusive" }, async () => {
         const persisted = await readDeviceIdentity();
