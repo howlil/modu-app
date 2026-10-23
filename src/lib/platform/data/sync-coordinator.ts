@@ -1,5 +1,6 @@
 import { globalDataPorts } from "./registry.ts";
 import { pairedTransport } from "./pairing-client.ts";
+import { takeSizeBoundedSyncBatch } from "./sync-transport.ts";
 import type { StoredDeviceIdentity } from "./device-identity.ts";
 
 export interface SyncProgress {
@@ -36,7 +37,8 @@ export async function syncNow(
       for (let batch = 0; batch < 100; batch++) {
         const pending = await module.readPendingSyncOperations(30);
         if (pending.length === 0) break;
-        const accepted = await transport.push(pending);
+        const bounded = takeSizeBoundedSyncBatch(pending);
+        const accepted = await transport.push(bounded);
         // SyncTransport validates exact ID/sequence correspondence before returning.
         await module.acknowledgeSyncOperations(accepted.accepted.map(row => row.operationId));
         progress.pushed += accepted.accepted.length;
