@@ -122,27 +122,27 @@ async function startCareerCapture(deviceId: string, explicitNewPairing: boolean)
         }
         const request = meta.get('capture');
         request.onsuccess = () => {
-        const current: unknown = request.result;
-        if (current !== undefined) {
-          if (current && typeof current === 'object' &&
-              (current as { enabled?: unknown }).enabled === true &&
-              (current as { deviceId?: unknown }).deviceId === deviceId) {
-            finish(undefined); // already enrolled, no duplicate baseline
+          const current: unknown = request.result;
+          if (current !== undefined) {
+            if (current && typeof current === 'object' &&
+                (current as { enabled?: unknown }).enabled === true &&
+                (current as { deviceId?: unknown }).deviceId === deviceId) {
+              finish(undefined); // already enrolled, no duplicate baseline
+              return;
+            }
+            fail(new Error('Career Evidence sync capture belongs to another device or is corrupt.'));
             return;
           }
-          fail(new Error('Career Evidence sync capture belongs to another device or is corrupt.'));
-          return;
-        }
-        allRecords(tx, (moments, outputs, snapshots) => {
-          const baseline = verifyCareerState(moments, outputs, snapshots);
-          if (new TextEncoder().encode(JSON.stringify(baseline)).byteLength > 185_000) {
-            fail(new Error('Career Evidence history exceeds the initial sync baseline limit. Export a backup first.'));
-            return;
-          }
-          initializeCaptureWithBaseline(tx, moduleId, deviceId, baseline);
-          if (explicitNewPairing) meta.delete(RECONCILIATION_KEY);
-          finish(undefined);
-        }, fail);
+          allRecords(tx, (moments, outputs, snapshots) => {
+            const baseline = verifyCareerState(moments, outputs, snapshots);
+            if (new TextEncoder().encode(JSON.stringify(baseline)).byteLength > 185_000) {
+              fail(new Error('Career Evidence history exceeds the initial sync baseline limit. Export a backup first.'));
+              return;
+            }
+            initializeCaptureWithBaseline(tx, moduleId, deviceId, baseline);
+            if (explicitNewPairing) meta.delete(RECONCILIATION_KEY);
+            finish(undefined);
+          }, fail);
         };
       };
     });
