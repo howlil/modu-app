@@ -18,7 +18,7 @@
   let targetRole = $state(initial?.targetRole ?? '');
   let organization = $state(initial?.organization ?? '');
   let periodMode = $state<Period['kind']>(initial?.period.kind ?? 'all-time');
-  let year = $state(initial?.period.kind !== 'all-time' ? String(initial.period.year) : String(new Date().getFullYear()));
+  let year = $state(initial && initial.period.kind !== 'all-time' ? String(initial.period.year) : String(new Date().getFullYear()));
   let month = $state(initial?.period.kind === 'month'
     ? String(initial.period.year) + '-' + String(initial.period.month).padStart(2, '0')
     : String(new Date().getFullYear()) + '-' + String(new Date().getMonth() + 1).padStart(2, '0'));
