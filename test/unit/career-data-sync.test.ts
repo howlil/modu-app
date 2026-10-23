@@ -68,6 +68,8 @@ describe('Career Evidence global data port', () => {
     await addMoment(source);
     await addOutput(toggleOutputMoment(createOutput(goal, 'shared-output', at), source));
     await careerDataPort.beginSyncCapture('owner_device_A');
+    await careerDataPort.beginSyncCapture('owner_device_A'); // pairing resume is idempotent
+    expect((await careerDataPort.readPendingSyncOperations()).length).toBe(1);
     await push();
     expect(journal.map(op => op.kind)).toEqual(['baseline']);
     await careerDataPort.applyRemoteChanges(journal);
