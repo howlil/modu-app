@@ -59,6 +59,41 @@ function makePorts() {
 }
 
 describe("recoverable Modu global restore", () => {
+  it("previews legacy three-module restores without silently retaining Career Evidence", async () => {
+    const { ports } = makePorts();
+    const legacy = await createGlobalBackup(ports);
+    let career = 7;
+    const newModule: RestorableDataPort = {
+      moduleId: "brag-document", backupVersion: 3,
+      emptyBackupForLegacyRestore: () => ({ value: 0 }),
+      async inspect() {
+        return { moduleId: "brag-document", backupVersion: 3,
+          recordCount: career, state: "ready" as const };
+      },
+      async exportBackup() { return { value: career }; },
+      async validateBackup(raw) {
+        if (!raw || typeof raw !== "object" || !("value" in raw) ||
+          typeof raw.value !== "number") throw new Error("Invalid Career Evidence.");
+        return { moduleId: "brag-document", recordCount: raw.value, warnings: [] };
+      },
+      async restoreBackup(raw) {
+        await this.validateBackup(raw);
+        career = (raw as { value: number }).value;
+      }
+    };
+    const upgradedPorts = [...ports, newModule];
+    const prepared = await prepareGlobalRestore(JSON.stringify(legacy), upgradedPorts);
+    expect(prepared.preview.find(x => x.moduleId === "brag-document")?.warnings.join(" "))
+      .toMatch(/clear its current data/);
+    expect(career).toBe(7);
+    await commitGlobalRestore(prepared, upgradedPorts);
+    expect(career).toBe(0);
+    const corrupt = JSON.parse(JSON.stringify(legacy));
+    corrupt.modules["unknown-feature"] = { backupVersion: 1, data: {} };
+    await expect(prepareGlobalRestore(JSON.stringify(corrupt), upgradedPorts))
+      .rejects.toThrow("unrecognized");
+  });
+
   it("rejects malformed module snapshots before any writes", async () => {
     const { values, ports } = makePorts();
     const envelope = await createGlobalBackup(ports);
