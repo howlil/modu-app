@@ -42,15 +42,12 @@ export function decodeCareerBackup(raw: unknown): CareerBackup {
   const sourceById = new Map(moments.map(item => [item.id, item]));
   for (const output of outputs) assertOutputReferences(output, moments);
   const docById = new Map(outputs.map(item => [item.id, item]));
-  const versions = new Set<string>();
   for (const snapshot of snapshots) {
     const parent = docById.get(snapshot.outputId);
     if (!parent || snapshot.outputRevision > parent.revision) {
       throw new CareerValidationError('Finalized version references an unavailable document revision.');
     }
-    const key = snapshot.outputId + ':' + snapshot.version;
-    if (versions.has(key)) throw new CareerValidationError('Duplicate finalized document version.');
-    versions.add(key);
+    // Version is a device-local ordinal. UUID is the immutable global identity.
     for (const section of snapshot.sections) {
       if (!sourceById.has(section.momentId)) {
         throw new CareerValidationError('Finalized version references a missing career moment.');
