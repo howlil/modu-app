@@ -140,7 +140,10 @@ export async function downloadLocalBackup(): Promise<void> {
     document.body.appendChild(link);
     link.click();
     link.remove();
-  } finally { URL.revokeObjectURL(url); }
+  } finally {
+    // Browsers may consume the object URL after the click task finishes.
+    window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+  }
 }
 
 export function subscribeMomentChanges(listener: () => void): () => void {
