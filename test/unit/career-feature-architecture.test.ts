@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 
 const ROOT = fileURLToPath(new URL('../../src/lib/modules/brag-document/', import.meta.url));
 const source = (path: string) => readFileSync(join(ROOT, path), 'utf8');
