@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { IDBFactory } from 'fake-indexeddb';
 import { careerDataPort } from '../../src/lib/modules/brag-document/adapters/data-port.ts';
 import {
@@ -12,7 +12,7 @@ import type { SequencedSyncOperation } from '../../src/lib/platform/data/sync-pr
 import { SYNC_META_STORE } from '../../src/lib/platform/data/outbox.ts';
 
 const at = new Date('2026-10-24T09:00:00Z');
-const browser = [new IDBFactory(), new IDBFactory()] as const;
+let browser = [new IDBFactory(), new IDBFactory()] as const;
 const useBrowser = (id: 0 | 1) => vi.stubGlobal('indexedDB', browser[id]);
 const m = (id: string) => createMoment({ note: 'Shipped ' + id },
   id, at, 'link-' + id);
@@ -30,6 +30,10 @@ async function push(): Promise<void> {
   }
   await careerDataPort.acknowledgeSyncOperations(pending.map(op => op.operationId));
 }
+beforeEach(() => {
+  browser = [new IDBFactory(), new IDBFactory()];
+  journal.length = 0;
+});
 afterEach(() => vi.unstubAllGlobals());
 
 describe('Career Evidence global data port', () => {
