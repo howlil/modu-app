@@ -34,7 +34,8 @@ describe('Career document IndexedDB persistence', () => {
     expect((await loadOutputs())[0]?.items[0]?.narrative).toBe('I isolated the failure');
     expect((await loadMoments())[0]?.note).toBe(source.note);
     const backup = JSON.parse(await exportMomentsBackup());
-    expect(backup.version).toBe(2);
+    expect(backup.version).toBe(3);
+    expect(backup.snapshots).toEqual([]);
     expect(backup.moments).toEqual([source]);
     expect(backup.outputs).toEqual([modified]);
   });
