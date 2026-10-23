@@ -14,7 +14,8 @@
     void controller.reload();
     const unsubscribe = subscribeMomentChanges(() => { void controller.reload(); });
     const beforeUnload = (event: BeforeUnloadEvent) => {
-      if (!controller.isDirty && !controller.isOutputDirty) return;
+      if (!controller.isDirty && !controller.isOutputDirty &&
+          !controller.noteDraft.trim() && !controller.evidenceDraft.trim()) return;
       event.preventDefault();
       event.returnValue = '';
     };
@@ -70,7 +71,7 @@
       {/if}
       <p class="mt-8 border-t border-border pt-4 text-meta text-muted-foreground">
         Career Evidence stays on this browser until you enable Data & Sync pairing.
-        use History → Export backup to keep a separate copy of moments, documents, and finalized versions.
+        Use History → Export backup to keep a separate copy of moments, documents, and finalized versions.
       </p>
     {/if}
   </div>
