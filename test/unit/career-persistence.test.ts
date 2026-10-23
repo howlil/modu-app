@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { IDBFactory } from 'fake-indexeddb';
+import { applyMomentEdit, setMomentArchived, toMomentEditInput } from '../../src/lib/modules/brag-document/core/enrichment.ts';
 import { createMoment } from '../../src/lib/modules/brag-document/core/moments.ts';
 import {
   addMoment, loadMoments, replaceMoment, exportMomentsBackup
@@ -32,5 +33,44 @@ describe('Career Evidence IndexedDB', () => {
     await replaceMoment({ ...moment, note: 'After', revision: 2 }, 1);
     await expect(replaceMoment({ ...moment, note: 'Stale', revision: 2 }, 1)).rejects.toThrow();
     expect((await loadMoments())[0]?.note).toBe('After');
+  });
+  it('commits a progressive edit, archive and restore without losing the original note', async () => {
+    const original = createMoment({ note: 'Investigated route selection' }, 'id-4',
+      new Date('2026-10-23T12:00:00Z'), 'link-4');
+    await addMoment(original);
+    const draft = toMomentEditInput(original);
+    draft.project = 'SOPFlow';
+    draft.problem = 'Branches can overlap';
+    draft.contribution = 'Investigated a graph routing approach';
+    draft.outcome = 'Defined the routing test cases';
+    draft.verification = 'observed';
+    draft.evidenceUrls = 'https://github.com/example/issues/23';
+    const enriched = applyMomentEdit(original, draft, new Date('2026-10-24T12:00:00Z'), () => 'e-4');
+    await replaceMoment(enriched, 1);
+    expect(await loadMoments()).toEqual([enriched]);
+    const archived = setMomentArchived(enriched, true, new Date('2026-10-25T12:00:00Z'));
+    await replaceMoment(archived, enriched.revision);
+    expect((await loadMoments())[0]?.archivedAt).not.toBeNull();
+    const restored = setMomentArchived(archived, false, new Date('2026-10-26T12:00:00Z'));
+    await replaceMoment(restored, archived.revision);
+    expect((await loadMoments())[0]).toEqual(restored);
+    expect(restored.contribution).toBe('Investigated a graph routing approach');
+  });
+
+  it('prevents a stale second-tab archive from overwriting newer edits', async () => {
+    const initial = createMoment({ note: 'Base' }, 'id-5',
+      new Date('2026-10-23T12:00:00Z'), 'link-5');
+    await addMoment(initial);
+    const updated = { ...initial, note: 'Newer change', revision: 2 };
+    await replaceMoment(updated, 1);
+    const staleArchive = setMomentArchived(initial, true, new Date('2026-10-24T12:00:00Z'));
+    await expect(replaceMoment(staleArchive, 1)).rejects.toThrow();
+    expect((await loadMoments())[0]?.note).toBe('Newer change');
+    expect((await loadMoments())[0]?.archivedAt).toBeNull();
+  });
+
+  it('fails safely when browser storage is unavailable', async () => {
+    vi.stubGlobal('indexedDB', undefined);
+    await expect(loadMoments()).rejects.toThrow('unavailable');
   });
 });
