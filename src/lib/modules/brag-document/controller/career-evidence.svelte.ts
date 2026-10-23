@@ -125,6 +125,7 @@ export function createCareerEvidenceController() {
       return;
     }
     clearEditor();
+    if (next !== 'documents') selectedSnapshotId = null;
     view = next;
     notice = '';
     error = '';
