@@ -51,7 +51,13 @@ async function until(label, expression, timeout = 16000) {
     } catch { /* still loading */ }
     await sleep(150);
   }
-  throw new Error("Timed out: " + label);
+  const debug = await js(`return JSON.stringify({
+    headings:[...document.querySelectorAll("h1,h2,h3")].map(e=>e.textContent.trim()).slice(-12),
+    content:document.body.innerText.slice(-3200),
+    checkboxes:document.querySelectorAll('input[type="checkbox"]').length,
+    sections:[...document.querySelectorAll("section[aria-label]")].map(e=>e.getAttribute("aria-label"))
+  });`).catch(cause => String(cause));
+  throw new Error("Timed out: " + label + " | " + debug);
 }
 
 async function clickButton(name) {
