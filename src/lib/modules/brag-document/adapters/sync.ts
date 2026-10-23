@@ -10,7 +10,7 @@ import {
 import { decodeMoment } from '../core/moments.ts';
 import { decodeOutput } from '../core/outputs.ts';
 import { decodeFinalizedSnapshot } from '../core/snapshots.ts';
-import { decodeCareerBackup, verifyCareerState, type CareerBackup } from '../core/backup.ts';
+import { decodeCareerBackup, verifyCareerState } from '../core/backup.ts';
 import {
   openCareerDatabase, notifyCareerChange, CAREER_MOMENTS_STORE as MOMENTS,
   CAREER_OUTPUTS_STORE as OUTPUTS, CAREER_SNAPSHOTS_STORE as SNAPSHOTS
@@ -96,11 +96,29 @@ export async function beginCareerSyncCapture(deviceId: string): Promise<void> {
   const db = await openCareerDatabase();
   try {
     await transaction(db, syncStores, 'readwrite', (tx, finish, fail) => {
-      allRecords(tx, (moments, outputs, snapshots) => {
-        initializeCaptureWithBaseline(tx, moduleId, deviceId,
-          { ...verifyCareerState(moments, outputs, snapshots) });
-        finish(undefined);
-      }, fail);
+      const request = tx.objectStore(SYNC_META_STORE).get('capture');
+      request.onsuccess = () => {
+        const current: unknown = request.result;
+        if (current !== undefined) {
+          if (current && typeof current === 'object' &&
+              (current as { enabled?: unknown }).enabled === true &&
+              (current as { deviceId?: unknown }).deviceId === deviceId) {
+            finish(undefined); // already enrolled, no duplicate baseline
+            return;
+          }
+          fail(new Error('Career Evidence sync capture belongs to another device or is corrupt.'));
+          return;
+        }
+        allRecords(tx, (moments, outputs, snapshots) => {
+          const baseline = verifyCareerState(moments, outputs, snapshots);
+          if (new TextEncoder().encode(JSON.stringify(baseline)).byteLength > 185_000) {
+            fail(new Error('Career Evidence history exceeds the initial sync baseline limit. Export a backup first.'));
+            return;
+          }
+          initializeCaptureWithBaseline(tx, moduleId, deviceId, baseline);
+          finish(undefined);
+        }, fail);
+      };
     });
   } finally { db.close(); }
 }
