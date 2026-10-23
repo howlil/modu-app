@@ -1,9 +1,11 @@
 import { decodeMoment } from '../core/moments.ts';
-import type { CareerMoment } from '../core/types.ts';
+import { decodeOutput } from '../core/outputs.ts';
+import type { CareerMoment, CareerOutput } from '../core/types.ts';
 
 const DATABASE = 'modu-career-evidence';
-const VERSION = 1;
+const VERSION = 2;
 const STORE = 'moments';
+const OUTPUTS = 'outputs';
 const EVENT = 'modu:career-evidence-changed';
 const CHANNEL = 'modu-career-evidence-changes';
 
@@ -23,6 +25,10 @@ function openDatabase(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(STORE)) {
         const store = db.createObjectStore(STORE, { keyPath: 'id' });
         store.createIndex('occurredOn', 'occurredOn');
+      }
+      if (!db.objectStoreNames.contains(OUTPUTS)) {
+        const store = db.createObjectStore(OUTPUTS, { keyPath: 'id' });
+        store.createIndex('updatedAt', 'updatedAt');
       }
     };
     request.onsuccess = () => {
@@ -47,17 +53,18 @@ async function withDatabase<T>(run: (db: IDBDatabase) => Promise<T>): Promise<T>
 function committedRequest<T>(
   db: IDBDatabase,
   mode: IDBTransactionMode,
-  request: (store: IDBObjectStore) => IDBRequest<T>
+  request: (store: IDBObjectStore) => IDBRequest<T>,
+  storeName: typeof STORE | typeof OUTPUTS = STORE
 ): Promise<T> {
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE, mode);
+    const tx = db.transaction(storeName, mode);
     let result: T;
     tx.oncomplete = () => resolve(result);
     tx.onabort = () => reject(new CareerStorageError(
       tx.error?.message || 'Career Evidence storage transaction failed.'
     ));
     try {
-      const op = request(tx.objectStore(STORE));
+      const op = request(tx.objectStore(storeName));
       op.onsuccess = () => { result = op.result; };
     } catch (error) {
       try { tx.abort(); } catch { /* tx may already have completed */ }
@@ -120,11 +127,76 @@ export async function replaceMoment(next: CareerMoment, expectedRevision: number
   notifyCommittedChange();
 }
 
+/** Output records share the existing IndexedDB database, never a second isolated storage. */
+export async function loadOutputs(): Promise<CareerOutput[]> {
+  return withDatabase(async db => {
+    const raw = await committedRequest<unknown[]>(db, 'readonly',
+      store => store.getAll(), OUTPUTS);
+    const outputs = raw.map(decodeOutput);
+    if (new Set(outputs.map(item => item.id)).size !== outputs.length)
+      throw new CareerStorageError('Duplicate saved document IDs.');
+    return outputs.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  });
+}
+
+export async function addOutput(output: CareerOutput): Promise<void> {
+  const valid = decodeOutput(output);
+  await withDatabase(db => committedRequest(db, 'readwrite',
+    store => store.add(valid), OUTPUTS));
+  notifyCommittedChange();
+}
+
+/** Atomic compare-and-swap inside a single readwrite transaction prevents lost updates. */
+export async function replaceOutput(next: CareerOutput, expectedRevision: number): Promise<void> {
+  const valid = decodeOutput(next);
+  await withDatabase(db => new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(OUTPUTS, 'readwrite');
+    const store = tx.objectStore(OUTPUTS);
+    let failure: Error | null = null;
+    tx.oncomplete = () => resolve();
+    tx.onabort = () => reject(failure ?? new CareerStorageError('Unable to save career document.'));
+    const query = store.get(valid.id);
+    query.onsuccess = () => {
+      try {
+        if (!query.result) throw new CareerStorageError('Document no longer exists.');
+        const current = decodeOutput(query.result);
+        if (current.revision !== expectedRevision ||
+          valid.revision !== expectedRevision + 1) {
+          throw new CareerStorageError('Document changed in another tab. Reload before editing.');
+        }
+        store.put(valid);
+      } catch (error) {
+        failure = error instanceof Error ? error : new CareerStorageError('Unable to save document.');
+        tx.abort();
+      }
+    };
+  }));
+  notifyCommittedChange();
+}
+
+/** Backup both stores from the same readonly IDB transaction to avoid split snapshots. */
 export async function exportMomentsBackup(): Promise<string> {
-  const moments = await loadMoments();
+  const snapshot = await withDatabase(db => new Promise<{
+    moments: CareerMoment[]; outputs: CareerOutput[];
+  }>((resolve, reject) => {
+    const tx = db.transaction([STORE, OUTPUTS], 'readonly');
+    let moments: unknown[] = [], outputs: unknown[] = [];
+    tx.onabort = () => reject(new CareerStorageError('Unable to read backup data.'));
+    tx.oncomplete = () => {
+      try {
+        resolve({ moments: moments.map(decodeMoment), outputs: outputs.map(decodeOutput) });
+      } catch (error) { reject(error); }
+    };
+    tx.objectStore(STORE).getAll().onsuccess = event => {
+      moments = (event.target as IDBRequest<unknown[]>).result;
+    };
+    tx.objectStore(OUTPUTS).getAll().onsuccess = event => {
+      outputs = (event.target as IDBRequest<unknown[]>).result;
+    };
+  }));
   return JSON.stringify({
-    format: 'modu-career-evidence-local',
-    version: 1, exportedAt: new Date().toISOString(), moments
+    format: 'modu-career-evidence-local', version: 2,
+    exportedAt: new Date().toISOString(), ...snapshot
   }, null, 2);
 }
 
