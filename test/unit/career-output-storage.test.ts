@@ -3,7 +3,7 @@ import { IDBFactory } from 'fake-indexeddb';
 import { createMoment } from '../../src/lib/modules/brag-document/core/moments.ts';
 import { createOutput, toggleOutputMoment } from '../../src/lib/modules/brag-document/core/outputs.ts';
 import {
-  addMoment, addOutput, exportMomentsBackup, loadMoments, loadOutputs, replaceOutput
+  addMoment, addOutput, exportMomentsBackup, loadMoments, loadOutputs, openCareerDatabase, replaceOutput
 } from '../../src/lib/modules/brag-document/adapters/persistence.ts';
 
 beforeEach(() => vi.stubGlobal('indexedDB', new IDBFactory()));
@@ -48,6 +48,22 @@ describe('Career document IndexedDB persistence', () => {
     await replaceOutput(updated, 1);
     await expect(replaceOutput({ ...output, title: 'Stale title', revision: 2 }, 1)).rejects.toThrow();
     expect((await loadOutputs())[0]?.title).toBe('Revised title');
+  });
+
+  it('refuses to export orphaned references as a valid recovery backup', async () => {
+    const source = createMoment({ note: 'Reference no longer available' },
+      'missing-source', at, 'missing-evidence');
+    const orphanedOutput = toggleOutputMoment(createOutput(goal, 'orphaned-document', at), source);
+    await loadOutputs(); // create current database stores
+    const db = await openCareerDatabase();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction('outputs', 'readwrite');
+      tx.objectStore('outputs').put(orphanedOutput);
+      tx.oncomplete = () => resolve();
+      tx.onabort = () => reject(tx.error);
+    });
+    db.close();
+    await expect(exportMomentsBackup()).rejects.toThrow('references');
   });
 
   it('upgrades the prior M2/M3 database without deleting existing moments', async () => {
