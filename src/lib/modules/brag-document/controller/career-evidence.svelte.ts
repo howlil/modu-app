@@ -288,9 +288,13 @@ export function createCareerEvidenceController() {
     get periodMode() { return periodMode; },
     set periodMode(next: 'all' | 'year' | 'month') { periodMode = next; },
     get periodYear() { return periodYear; },
-    set periodYear(next: number) { periodYear = next; },
+    set periodYear(next: number) {
+      if (Number.isSafeInteger(next) && next >= 1 && next <= 9999) periodYear = next;
+    },
     get periodMonth() { return periodMonth; },
-    set periodMonth(next: string) { periodMonth = next; },
+    set periodMonth(next: string) {
+      if (/^\d{4}-(0[1-9]|1[0-2])$/.test(next)) periodMonth = next;
+    },
     get selectedMoment() { return selectedMoment; },
     get selectedMomentId() { return selectedMomentId; },
     get editDraft() { return editDraft; },
