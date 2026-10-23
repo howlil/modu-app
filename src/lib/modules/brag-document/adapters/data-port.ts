@@ -33,6 +33,7 @@ export const careerDataPort: SyncOutboxPort = {
   },
   restoreBackup: replaceCareerBackupForRestore,
   beginSyncCapture: beginCareerSyncCapture,
+  resumeSyncCapture: beginCareerSyncCapture,
   beginRemoteSyncCapture: beginCareerRemoteCapture,
   readRemoteCursor: readCareerRemoteCursor,
   applyRemoteChanges: applyCareerRemoteChanges,
