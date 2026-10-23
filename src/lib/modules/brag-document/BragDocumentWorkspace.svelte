@@ -70,7 +70,7 @@
       {/if}
       <p class="mt-8 border-t border-border pt-4 text-meta text-muted-foreground">
         Saved in this browser only. Career Evidence is not yet included in Modu global backup or sync;
-        use History → Export backup to keep a separate copy of moments and documents.
+        use History → Export backup to keep a separate copy of moments, documents, and finalized versions.
       </p>
     {/if}
   </div>
