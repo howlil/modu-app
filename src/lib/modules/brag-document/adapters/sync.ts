@@ -240,9 +240,9 @@ function applyCareerOperation(
     req.onsuccess = () => {
       if (req.result.some((value: unknown) => {
         const other = decodeFinalizedSnapshot(value);
-        return other.id === row.id || other.version === row.version;
+        return other.id === row.id;
       })) {
-        fail(new RemoteApplyConflict('Finalized document version collision.')); return;
+        fail(new RemoteApplyConflict('Finalized document snapshot identity collision.')); return;
       }
       const outputReq = tx.objectStore(OUTPUTS).get(row.outputId);
       outputReq.onsuccess = () => {
