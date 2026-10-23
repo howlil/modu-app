@@ -16,6 +16,13 @@ export const modules: ModuleDefinition[] = [
     status: 'available'
   },
   {
+    id: 'brag-document',
+    name: 'Career Evidence',
+    route: '/brag-document',
+    layout: 'focus',
+    status: 'available'
+  },
+  {
     id: 'pomodoro',
     name: 'Pomodoro',
     route: '/pomodoro',
