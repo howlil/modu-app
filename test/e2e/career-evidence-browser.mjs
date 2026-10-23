@@ -125,7 +125,7 @@ async function run() {
   await fill("#career-goal-title", "M7 Backend Interview");
   await fill("#career-goal-role", "Backend Engineer");
   await clickButton("Create document");
-  await until("Output builder", 'Boolean(document.querySelector("section[aria-label=\"Choose career evidence\"] input[type=checkbox]"))');
+  await until("Output builder", 'Boolean(document.querySelector("section[aria-label*=evidence] input[type=checkbox]"))');
   await clickSelector('section[aria-label="Choose career evidence"] input[type=checkbox]');
   await until("Evidence selected", 'document.body.textContent.includes("1 selected")');
   await fill('textarea[id^="output-story-"]',
