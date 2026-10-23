@@ -7,6 +7,7 @@
   import { subscribeMomentChanges } from './adapters/persistence.ts';
   import CaptureView from './components/CaptureView.svelte';
   import HistoryView from './components/HistoryView.svelte';
+  import DocumentsView from './components/DocumentsView.svelte';
 
   const controller = createCareerEvidenceController();
   onMount(() => {
@@ -29,6 +30,10 @@
           class="h-7 flex-none rounded-full px-3 py-0 text-meta font-normal data-[state=active]:font-medium data-[state=active]:shadow-none">
           History
         </Tabs.Trigger>
+        <Tabs.Trigger value="documents"
+          class="h-7 flex-none rounded-full px-3 py-0 text-meta font-normal data-[state=active]:font-medium data-[state=active]:shadow-none">
+          Documents
+        </Tabs.Trigger>
       </Tabs.List>
     </Tabs.Root>
 
@@ -49,12 +54,14 @@
       {/if}
       {#if controller.view === 'capture'}
         <CaptureView {controller} />
-      {:else}
+      {:else if controller.view === 'history'}
         <HistoryView {controller} />
+      {:else}
+        <DocumentsView {controller} />
       {/if}
       <p class="mt-8 border-t border-border pt-4 text-meta text-muted-foreground">
         Saved in this browser only. Career Evidence is not yet included in Modu global backup or sync;
-        use History → Export backup to keep a separate copy.
+        use History → Export backup to keep a separate copy of moments and documents.
       </p>
     {/if}
   </div>
