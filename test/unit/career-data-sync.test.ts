@@ -94,6 +94,51 @@ describe('Career Evidence global data port', () => {
     expect((await careerDataPort.readPendingSyncOperations()).length).toBe(0);
   });
 
+  it('accepts concurrent finalized copies sharing one device-local ordinal', async () => {
+    useBrowser(0);
+    const moment = m('shared');
+    await addMoment(moment);
+    await addOutput(toggleOutputMoment(createOutput(goal, 'shared-output', at), moment));
+    await careerDataPort.beginSyncCapture('owner_device_A');
+    await push(); // baseline = seq 1
+    await careerDataPort.applyRemoteChanges(journal);
+    useBrowser(1);
+    await careerDataPort.applyRemoteChanges(journal);
+    await careerDataPort.beginRemoteSyncCapture('joined_device_B');
+
+    // Both devices independently finalize version 1 without seeing the other's snapshot.
+    await finalizeSavedOutput('shared-output', 1, 'snap-device-b', at);
+    await push(); // seq 2
+    useBrowser(0);
+    await finalizeSavedOutput('shared-output', 1, 'snap-device-a', at);
+    await push(); // seq 3
+
+    await careerDataPort.applyRemoteChanges(journal.slice(1));
+    expect((await loadFinalizedSnapshots()).map(s => s.id).sort())
+      .toEqual(['snap-device-a', 'snap-device-b']);
+    useBrowser(1);
+    await careerDataPort.applyRemoteChanges(journal.slice(1));
+    expect((await loadFinalizedSnapshots()).map(s => s.id).sort())
+      .toEqual(['snap-device-a', 'snap-device-b']);
+    expect((await loadFinalizedSnapshots()).map(s => s.version)).toEqual([1, 1]);
+  });
+
+  it('prevents automatic sync after restoring paired data until new pairing', async () => {
+    useBrowser(0);
+    await addMoment(m('before-restore'));
+    await careerDataPort.beginSyncCapture('owner_device_A');
+    await careerDataPort.restoreBackup({
+      ...emptyCareerBackup(), moments: [m('from-backup')]
+    });
+    expect((await loadMoments()).map(item => item.id)).toEqual(['from-backup']);
+    await expect(careerDataPort.resumeSyncCapture!('owner_device_A'))
+      .rejects.toThrow('requires a new pairing');
+    // Only the explicit new-owner pairing entrypoint can establish a new generation.
+    await careerDataPort.beginSyncCapture('new_owner_device_C');
+    expect((await careerDataPort.readPendingSyncOperations()).map(op => op.kind))
+      .toEqual(['baseline']);
+  });
+
   it('rejects corrupted remote events without advancing the cursor', async () => {
     useBrowser(0);
     const before = await careerDataPort.readRemoteCursor();
