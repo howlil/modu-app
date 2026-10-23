@@ -27,15 +27,31 @@ function decodedEnvelope(raw: unknown, ports: readonly RestorableDataPort[]): Gl
       typeof backup.exportedAt !== "string" || !Number.isFinite(Date.parse(backup.exportedAt))) {
     throw new Error("Unsupported Modu global backup.");
   }
-  const modules = backup.modules as Record<string, unknown>;
-  const names = Object.keys(modules);
-  if (names.length !== ports.length || new Set(ports.map(p => p.moduleId)).size !== ports.length) {
-    throw new Error("Backup module set does not match installed modules.");
+  const original = backup.modules as Record<string, unknown>;
+  const names = Object.keys(original);
+  if (new Set(ports.map(p => p.moduleId)).size !== ports.length) {
+    throw new Error("Installed backup module registry is invalid.");
   }
   for (const key of names) {
     if (!ports.some(port => port.moduleId === key)) {
       throw new Error("Backup contains an unrecognized module: " + key);
     }
+  }
+  // A legacy backup can omit only explicitly new, opt-in modules. Never
+  // synthesize arbitrary missing modules or silently accept unknown records.
+  const modules = { ...original };
+  for (const port of ports) {
+    if (Object.hasOwn(modules, port.moduleId)) continue;
+    if (!port.emptyBackupForLegacyRestore) {
+      throw new Error("Backup is missing " + port.moduleId);
+    }
+    modules[port.moduleId] = {
+      backupVersion: port.backupVersion,
+      data: port.emptyBackupForLegacyRestore()
+    };
+  }
+  if (Object.keys(modules).length !== ports.length) {
+    throw new Error("Backup module set does not match installed modules.");
   }
   for (const port of ports) {
     const entry = modules[port.moduleId];
@@ -47,7 +63,7 @@ function decodedEnvelope(raw: unknown, ports: readonly RestorableDataPort[]): Gl
       throw new Error("Incompatible backup version for " + port.moduleId);
     }
   }
-  return backup as GlobalBackupV1;
+  return { ...(backup as GlobalBackupV1), modules: modules as GlobalBackupV1['modules'] };
 }
 
 export async function prepareGlobalRestore(
@@ -59,8 +75,15 @@ export async function prepareGlobalRestore(
   catch { throw new Error("Backup file contains invalid JSON."); }
   const backup = decodedEnvelope(parsed, ports);
   const preview: RestorePreview[] = [];
+  const source = parsed as { modules: Record<string, unknown> };
   for (const port of ports) {
-    preview.push(await port.validateBackup(backup.modules[port.moduleId]!.data));
+    const result = await port.validateBackup(backup.modules[port.moduleId]!.data);
+    if (!Object.hasOwn(source.modules, port.moduleId)) {
+      result.warnings.push(
+        port.moduleId + " did not exist in this older backup. Restoring will clear its current data."
+      );
+    }
+    preview.push(result);
   }
   return { backup, preview };
 }
