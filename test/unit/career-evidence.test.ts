@@ -39,7 +39,7 @@ describe('Career Evidence domain', () => {
     const base = (id: string): CareerOutput => ({
       id, kind: 'interview', title: 'Interview', targetRole: 'Backend Engineer',
       organization: null, period: { kind: 'all-time' },
-      items: [], createdAt: at.toISOString(), updatedAt: at.toISOString()
+      items: [], revision: 1, createdAt: at.toISOString(), updatedAt: at.toISOString()
     });
     const first = setOutputNarrative(selectMomentForOutput(base('a'), source), source.id, 'Backend story');
     const second = setOutputNarrative(selectMomentForOutput(base('b'), source), source.id, 'Cloud story');
