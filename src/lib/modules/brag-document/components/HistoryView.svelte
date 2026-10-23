@@ -69,6 +69,28 @@
         disabled={!controller.storageReady} />
     </div>
 
+    <div class="mb-5 flex flex-wrap items-center gap-2">
+      <label for="career-period-mode" class="text-meta text-muted-foreground">Date</label>
+      <select id="career-period-mode" class="h-9 rounded-md border border-input bg-card px-3 text-ui outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
+        value={controller.periodMode}
+        onchange={(event) => controller.periodMode = event.currentTarget.value as 'all' | 'year' | 'month'}>
+        <option value="all">All time</option>
+        <option value="year">Year</option>
+        <option value="month">Month</option>
+      </select>
+      {#if controller.periodMode === 'year'}
+        <label for="career-filter-year" class="sr-only">Filter by year</label>
+        <Input id="career-filter-year" type="number" min="1" max="9999"
+          class="w-28" value={String(controller.periodYear)}
+          oninput={(event) => controller.periodYear = Number(event.currentTarget.value)} />
+      {:else if controller.periodMode === 'month'}
+        <label for="career-filter-month" class="sr-only">Filter by month</label>
+        <Input id="career-filter-month" type="month" class="w-44"
+          value={controller.periodMonth}
+          oninput={(event) => controller.periodMonth = event.currentTarget.value} />
+      {/if}
+    </div>
+
     {#if controller.moments.length === 0}
       <div class="rounded-xl border border-dashed border-border px-5 py-10 text-center">
         <p class="text-ui font-medium">No moments yet.</p>
@@ -78,12 +100,12 @@
     {:else if controller.visibleMoments.length === 0}
       <div class="rounded-xl border border-dashed border-border px-5 py-10 text-center">
         <p class="text-ui font-medium">
-          {controller.query.trim()
-            ? 'No moments match your search.'
+          {controller.query.trim() || controller.periodMode !== 'all'
+            ? 'No moments match these filters.'
             : controller.showArchived ? 'No archived moments.' : 'No active moments.'}
         </p>
         <p class="mt-1 text-meta text-muted-foreground">
-          {controller.query.trim() ? 'Try a different search.' : 'Your previous work is still available in the other view.'}
+          {controller.query.trim() || controller.periodMode !== 'all' ? 'Try another search or period.' : 'Your previous work is still available in the other view.'}
         </p>
       </div>
     {:else}
