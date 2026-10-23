@@ -54,7 +54,16 @@ export function decodeOutput(value: unknown): CareerOutput {
   });
   return {
     id: value.id, kind: value.kind as CareerOutput['kind'], title,
-    targetRole, organization, period: value.period as Period,
+    targetRole, organization,
+    // A Svelte $state draft is a Proxy. Never return nested ingress objects:
+    // IndexedDB structured cloning rejects Proxy instances even when valid.
+    period: (value.period as Period).kind === 'all-time'
+      ? { kind: 'all-time' }
+      : (value.period as Period).kind === 'year'
+        ? { kind: 'year', year: (value.period as Extract<Period, { kind: 'year' }>).year }
+        : { kind: 'month',
+          year: (value.period as Extract<Period, { kind: 'month' }>).year,
+          month: (value.period as Extract<Period, { kind: 'month' }>).month },
     items, revision: value.revision as number,
     createdAt: value.createdAt, updatedAt: value.updatedAt
   };
