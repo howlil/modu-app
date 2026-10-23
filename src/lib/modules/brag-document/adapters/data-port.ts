@@ -1,5 +1,5 @@
 import type { SyncOutboxPort } from '#lib/platform/data/contracts.ts';
-import { decodeCareerBackup } from '../core/backup.ts';
+import { decodeCareerBackup, emptyCareerBackup } from '../core/backup.ts';
 import { exportMomentsBackup } from './persistence.ts';
 import {
   acknowledgeCareerSyncOperations, applyCareerRemoteChanges,
@@ -13,6 +13,7 @@ const snapshot = async () => decodeCareerBackup(JSON.parse(await exportMomentsBa
 export const careerDataPort: SyncOutboxPort = {
   moduleId: 'brag-document',
   backupVersion: 3,
+  emptyBackupForLegacyRestore: emptyCareerBackup,
   async inspect() {
     const state = await snapshot();
     const recordCount = state.moments.length + state.outputs.length + state.snapshots.length;
