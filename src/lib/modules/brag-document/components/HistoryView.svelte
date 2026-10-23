@@ -14,6 +14,13 @@
     controller.openMoment(id);
   }
 
+  async function restoreMoment(id: string): Promise<void> {
+    if (await controller.setArchived(id, false)) {
+      await tick();
+      document.getElementById('career-history-heading')?.focus();
+    }
+  }
+
   $effect(() => {
     if (!controller.selectedMomentId && lastOpenedId) {
       const id = lastOpenedId;
@@ -136,7 +143,7 @@
             {#if controller.showArchived}
               <div class="mt-3">
                 <Button size="sm" variant="outline" disabled={controller.busy}
-                  onclick={() => void controller.setArchived(moment.id, false)}>
+                  onclick={() => void restoreMoment(moment.id)}>
                   <ArchiveRestore class="size-4"/> Restore
                 </Button>
               </div>
