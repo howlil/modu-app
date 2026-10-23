@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { Button } from '#lib/components/ui/button/index.js';
   import { Input } from '#lib/components/ui/input/index.js';
   import type { CareerOutput, NewOutputInput, OutputKind, Period } from '../core/types.ts';
@@ -23,6 +24,7 @@
     ? String(initial.period.year) + '-' + String(initial.period.month).padStart(2, '0')
     : String(new Date().getFullYear()) + '-' + String(new Date().getMonth() + 1).padStart(2, '0'));
   let fieldError = $state('');
+  onMount(() => document.getElementById('career-goal-title')?.focus());
 
   function submit(event: SubmitEvent) {
     event.preventDefault();
