@@ -2,7 +2,7 @@ import type { CareerMoment, CareerOutput, MomentEditInput, NewOutputInput, Perio
 import { createMoment, filterMoments } from '../core/moments.ts';
 import {
   committedOutputDraft, createOutput, outputCandidates, projectOutputItems,
-  toggleOutputMoment, moveOutputMoment, updateOutputGoal, updateOutputNarrative
+  toggleOutputMoment, removeOutputMoment, moveOutputMoment, updateOutputGoal, updateOutputNarrative
 } from '../core/outputs.ts';
 import { applyMomentEdit, setMomentArchived, toMomentEditInput } from '../core/enrichment.ts';
 import {
@@ -374,8 +374,12 @@ export function createCareerEvidenceController() {
   function toggleEvidence(momentId: string): void {
     if (!outputDraft) return;
     const source = moments.find(item => item.id === momentId);
-    if (!source || source.archivedAt) return;
-    outputDraft = toggleOutputMoment(outputDraft, source);
+    if (outputDraft.items.some(item => item.momentId === momentId)) {
+      outputDraft = removeOutputMoment(outputDraft, momentId);
+    } else {
+      if (!source || source.archivedAt) return;
+      outputDraft = toggleOutputMoment(outputDraft, source);
+    }
     outputError = '';
   }
 
