@@ -139,6 +139,29 @@ describe('Career Evidence global data port', () => {
       .toEqual(['baseline']);
   });
 
+  it('rejects incoming replay after restoring a paired browser without moving cursor', async () => {
+    useBrowser(0);
+    await addMoment(m('locally-owned'));
+    await careerDataPort.beginSyncCapture('owner_device_A');
+    await careerDataPort.restoreBackup({ ...emptyCareerBackup(), moments: [m('restored')] });
+    const before = await careerDataPort.readRemoteCursor();
+    const foreign: SequencedSyncOperation = {
+      operationId: 'remote-moment-after-restore',
+      moduleId: 'brag-document',
+      deviceId: 'another_device_123',
+      entityId: 'moment:foreign',
+      kind: 'upsert',
+      baseRevision: null,
+      payload: { moment: m('foreign') },
+      createdAt: at.getTime(),
+      sequence: before + 1
+    };
+    await expect(careerDataPort.applyRemoteChanges([foreign]))
+      .rejects.toThrow('restore conflict');
+    expect(await careerDataPort.readRemoteCursor()).toBe(before);
+    expect((await loadMoments()).map(item => item.id)).toEqual(['restored']);
+  });
+
   it('rejects corrupted remote events without advancing the cursor', async () => {
     useBrowser(0);
     const before = await careerDataPort.readRemoteCursor();
