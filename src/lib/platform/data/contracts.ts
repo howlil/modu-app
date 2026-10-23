@@ -37,6 +37,8 @@ export type RestorePreview = {
 };
 
 export interface RestorableDataPort extends ModuleDataPort {
+  /** Opt-in only for a newly introduced module; older global backups omit it. */
+  emptyBackupForLegacyRestore?(): unknown;
   validateBackup(data: unknown): Promise<RestorePreview>;
   restoreBackup(data: unknown): Promise<void>;
 }
