@@ -40,4 +40,9 @@ jobs:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
           CHROMEDRIVER_BIN: ${{ steps.chrome.outputs.chromedriver-path }}
         run: node test/e2e/global-data-browser.mjs
+      - name: Career Evidence browser E2E
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+          CHROMEDRIVER_BIN: ${{ steps.chrome.outputs.chromedriver-path }}
+        run: node test/e2e/career-evidence-browser.mjs
 
