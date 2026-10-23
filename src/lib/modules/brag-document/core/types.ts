@@ -39,6 +39,7 @@ export interface CareerOutput {
   organization: string | null;
   period: Period;
   items: CareerOutputItem[];
+  revision: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -64,4 +65,12 @@ export interface MomentEditInput {
   verification: Verification;
   /** One HTTP(S) evidence URL per line. */
   evidenceUrls: string;
+}
+
+export interface NewOutputInput {
+  kind: OutputKind;
+  title: string;
+  targetRole: string;
+  organization: string;
+  period: Period;
 }
