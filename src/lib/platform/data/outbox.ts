@@ -1,4 +1,5 @@
 import type { ModuleDataId } from "./contracts.ts";
+import { SYNC_MAX_BODY_BYTES } from "./sync-protocol.ts";
 
 /**
  * Feature-owned IndexedDB outbox. Domain data and queued operations MUST share
@@ -70,7 +71,7 @@ export function assertQueueableSyncOperation(
     payload, createdAt: Number.MAX_SAFE_INTEGER
   };
   const bytes = new TextEncoder().encode(JSON.stringify({ operations: [example] })).byteLength;
-  if (bytes > 256 * 1024) {
+  if (bytes > SYNC_MAX_BODY_BYTES) {
     throw new Error("This record exceeds the sync payload limit. Split the document before saving.");
   }
 }
