@@ -69,7 +69,7 @@
         <DocumentsView {controller} />
       {/if}
       <p class="mt-8 border-t border-border pt-4 text-meta text-muted-foreground">
-        Saved in this browser only. Career Evidence is not yet included in Modu global backup or sync;
+        Career Evidence stays on this browser until you enable Data & Sync pairing.
         use History → Export backup to keep a separate copy of moments, documents, and finalized versions.
       </p>
     {/if}
