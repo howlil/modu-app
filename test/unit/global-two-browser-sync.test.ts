@@ -61,7 +61,7 @@ describe("M5 two isolated browsers, feature-owned sync replay", () => {
     await learningPersistence.profiles();
     await learningPersistence.createProfile({ id: "spanish-custom", targetLanguage: "es" });
     for (const port of globalDataPorts) await port.beginSyncCapture("device_A_owner");
-    expect(await pushBrowserEvents(server)).toBe(3);
+    expect(await pushBrowserEvents(server)).toBe(4);
     await pullBrowserEvents(server);
 
     useBrowser(1);
@@ -96,6 +96,6 @@ describe("M5 two isolated browsers, feature-owned sync replay", () => {
     expect((await loadHabitSnapshot()).habits.map(x=>x.title).sort()).toEqual(["Exercise","Read"]);
     expect((await learningPersistence.profiles()).some(x=>x.id==="german-custom")).toBe(true);
     expect((await learningPersistence.get("session-remote"))?.session.attempts).toHaveLength(1);
-    expect(new Set(await Promise.all(globalDataPorts.map(x=>x.readRemoteCursor())))).toEqual(new Set([9]));
+    expect(new Set(await Promise.all(globalDataPorts.map(x=>x.readRemoteCursor())))).toEqual(new Set([10]));
   });
 });
