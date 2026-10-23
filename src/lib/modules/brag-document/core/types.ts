@@ -44,12 +44,26 @@ export interface CareerOutput {
   updatedAt: string;
 }
 
+/** Immutable, self-contained copy: rendering never reads current CareerMoment records. */
 export interface FinalizedSnapshot {
   id: string;
   outputId: string;
+  version: number;
+  outputRevision: number;
   finalizedAt: string;
+  kind: OutputKind;
   title: string;
-  sections: { heading: string; body: string; evidenceUrls: string[] }[];
+  targetRole: string | null;
+  organization: string | null;
+  period: Period;
+  sections: {
+    momentId: string;
+    heading: string;
+    body: string;
+    occurredOn: string;
+    project: string | null;
+    evidenceUrls: string[];
+  }[];
 }
 
 export type NewMomentInput = { note: string; evidenceUrl?: string; project?: string };
