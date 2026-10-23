@@ -61,11 +61,6 @@ export function createCareerEvidenceController() {
     snapshots.filter(snapshot => snapshot.outputId === selectedOutputId)
       .sort((a, b) => b.finalizedAt.localeCompare(a.finalizedAt) || a.id.localeCompare(b.id))
   );
-  const canFinalize = $derived(
-    !!outputDraft && !isOutputDirty && !isOutputStale && !busy &&
-    outputDraft.items.length > 0 && outputPreview.every(item =>
-      !item.missing && !item.sourceChanged)
-  );
   const selectedOutput = $derived(outputs.find(item => item.id === selectedOutputId) ?? null);
   const isOutputDirty = $derived(!!outputBase && !!outputDraft &&
     JSON.stringify(outputBase) !== JSON.stringify(outputDraft));
@@ -74,6 +69,11 @@ export function createCareerEvidenceController() {
   const availableEvidence = $derived(outputDraft
     ? outputCandidates(moments, outputDraft, outputQuery) : []);
   const outputPreview = $derived(outputDraft ? projectOutputItems(outputDraft, moments) : []);
+  const canFinalize = $derived(
+    !!outputDraft && !isOutputDirty && !isOutputStale && !busy &&
+    outputDraft.items.length > 0 && outputPreview.every(item =>
+      !item.missing && !item.sourceChanged)
+  );
   const recentMoments = $derived(filterMoments(moments, '').slice(0, 3));
   const activeCount = $derived(moments.filter(moment => !moment.archivedAt).length);
   const archivedCount = $derived(moments.filter(moment => moment.archivedAt).length);
