@@ -46,6 +46,8 @@ export interface RestorableDataPort extends ModuleDataPort {
 /** Feature-owned M3 transport port. No network operation belongs in a module. */
 export interface SyncOutboxPort extends RestorableDataPort {
   beginSyncCapture(deviceId: string): Promise<void>;
+  /** Optional for modules introduced after a browser has already paired. */
+  resumeSyncCapture?(deviceId: string): Promise<void>;
   beginRemoteSyncCapture(deviceId: string): Promise<void>;
   readRemoteCursor(): Promise<number>;
   applyRemoteChanges(events: readonly import("./sync-protocol.ts").SequencedSyncOperation[]): Promise<void>;
