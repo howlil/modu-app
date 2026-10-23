@@ -1,11 +1,15 @@
-import type { CareerMoment, MomentEditInput, Period } from '../core/types.ts';
+import type { CareerMoment, CareerOutput, MomentEditInput, NewOutputInput, Period } from '../core/types.ts';
 import { createMoment, filterMoments } from '../core/moments.ts';
+import {
+  committedOutputDraft, createOutput, outputCandidates, projectOutputItems,
+  toggleOutputMoment, moveOutputMoment, updateOutputGoal, updateOutputNarrative
+} from '../core/outputs.ts';
 import { applyMomentEdit, setMomentArchived, toMomentEditInput } from '../core/enrichment.ts';
 import {
-  addMoment, downloadLocalBackup, loadMoments, replaceMoment
+  addMoment, addOutput, downloadLocalBackup, loadMoments, loadOutputs, replaceMoment, replaceOutput
 } from '../adapters/persistence.ts';
 
-export type CareerView = 'capture' | 'history';
+export type CareerView = 'capture' | 'history' | 'documents';
 
 function explainError(error: unknown): string {
   return error instanceof Error ? error.message : 'The operation failed. Your changes remain here.';
@@ -15,6 +19,13 @@ function explainError(error: unknown): string {
 export function createCareerEvidenceController() {
   let view = $state<CareerView>('capture');
   let moments = $state<CareerMoment[]>([]);
+  let outputs = $state<CareerOutput[]>([]);
+  let selectedOutputId = $state<string | null>(null);
+  let outputBase = $state<CareerOutput | null>(null);
+  let outputDraft = $state<CareerOutput | null>(null);
+  let outputQuery = $state('');
+  let outputError = $state('');
+  let confirmOutputDiscard = $state(false);
   let loading = $state(true);
   let storageReady = $state(false);
   let busy = $state(false);
@@ -37,6 +48,14 @@ export function createCareerEvidenceController() {
   let pendingReload = $state(false);
   let readVersion = 0;
 
+  const selectedOutput = $derived(outputs.find(item => item.id === selectedOutputId) ?? null);
+  const isOutputDirty = $derived(!!outputBase && !!outputDraft &&
+    JSON.stringify(outputBase) !== JSON.stringify(outputDraft));
+  const isOutputStale = $derived(!!outputBase &&
+    (!selectedOutput || selectedOutput.revision !== outputBase.revision));
+  const availableEvidence = $derived(outputDraft
+    ? outputCandidates(moments, outputDraft, outputQuery) : []);
+  const outputPreview = $derived(outputDraft ? projectOutputItems(outputDraft, moments) : []);
   const recentMoments = $derived(filterMoments(moments, '').slice(0, 3));
   const activeCount = $derived(moments.filter(moment => !moment.archivedAt).length);
   const archivedCount = $derived(moments.filter(moment => moment.archivedAt).length);
@@ -74,6 +93,11 @@ export function createCareerEvidenceController() {
 
   function navigate(next: CareerView): void {
     if (next === view) return;
+    if (view === 'documents' && isOutputDirty) {
+      outputError = 'Save or discard document changes before switching views.';
+      confirmOutputDiscard = true;
+      return;
+    }
     if (selectedMomentId && isDirty) {
       pendingView = next;
       pendingReload = false;
@@ -89,9 +113,10 @@ export function createCareerEvidenceController() {
   async function reload(): Promise<void> {
     const current = ++readVersion;
     try {
-      const stored = await loadMoments();
+      const [stored, storedOutputs] = await Promise.all([loadMoments(), loadOutputs()]);
       if (current !== readVersion) return;
       moments = stored;
+      outputs = storedOutputs;
       storageReady = true;
       if (!busy) error = '';
     } catch (failure) {
@@ -263,6 +288,154 @@ export function createCareerEvidenceController() {
     } finally { busy = false; }
   }
 
+  function openOutput(id: string): void {
+    if (isOutputDirty && selectedOutputId !== id) {
+      outputError = 'Save or discard changes before opening another document.';
+      confirmOutputDiscard = true;
+      return;
+    }
+    const selected = outputs.find(item => item.id === id);
+    if (!selected) return;
+    selectedOutputId = id;
+    outputBase = selected;
+    outputDraft = structuredClone(selected);
+    outputQuery = '';
+    outputError = '';
+    confirmOutputDiscard = false;
+    view = 'documents';
+  }
+
+  function discardOutput(): void {
+    if (outputBase) {
+      outputDraft = structuredClone(outputBase);
+    }
+    outputError = '';
+    confirmOutputDiscard = false;
+  }
+
+  function closeOutput(): void {
+    if (isOutputDirty) {
+      outputError = 'You have unsaved document changes.';
+      confirmOutputDiscard = true;
+      return;
+    }
+    selectedOutputId = null;
+    outputBase = null;
+    outputDraft = null;
+    outputError = '';
+    confirmOutputDiscard = false;
+  }
+
+  function cancelOutputDiscard(): void {
+    confirmOutputDiscard = false;
+    outputError = '';
+  }
+
+  async function createDocument(input: NewOutputInput): Promise<boolean> {
+    if (!storageReady || busy || isOutputDirty) return false;
+    let draft: CareerOutput;
+    try {
+      draft = createOutput(input, crypto.randomUUID(), new Date());
+    } catch (failure) {
+      outputError = explainError(failure);
+      return false;
+    }
+    busy = true;
+    outputError = '';
+    notice = '';
+    try {
+      await addOutput(draft);
+      outputs = [draft, ...outputs];
+      selectedOutputId = draft.id;
+      outputBase = draft;
+      outputDraft = structuredClone(draft);
+      outputQuery = '';
+      confirmOutputDiscard = false;
+      notice = 'Document created. Select the evidence you want to use.';
+      return true;
+    } catch (failure) {
+      outputError = 'Document not created. ' + explainError(failure);
+      return false;
+    } finally { busy = false; }
+  }
+
+  function setOutputGoal(input: NewOutputInput): boolean {
+    if (!outputDraft) return false;
+    try {
+      outputDraft = updateOutputGoal(outputDraft, input);
+      outputError = '';
+      return true;
+    } catch (failure) {
+      outputError = explainError(failure);
+      return false;
+    }
+  }
+
+  function toggleEvidence(momentId: string): void {
+    if (!outputDraft) return;
+    const source = moments.find(item => item.id === momentId);
+    if (!source || source.archivedAt) return;
+    outputDraft = toggleOutputMoment(outputDraft, source);
+    outputError = '';
+  }
+
+  function reorderEvidence(momentId: string, direction: -1 | 1): void {
+    if (!outputDraft) return;
+    outputDraft = moveOutputMoment(outputDraft, momentId, direction);
+  }
+
+  function changeNarrative(momentId: string, narrative: string): void {
+    if (!outputDraft) return;
+    try {
+      outputDraft = updateOutputNarrative(outputDraft, momentId, narrative);
+      outputError = '';
+    } catch (failure) { outputError = explainError(failure); }
+  }
+
+  function reloadOutputLatest(): void {
+    if (!selectedOutput) return;
+    if (isOutputDirty) {
+      outputError = 'Discard your local edits before loading the latest document.';
+      confirmOutputDiscard = true;
+      return;
+    }
+    outputBase = selectedOutput;
+    outputDraft = structuredClone(selectedOutput);
+    outputError = '';
+  }
+
+  async function saveOutput(): Promise<boolean> {
+    if (!storageReady || busy || !outputDraft || !outputBase) return false;
+    if (isOutputStale) {
+      outputError = 'This document changed in another tab. Review or discard your local edits.';
+      return false;
+    }
+    let committed: CareerOutput;
+    try {
+      committed = committedOutputDraft(outputDraft, outputBase, new Date());
+    } catch (failure) {
+      outputError = explainError(failure);
+      return false;
+    }
+    busy = true;
+    outputError = '';
+    notice = '';
+    try {
+      await replaceOutput(committed, outputBase.revision);
+      outputs = outputs.map(item => item.id === committed.id ? committed : item);
+      outputBase = committed;
+      outputDraft = structuredClone(committed);
+      confirmOutputDiscard = false;
+      notice = 'Document saved.';
+      return true;
+    } catch (failure) {
+      // Reload source revisions but preserve the local draft.
+      await reload();
+      outputError = 'Document not saved. ' + explainError(failure);
+      return false;
+    } finally { busy = false; }
+  }
+
   async function exportBackup(): Promise<void> {
     if (busy || !storageReady) return;
     busy = true;
@@ -279,6 +452,18 @@ export function createCareerEvidenceController() {
     get view() { return view; },
     set view(next: CareerView) { navigate(next); },
     get moments() { return moments; },
+    get outputs() { return outputs; },
+    get selectedOutputId() { return selectedOutputId; },
+    get selectedOutput() { return selectedOutput; },
+    get outputDraft() { return outputDraft; },
+    get isOutputDirty() { return isOutputDirty; },
+    get isOutputStale() { return isOutputStale; },
+    get availableEvidence() { return availableEvidence; },
+    get outputPreview() { return outputPreview; },
+    get outputQuery() { return outputQuery; },
+    set outputQuery(value: string) { outputQuery = value; },
+    get outputError() { return outputError; },
+    get confirmOutputDiscard() { return confirmOutputDiscard; },
     get visibleMoments() { return visibleMoments; },
     get recentMoments() { return recentMoments; },
     get activeCount() { return activeCount; },
@@ -315,7 +500,10 @@ export function createCareerEvidenceController() {
     get notice() { return notice; },
     reload, capture, openMoment, changeEditField, requestCloseMoment,
     requestReloadLatest, cancelDiscard, confirmDiscardChanges, saveEdit,
-    setArchived, exportBackup
+    setArchived, openOutput, closeOutput, cancelOutputDiscard,
+    discardOutput, reloadOutputLatest, createDocument,
+    setOutputGoal, toggleEvidence, reorderEvidence, changeNarrative,
+    saveOutput, exportBackup
   };
 }
 export type CareerEvidenceController = ReturnType<typeof createCareerEvidenceController>;
