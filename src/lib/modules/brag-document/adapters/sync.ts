@@ -319,16 +319,25 @@ export async function applyCareerRemoteChanges(
   const db = await openCareerDatabase();
   try {
     await transaction(db, incomingStores, 'readwrite', (tx, finish, fail) => {
-      applyIncomingInTransaction(
-        tx, moduleId, events,
-        (event, next, stop) => {
-          try { applyCareerOperation(tx, event, next, stop); }
-          catch (cause) {
-            stop(cause instanceof Error ? cause : new RemoteApplyConflict('Invalid remote career operation.'));
-          }
-        },
-        () => finish(undefined), fail
-      );
+      const pendingReconciliation = tx.objectStore(SYNC_META_STORE).get(RECONCILIATION_KEY);
+      pendingReconciliation.onsuccess = () => {
+        if (pendingReconciliation.result) {
+          fail(new RemoteApplyConflict(
+            'Career Evidence restore conflict: manual resolution required before remote replay.'
+          ));
+          return;
+        }
+        applyIncomingInTransaction(
+          tx, moduleId, events,
+          (event, next, stop) => {
+            try { applyCareerOperation(tx, event, next, stop); }
+            catch (cause) {
+              stop(cause instanceof Error ? cause : new RemoteApplyConflict('Invalid remote career operation.'));
+            }
+          },
+          () => finish(undefined), fail
+        );
+      };
     });
     notifyCareerChange();
   } finally { db.close(); }
