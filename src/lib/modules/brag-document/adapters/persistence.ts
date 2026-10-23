@@ -99,7 +99,7 @@ export async function addMoment(moment: CareerMoment): Promise<void> {
   notifyCommittedChange();
 }
 
-/** Prepare for M3; optimistic revision enforcement stays inside one IDB transaction. */
+/** Optimistic revision enforcement stays inside one IDB transaction. */
 export async function replaceMoment(next: CareerMoment, expectedRevision: number): Promise<void> {
   const valid = decodeMoment(next);
   await withDatabase(db => new Promise<void>((resolve, reject) => {
