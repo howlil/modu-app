@@ -59,7 +59,7 @@ export function createCareerEvidenceController() {
   );
   const outputSnapshots = $derived(
     snapshots.filter(snapshot => snapshot.outputId === selectedOutputId)
-      .sort((a, b) => b.version - a.version)
+      .sort((a, b) => b.finalizedAt.localeCompare(a.finalizedAt) || a.id.localeCompare(b.id))
   );
   const canFinalize = $derived(
     !!outputDraft && !isOutputDirty && !isOutputStale && !busy &&
