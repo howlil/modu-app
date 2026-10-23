@@ -1,5 +1,6 @@
 <script lang="ts">
   import { FilePlus2, FileText, ChevronRight } from 'lucide-svelte';
+  import { tick } from 'svelte';
   import { Button } from '#lib/components/ui/button/index.js';
   import type { CareerEvidenceController } from '../controller/career-evidence.svelte.ts';
   import type { NewOutputInput } from '../core/types.ts';
@@ -8,13 +9,33 @@
 
   let { controller }: { controller: CareerEvidenceController } = $props();
   let creating = $state(false);
+  let lastOpenedId = $state<string | null>(null);
   const kindLabel = { interview: 'Interview', application: 'Application', review: 'Review' } as const;
 
   function submitNew(input: NewOutputInput): void {
     void controller.createDocument(input).then(created => {
-      if (created) creating = false;
+      if (created) {
+        creating = false;
+        lastOpenedId = controller.selectedOutputId;
+      }
     });
   }
+
+  function openDocument(id: string): void {
+    lastOpenedId = id;
+    controller.openOutput(id);
+  }
+
+  $effect(() => {
+    if (!controller.selectedOutputId && lastOpenedId) {
+      const previous = lastOpenedId;
+      lastOpenedId = null;
+      void tick().then(() => {
+        (document.getElementById('output-open-' + previous) ??
+          document.getElementById('career-documents-heading'))?.focus();
+      });
+    }
+  });
 </script>
 
 {#if controller.selectedOutputId}
@@ -23,7 +44,7 @@
   <section aria-label="Career documents">
     <div class="mb-5 flex flex-wrap items-start justify-between gap-3">
       <div>
-        <h2 class="text-title-lg font-medium">Documents</h2>
+        <h2 id="career-documents-heading" tabindex="-1" class="text-title-lg font-medium focus:outline-none">Documents</h2>
         <p class="mt-1 text-ui text-muted-foreground">Different goals. The same career history.</p>
       </div>
       {#if !creating}
@@ -50,8 +71,8 @@
     {:else if controller.outputs.length}
       <div class="border-t border-border">
         {#each controller.outputs as output (output.id)}
-          <button type="button" class="flex w-full items-start gap-3 border-b border-border py-4 text-left hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            onclick={() => controller.openOutput(output.id)}>
+          <button id={'output-open-' + output.id} type="button" class="flex w-full items-start gap-3 border-b border-border py-4 text-left hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            onclick={() => openDocument(output.id)}>
             <FileText class="mt-1 size-4 shrink-0 text-muted-foreground" />
             <span class="min-w-0 flex-1">
               <span class="block break-words text-ui font-medium">{output.title}</span>
