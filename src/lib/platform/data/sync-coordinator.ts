@@ -24,11 +24,11 @@ export async function syncNow(
   const transport = pairedTransport(identity);
   return navigator.locks.request("modu-global-restore", { mode: "exclusive" }, async () => {
     const progress: SyncProgress = { pushed: 0, pulled: 0, cursor: 0, modules: globalDataPorts.length };
-    // Resume an existing owner's new feature baselines after an app upgrade.
-    // Each module must implement beginSyncCapture idempotently for its device.
+    // Only newly introduced modules opt into post-pairing enrollment.
+    // Never re-run baseline capture for every mature module on each Sync now.
     if (identity.enrollmentKind === "owner") {
       for (const module of globalDataPorts) {
-        await module.beginSyncCapture(identity.deviceId);
+        await module.resumeSyncCapture?.(identity.deviceId);
       }
     }
     // Never batch/merge operations from different feature DBs before feature-owned read.
