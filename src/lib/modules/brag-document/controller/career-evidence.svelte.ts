@@ -26,6 +26,8 @@ export function createCareerEvidenceController() {
   let outputQuery = $state('');
   let outputError = $state('');
   let confirmOutputDiscard = $state(false);
+  let pendingOutputView = $state<CareerView | null>(null);
+  let pendingOutputReload = $state(false);
   let loading = $state(true);
   let storageReady = $state(false);
   let busy = $state(false);
@@ -95,6 +97,8 @@ export function createCareerEvidenceController() {
     if (next === view) return;
     if (view === 'documents' && isOutputDirty) {
       outputError = 'Save or discard document changes before switching views.';
+      pendingOutputView = next;
+      pendingOutputReload = false;
       confirmOutputDiscard = true;
       return;
     }
@@ -292,6 +296,8 @@ export function createCareerEvidenceController() {
     if (isOutputDirty && selectedOutputId !== id) {
       outputError = 'Save or discard changes before opening another document.';
       confirmOutputDiscard = true;
+      pendingOutputView = null;
+      pendingOutputReload = false;
       return;
     }
     const selected = outputs.find(item => item.id === id);
@@ -302,20 +308,37 @@ export function createCareerEvidenceController() {
     outputQuery = '';
     outputError = '';
     confirmOutputDiscard = false;
+    pendingOutputView = null;
+    pendingOutputReload = false;
     view = 'documents';
   }
 
   function discardOutput(): void {
-    if (outputBase) {
+    const next = pendingOutputView;
+    if (pendingOutputReload && selectedOutput) {
+      outputBase = selectedOutput;
+      outputDraft = structuredClone(selectedOutput);
+    } else if (outputBase) {
       outputDraft = structuredClone(outputBase);
     }
     outputError = '';
     confirmOutputDiscard = false;
+    pendingOutputView = null;
+    pendingOutputReload = false;
+    if (next) {
+      selectedOutputId = null;
+      outputBase = null;
+      outputDraft = null;
+      view = next;
+      notice = '';
+    }
   }
 
   function closeOutput(): void {
     if (isOutputDirty) {
       outputError = 'You have unsaved document changes.';
+      pendingOutputView = null;
+      pendingOutputReload = false;
       confirmOutputDiscard = true;
       return;
     }
@@ -324,10 +347,14 @@ export function createCareerEvidenceController() {
     outputDraft = null;
     outputError = '';
     confirmOutputDiscard = false;
+    pendingOutputView = null;
+    pendingOutputReload = false;
   }
 
   function cancelOutputDiscard(): void {
     confirmOutputDiscard = false;
+    pendingOutputView = null;
+    pendingOutputReload = false;
     outputError = '';
   }
 
@@ -400,12 +427,15 @@ export function createCareerEvidenceController() {
     if (!selectedOutput) return;
     if (isOutputDirty) {
       outputError = 'Discard your local edits before loading the latest document.';
+      pendingOutputReload = true;
+      pendingOutputView = null;
       confirmOutputDiscard = true;
       return;
     }
     outputBase = selectedOutput;
     outputDraft = structuredClone(selectedOutput);
     outputError = '';
+    pendingOutputReload = false;
   }
 
   async function saveOutput(): Promise<boolean> {
