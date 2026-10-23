@@ -1,6 +1,6 @@
 <script lang="ts">
   import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, RefreshCw, Save, Search, X } from 'lucide-svelte';
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { Button } from '#lib/components/ui/button/index.js';
   import { Input } from '#lib/components/ui/input/index.js';
   import { Textarea } from '#lib/components/ui/textarea/index.js';
@@ -11,13 +11,27 @@
   let { controller }: { controller: CareerEvidenceController } = $props();
   let editGoal = $state(false);
   let heading: HTMLHeadingElement;
+  let lastSnapshotId: string | null = null;
   onMount(() => heading?.focus());
+
+  function openVersion(id: string): void {
+    lastSnapshotId = id;
+    controller.openSnapshot(id);
+  }
+
+  function backFromVersion(): void {
+    controller.closeSnapshot();
+    const id = lastSnapshotId;
+    void tick().then(() => {
+      (id ? document.getElementById('career-snapshot-' + id) : null)?.focus();
+    });
+  }
 
   const kindLabel = { interview: 'Interview', application: 'Application', review: 'Review' } as const;
 </script>
 
 {#if controller.selectedSnapshot}
-  <DocumentPreview snapshot={controller.selectedSnapshot} onBack={controller.closeSnapshot}/>
+  <DocumentPreview snapshot={controller.selectedSnapshot} onBack={backFromVersion}/>
 {:else if controller.outputDraft}
   <section aria-label="Career document builder">
     <div class="mb-5 flex flex-wrap items-center justify-between gap-2">
@@ -226,9 +240,9 @@
       {#if controller.outputSnapshots.length}
         <div class="mt-4 divide-y divide-border border-t border-border">
           {#each controller.outputSnapshots as snapshot (snapshot.id)}
-            <button type="button"
+            <button id={'career-snapshot-' + snapshot.id} type="button"
               class="flex w-full items-center justify-between gap-3 py-3 text-left text-ui hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              onclick={() => controller.openSnapshot(snapshot.id)}>
+              onclick={() => openVersion(snapshot.id)}>
               <span>
                 <span class="block font-medium">Version {snapshot.version}</span>
                 <span class="block text-meta text-muted-foreground">
