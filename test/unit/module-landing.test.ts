@@ -8,11 +8,12 @@ const pages = import.meta.glob<string>('../../src/routes/**/+page.svelte', {
 describe('Landing module registry', () => {
   it('exposes all current modules without duplicate routes', () => {
     expect(modules.map(module => module.id)).toEqual([
-      'language-learning', 'habit-tracker', 'pomodoro'
+      'language-learning', 'habit-tracker', 'brag-document', 'pomodoro'
     ]);
     expect(new Set(modules.map(module => module.route)).size).toBe(modules.length);
     expect(modules.every(module => module.status === 'available')).toBe(true);
     expect(getModule('language-learning')?.route).toBe('/language');
+    expect(getModule('brag-document')?.route).toBe('/brag-document');
   });
 
   it('each available landing card targets an implemented route and workspace', () => {
