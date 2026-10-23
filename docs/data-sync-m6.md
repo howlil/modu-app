@@ -72,3 +72,16 @@ CI gates: `bun run check`, `bun run test`, `bun run build`, `wrangler deploy --c
 - Monitor sanitized status codes, operation count and storage quota without logging recovery codes, secrets, signed request bodies, or raw module history.
 
 For any conflict or full space: use **Export all data** in global Data & Sync before manual resolution. Clearing browser site data is not an acceptable recovery procedure.
+
+
+## Career Evidence module integration (2026-10-24)
+
+- Registered `brag-document` as the fourth feature in `MODULE_DATA_IDS`, `globalDataPorts`, sync wire validation and outbox ingress.
+- Schema: `modu-career-evidence` IndexedDB v4 contains `moments`, `outputs`, `snapshots`, and shared protocol outbox / metadata / inbox / tombstone stores. This is an additive upgrade from local-only v3.
+- New source, output draft and immutable finalized version mutations enqueue operations in their own feature transaction. No network writes from UI or domain functions.
+- Initial owner pairing captures an all-store baseline atomically. Existing owners initialize newly registered module baselines before their next Sync now. Joined browsers accept a validated baseline, then activate remote capture after the imported cursor is durable.
+- Foreign upserts use entity prefixes (`moment:`, `output:`, `snapshot:`) with per-record validation and revision comparisons. The server journal and module inbox cursor advance only with the successful domain transaction. Missing references, stale revisions, duplicate finalized versions and baseline divergence fail closed.
+- Local/global backup V3 includes all three record collections in one read transaction. Restore checks duplicate IDs, source references, document references and snapshot versions before writing. It replaces all three collections and resets the sync generation atomically.
+- An old three-module global backup may be restored into the four-module registry only through the explicitly opted-in empty Career Evidence migration, with a preview warning that its current career data will be cleared. Unknown modules and corrupt payloads remain rejected.
+- Each baseline is capped at 185,000 serialized bytes, consistent with the signed transport's body limit. Large career histories must be backed up locally instead of silently claiming cloud synchronization.
+- Pairing and remote transport are still gated by the existing `SYNC_ROLLOUT_ENABLED` flag. Implementation does **not** imply production sync is enabled; verify CI, fault injection, two-browser acceptance and deployment gates before release.
