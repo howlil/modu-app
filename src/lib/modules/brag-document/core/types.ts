@@ -52,3 +52,16 @@ export interface FinalizedSnapshot {
 }
 
 export type NewMomentInput = { note: string; evidenceUrl?: string; project?: string };
+
+/** Form values are strings to keep editing independent of committed records. */
+export interface MomentEditInput {
+  note: string;
+  occurredOn: string;
+  project: string;
+  problem: string;
+  contribution: string;
+  outcome: string;
+  verification: Verification;
+  /** One HTTP(S) evidence URL per line. */
+  evidenceUrls: string;
+}
