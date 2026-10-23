@@ -2,12 +2,17 @@ import { decodeMoment } from '../core/moments.ts';
 import { decodeOutput } from '../core/outputs.ts';
 import { buildFinalizedSnapshot, decodeFinalizedSnapshot } from '../core/snapshots.ts';
 import type { CareerMoment, CareerOutput, FinalizedSnapshot } from '../core/types.ts';
+import { OUTBOX_STORE, SYNC_META_STORE, ensureOutboxStores, queueLocalMutation } from '#lib/platform/data/outbox.ts';
+import { ensureInboxStores, INBOX_STORE, TOMBSTONE_STORE } from '#lib/platform/data/inbox.ts';
 
 const DATABASE = 'modu-career-evidence';
-const VERSION = 3;
-const STORE = 'moments';
-const OUTPUTS = 'outputs';
-const SNAPSHOTS = 'snapshots';
+const VERSION = 4;
+export const CAREER_MOMENTS_STORE = 'moments';
+const STORE = CAREER_MOMENTS_STORE;
+export const CAREER_OUTPUTS_STORE = 'outputs';
+const OUTPUTS = CAREER_OUTPUTS_STORE;
+export const CAREER_SNAPSHOTS_STORE = 'snapshots';
+const SNAPSHOTS = CAREER_SNAPSHOTS_STORE;
 const EVENT = 'modu:career-evidence-changed';
 const CHANNEL = 'modu-career-evidence-changes';
 
@@ -15,7 +20,7 @@ export class CareerStorageError extends Error {
   constructor(message: string) { super(message); this.name = 'CareerStorageError'; }
 }
 
-function openDatabase(): Promise<IDBDatabase> {
+export function openCareerDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (typeof indexedDB === 'undefined') {
       reject(new CareerStorageError('Browser storage is unavailable.')); return;
@@ -36,6 +41,8 @@ function openDatabase(): Promise<IDBDatabase> {
         const store = db.createObjectStore(SNAPSHOTS, { keyPath: 'id' });
         store.createIndex('outputId', 'outputId', { unique: false });
       }
+      ensureOutboxStores(db);
+      ensureInboxStores(db);
     };
     request.onsuccess = () => {
       if (blocked) { request.result.close(); return; }
@@ -51,7 +58,7 @@ function openDatabase(): Promise<IDBDatabase> {
 }
 
 async function withDatabase<T>(run: (db: IDBDatabase) => Promise<T>): Promise<T> {
-  const db = await openDatabase();
+  const db = await openCareerDatabase();
   try { return await run(db); }
   finally { db.close(); }
 }
@@ -60,10 +67,12 @@ function committedRequest<T>(
   db: IDBDatabase,
   mode: IDBTransactionMode,
   request: (store: IDBObjectStore) => IDBRequest<T>,
-  storeName: typeof STORE | typeof OUTPUTS | typeof SNAPSHOTS = STORE
+  storeName: typeof STORE | typeof OUTPUTS | typeof SNAPSHOTS = STORE,
+  onQueue?: (tx: IDBTransaction) => void
 ): Promise<T> {
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, mode);
+    const tx = db.transaction(mode === 'readwrite'
+      ? [storeName, OUTBOX_STORE, SYNC_META_STORE] : [storeName], mode);
     let result: T;
     tx.oncomplete = () => resolve(result);
     tx.onabort = () => reject(new CareerStorageError(
@@ -71,6 +80,7 @@ function committedRequest<T>(
     ));
     try {
       const op = request(tx.objectStore(storeName));
+      onQueue?.(tx);
       op.onsuccess = () => { result = op.result; };
     } catch (error) {
       try { tx.abort(); } catch { /* tx may already have completed */ }
@@ -87,7 +97,7 @@ export async function loadMoments(): Promise<CareerMoment[]> {
   });
 }
 
-function notifyCommittedChange(): void {
+export function notifyCareerChange(): void {
   if (typeof window === 'undefined') return;
   window.dispatchEvent(new Event(EVENT));
   if (typeof BroadcastChannel === 'undefined') return;
@@ -101,15 +111,17 @@ function notifyCommittedChange(): void {
 
 export async function addMoment(moment: CareerMoment): Promise<void> {
   const valid = decodeMoment(moment);
-  await withDatabase(db => committedRequest(db, 'readwrite', store => store.add(valid)));
-  notifyCommittedChange();
+  await withDatabase(db => committedRequest(db, 'readwrite', store => store.add(valid),
+    STORE, tx => queueLocalMutation(tx, 'brag-document', 'moment:' + valid.id,
+      'upsert', { moment: valid })));
+  notifyCareerChange();
 }
 
 /** Optimistic revision enforcement stays inside one IDB transaction. */
 export async function replaceMoment(next: CareerMoment, expectedRevision: number): Promise<void> {
   const valid = decodeMoment(next);
   await withDatabase(db => new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(STORE, 'readwrite');
+    const tx = db.transaction([STORE, OUTBOX_STORE, SYNC_META_STORE], 'readwrite');
     const store = tx.objectStore(STORE);
     let failure: Error | null = null;
     tx.oncomplete = () => resolve();
@@ -124,6 +136,8 @@ export async function replaceMoment(next: CareerMoment, expectedRevision: number
           throw new CareerStorageError('This moment changed in another tab. Reload before editing.');
         }
         store.put(valid);
+        queueLocalMutation(tx, 'brag-document', 'moment:' + valid.id,
+          'upsert', { moment: valid }, String(current.revision));
       } catch (error) {
         failure = error instanceof Error ? error : new CareerStorageError('Unable to update moment.');
         tx.abort();
@@ -148,7 +162,9 @@ export async function loadOutputs(): Promise<CareerOutput[]> {
 export async function addOutput(output: CareerOutput): Promise<void> {
   const valid = decodeOutput(output);
   await withDatabase(db => committedRequest(db, 'readwrite',
-    store => store.add(valid), OUTPUTS));
+    store => store.add(valid), OUTPUTS,
+    tx => queueLocalMutation(tx, 'brag-document', 'output:' + valid.id, 'upsert',
+      { output: valid })));
   notifyCommittedChange();
 }
 
@@ -156,7 +172,7 @@ export async function addOutput(output: CareerOutput): Promise<void> {
 export async function replaceOutput(next: CareerOutput, expectedRevision: number): Promise<void> {
   const valid = decodeOutput(next);
   await withDatabase(db => new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(OUTPUTS, 'readwrite');
+    const tx = db.transaction([OUTPUTS, OUTBOX_STORE, SYNC_META_STORE], 'readwrite');
     const store = tx.objectStore(OUTPUTS);
     let failure: Error | null = null;
     tx.oncomplete = () => resolve();
@@ -171,6 +187,8 @@ export async function replaceOutput(next: CareerOutput, expectedRevision: number
           throw new CareerStorageError('Document changed in another tab. Reload before editing.');
         }
         store.put(valid);
+        queueLocalMutation(tx, 'brag-document', 'output:' + valid.id,
+          'upsert', { output: valid }, String(current.revision));
       } catch (error) {
         failure = error instanceof Error ? error : new CareerStorageError('Unable to save document.');
         tx.abort();
@@ -195,7 +213,7 @@ export async function finalizeSavedOutput(
   outputId: string, expectedRevision: number, snapshotId: string, now: Date
 ): Promise<FinalizedSnapshot> {
   const result = await withDatabase(db => new Promise<FinalizedSnapshot>((resolve, reject) => {
-    const tx = db.transaction([STORE, OUTPUTS, SNAPSHOTS], 'readwrite');
+    const tx = db.transaction([STORE, OUTPUTS, SNAPSHOTS, OUTBOX_STORE, SYNC_META_STORE], 'readwrite');
     let failure: Error | null = null;
     let created: FinalizedSnapshot | null = null;
     tx.oncomplete = () => {
@@ -222,6 +240,8 @@ export async function finalizeSavedOutput(
         const version = Math.max(0, ...versions.map(v => v.version)) + 1;
         created = buildFinalizedSnapshot(output, moments, snapshotId, version, now);
         tx.objectStore(SNAPSHOTS).add(created);
+        queueLocalMutation(tx, 'brag-document', 'snapshot:' + created.id,
+          'upsert', { snapshot: created });
       } catch (error) {
         failure = error instanceof Error ? error : new CareerStorageError('Invalid document snapshot.');
         try { tx.abort(); } catch { reject(failure); }
