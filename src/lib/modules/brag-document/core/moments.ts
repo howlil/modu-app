@@ -66,7 +66,8 @@ export function filterMoments(
   return moments.filter(moment =>
     (options.includeArchived || !moment.archivedAt) &&
     (!options.period || matchesPeriod(moment.occurredOn, options.period)) &&
-    (!term || [moment.note, moment.project, moment.problem, moment.contribution, moment.outcome]
+    (!term || [moment.note, moment.project, moment.problem, moment.contribution, moment.outcome,
+      ...moment.evidence.flatMap(link => [link.url, link.label ?? ''])]
       .some(text => (text ?? '').toLocaleLowerCase().includes(term)))
   ).sort((a, b) => b.occurredOn.localeCompare(a.occurredOn) ||
     b.createdAt.localeCompare(a.createdAt));
@@ -88,13 +89,20 @@ export function decodeMoment(value: unknown): CareerMoment {
     typeof value.revision !== 'number' || !Number.isSafeInteger(value.revision) || value.revision < 1 ||
     typeof value.createdAt !== 'string' || !Number.isFinite(Date.parse(value.createdAt)) ||
     typeof value.updatedAt !== 'string' || !Number.isFinite(Date.parse(value.updatedAt)) ||
+    (value.archivedAt !== null && (typeof value.archivedAt !== 'string' || !Number.isFinite(Date.parse(value.archivedAt)))) ||
     !Array.isArray(value.evidence) || !['not-measured','observed','measured'].includes(String(value.verification))) {
     throw new CareerValidationError('Stored Career Evidence contains an invalid moment.');
   }
-  for (const key of ['project', 'problem', 'contribution', 'outcome', 'archivedAt']) {
-    if (value[key] !== null && typeof value[key] !== 'string') {
+  for (const [key, limit] of [
+    ['project', 120], ['problem', 2000], ['contribution', 2000], ['outcome', 2000]
+  ] as const) {
+    if (value[key] !== null && (typeof value[key] !== 'string' ||
+      (value[key] as string).length > limit)) {
       throw new CareerValidationError('Stored Career Evidence has invalid fields.');
     }
+  }
+  if (value.evidence.length > 12) {
+    throw new CareerValidationError('Stored Career Evidence has too many links.');
   }
   const evidence: EvidenceRef[] = value.evidence.map(item => {
     if (!isRecord(item) || typeof item.id !== 'string' || !item.id ||
@@ -104,6 +112,10 @@ export function decodeMoment(value: unknown): CareerMoment {
     }
     return { id: item.id, url: item.url, ...(item.label ? { label: item.label } : {}) };
   });
+  if (new Set(evidence.map(link => link.id)).size !== evidence.length ||
+    new Set(evidence.map(link => link.url)).size !== evidence.length) {
+    throw new CareerValidationError('Stored Career Evidence has duplicate links.');
+  }
   return {
     id: value.id, note: value.note, occurredOn: value.occurredOn,
     project: value.project as string | null,
