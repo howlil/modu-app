@@ -1,5 +1,6 @@
 import type { CareerMoment, CareerOutput, FinalizedSnapshot, MomentEditInput, NewOutputInput, Period } from '../core/types.ts';
 import { createMoment, filterMoments } from '../core/moments.ts';
+import { decodeOutput } from '../core/outputs.ts';
 import {
   committedOutputDraft, createOutput, outputCandidates, projectOutputItems,
   toggleOutputMoment, removeOutputMoment, moveOutputMoment, updateOutputGoal, updateOutputNarrative
@@ -325,7 +326,7 @@ export function createCareerEvidenceController() {
     selectedOutputId = id;
     selectedSnapshotId = null;
     outputBase = selected;
-    outputDraft = structuredClone(selected);
+    outputDraft = decodeOutput(selected);
     outputQuery = '';
     outputError = '';
     confirmOutputDiscard = false;
@@ -338,9 +339,9 @@ export function createCareerEvidenceController() {
     const next = pendingOutputView;
     if (pendingOutputReload && selectedOutput) {
       outputBase = selectedOutput;
-      outputDraft = structuredClone(selectedOutput);
+      outputDraft = decodeOutput(selectedOutput);
     } else if (outputBase) {
-      outputDraft = structuredClone(outputBase);
+      outputDraft = decodeOutput(outputBase);
     }
     outputError = '';
     confirmOutputDiscard = false;
@@ -399,7 +400,7 @@ export function createCareerEvidenceController() {
       selectedOutputId = draft.id;
       selectedSnapshotId = null;
       outputBase = draft;
-      outputDraft = structuredClone(draft);
+      outputDraft = decodeOutput(draft);
       outputQuery = '';
       confirmOutputDiscard = false;
       notice = 'Document created. Select the evidence you want to use.';
@@ -457,7 +458,7 @@ export function createCareerEvidenceController() {
       return;
     }
     outputBase = selectedOutput;
-    outputDraft = structuredClone(selectedOutput);
+    outputDraft = decodeOutput(selectedOutput);
     outputError = '';
     pendingOutputReload = false;
   }
@@ -482,7 +483,7 @@ export function createCareerEvidenceController() {
       await replaceOutput(committed, outputBase.revision);
       outputs = outputs.map(item => item.id === committed.id ? committed : item);
       outputBase = committed;
-      outputDraft = structuredClone(committed);
+      outputDraft = decodeOutput(committed);
       confirmOutputDiscard = false;
       notice = 'Document saved.';
       return true;
