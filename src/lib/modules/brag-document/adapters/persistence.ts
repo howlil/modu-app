@@ -244,7 +244,8 @@ export async function loadFinalizedSnapshots(): Promise<FinalizedSnapshot[]> {
     const raw = await committedRequest<unknown[]>(db, 'readonly',
       store => store.getAll(), SNAPSHOTS);
     return raw.map(decodeFinalizedSnapshot).sort((a, b) =>
-      a.outputId.localeCompare(b.outputId) || b.version - a.version);
+      a.outputId.localeCompare(b.outputId) ||
+      b.finalizedAt.localeCompare(a.finalizedAt) || a.id.localeCompare(b.id));
   });
 }
 
