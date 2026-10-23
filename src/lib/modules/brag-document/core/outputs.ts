@@ -11,10 +11,10 @@ const timestamp = (v: unknown): v is string =>
 export function validPeriod(value: unknown): value is Period {
   if (!object(value)) return false;
   if (value.kind === 'all-time') return true;
-  if (!Number.isInteger(value.year) || Number(value.year) < 1 || Number(value.year) > 9999)
+  if ((typeof value.year !== 'number' || !Number.isInteger(value.year)) || Number(value.year) < 1 || Number(value.year) > 9999)
     return false;
   return value.kind === 'year' ||
-    (value.kind === 'month' && Number.isInteger(value.month) &&
+    (value.kind === 'month' && typeof value.month === 'number' && Number.isInteger(value.month) &&
       Number(value.month) >= 1 && Number(value.month) <= 12);
 }
 
@@ -31,7 +31,7 @@ export function decodeOutput(value: unknown): CareerOutput {
   if (!object(value) || typeof value.id !== 'string' || !value.id ||
     !['interview', 'application', 'review'].includes(String(value.kind)) ||
     !validPeriod(value.period) || !Array.isArray(value.items) ||
-    !Number.isSafeInteger(value.revision) || Number(value.revision) < 1 ||
+    (typeof value.revision !== 'number' || !Number.isSafeInteger(value.revision)) || Number(value.revision) < 1 ||
     !timestamp(value.createdAt) || !timestamp(value.updatedAt)) {
     throw new CareerValidationError('Stored career document is invalid.');
   }
@@ -44,7 +44,7 @@ export function decodeOutput(value: unknown): CareerOutput {
   const items: CareerOutputItem[] = value.items.map((v, i) => {
     if (!object(v) || typeof v.momentId !== 'string' || !v.momentId ||
       seen.has(v.momentId) || v.position !== i ||
-      !Number.isSafeInteger(v.sourceRevision) || Number(v.sourceRevision) < 1 ||
+      (typeof v.sourceRevision !== 'number' || !Number.isSafeInteger(v.sourceRevision)) || Number(v.sourceRevision) < 1 ||
       (v.narrative !== null && (typeof v.narrative !== 'string' || v.narrative.length > 3500))) {
       throw new CareerValidationError('Document contains an invalid or duplicate evidence item.');
     }
