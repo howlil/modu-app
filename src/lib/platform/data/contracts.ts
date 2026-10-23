@@ -1,5 +1,5 @@
 /** Public, feature-owned data-management ports. Never expose raw IDB handles here. */
-export const MODULE_DATA_IDS = ["pomodoro", "habit-tracker", "language-learning"] as const;
+export const MODULE_DATA_IDS = ["pomodoro", "habit-tracker", "language-learning", "brag-document"] as const;
 export type ModuleDataId = (typeof MODULE_DATA_IDS)[number];
 
 export type DataInspection = {
