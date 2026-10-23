@@ -104,6 +104,12 @@ export function toggleOutputMoment(
   };
 }
 
+export function removeOutputMoment(output: CareerOutput, momentId: string): CareerOutput {
+  if (!output.items.some(item => item.momentId === momentId)) return output;
+  return { ...output, items: output.items.filter(item => item.momentId !== momentId)
+    .map((item, position) => ({ ...item, position })) };
+}
+
 export function moveOutputMoment(
   output: CareerOutput, momentId: string, direction: -1 | 1
 ): CareerOutput {
