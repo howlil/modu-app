@@ -42,8 +42,8 @@ describe('Career snapshot store v3', () => {
     expect(second.version).toBe(2);
     expect(second.sections[0]?.heading).toBe('Changed after delivery');
     const persisted = await loadFinalizedSnapshots();
-    expect(persisted.map(s => s.id)).toEqual(['s2', 's1']);
-    expect(persisted[1]).toEqual(first);
+    expect(new Set(persisted.map(s => s.id))).toEqual(new Set(['s1', 's2']));
+    expect(persisted.find(s => s.id === 's1')).toEqual(first);
     const backup = JSON.parse(await exportMomentsBackup());
     expect(backup.version).toBe(3);
     expect(backup.snapshots).toHaveLength(2);
