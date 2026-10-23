@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ArrowRight, Link2, Plus, Check, History } from 'lucide-svelte';
+  import { ArrowRight, Link2, Check, History } from 'lucide-svelte';
   import { Button } from '#lib/components/ui/button/index.js';
   import { Textarea } from '#lib/components/ui/textarea/index.js';
   import { Input } from '#lib/components/ui/input/index.js';
