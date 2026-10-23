@@ -13,7 +13,16 @@
   onMount(() => {
     void controller.reload();
     const unsubscribe = subscribeMomentChanges(() => { void controller.reload(); });
-    return unsubscribe;
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (!controller.isDirty && !controller.isOutputDirty) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', beforeUnload);
+    return () => {
+      unsubscribe();
+      window.removeEventListener('beforeunload', beforeUnload);
+    };
   });
 </script>
 
