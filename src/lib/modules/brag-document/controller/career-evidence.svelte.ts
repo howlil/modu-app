@@ -1,12 +1,14 @@
-import type { CareerMoment, CareerOutput, MomentEditInput, NewOutputInput, Period } from '../core/types.ts';
+import type { CareerMoment, CareerOutput, FinalizedSnapshot, MomentEditInput, NewOutputInput, Period } from '../core/types.ts';
 import { createMoment, filterMoments } from '../core/moments.ts';
 import {
   committedOutputDraft, createOutput, outputCandidates, projectOutputItems,
   toggleOutputMoment, removeOutputMoment, moveOutputMoment, updateOutputGoal, updateOutputNarrative
 } from '../core/outputs.ts';
+import { acknowledgeSourceRevision } from '../core/snapshots.ts';
 import { applyMomentEdit, setMomentArchived, toMomentEditInput } from '../core/enrichment.ts';
 import {
-  addMoment, addOutput, downloadLocalBackup, loadMoments, loadOutputs, replaceMoment, replaceOutput
+  addMoment, addOutput, downloadLocalBackup, loadMoments, loadOutputs, loadFinalizedSnapshots,
+  finalizeSavedOutput, replaceMoment, replaceOutput
 } from '../adapters/persistence.ts';
 
 export type CareerView = 'capture' | 'history' | 'documents';
@@ -20,6 +22,8 @@ export function createCareerEvidenceController() {
   let view = $state<CareerView>('capture');
   let moments = $state<CareerMoment[]>([]);
   let outputs = $state<CareerOutput[]>([]);
+  let snapshots = $state<FinalizedSnapshot[]>([]);
+  let selectedSnapshotId = $state<string | null>(null);
   let selectedOutputId = $state<string | null>(null);
   let outputBase = $state<CareerOutput | null>(null);
   let outputDraft = $state<CareerOutput | null>(null);
@@ -50,6 +54,18 @@ export function createCareerEvidenceController() {
   let pendingReload = $state(false);
   let readVersion = 0;
 
+  const selectedSnapshot = $derived(
+    snapshots.find(snapshot => snapshot.id === selectedSnapshotId) ?? null
+  );
+  const outputSnapshots = $derived(
+    snapshots.filter(snapshot => snapshot.outputId === selectedOutputId)
+      .sort((a, b) => b.version - a.version)
+  );
+  const canFinalize = $derived(
+    !!outputDraft && !isOutputDirty && !isOutputStale && !busy &&
+    outputDraft.items.length > 0 && outputPreview.every(item =>
+      !item.missing && !item.sourceChanged)
+  );
   const selectedOutput = $derived(outputs.find(item => item.id === selectedOutputId) ?? null);
   const isOutputDirty = $derived(!!outputBase && !!outputDraft &&
     JSON.stringify(outputBase) !== JSON.stringify(outputDraft));
@@ -117,10 +133,13 @@ export function createCareerEvidenceController() {
   async function reload(): Promise<void> {
     const current = ++readVersion;
     try {
-      const [stored, storedOutputs] = await Promise.all([loadMoments(), loadOutputs()]);
+      const [stored, storedOutputs, storedSnapshots] = await Promise.all([
+        loadMoments(), loadOutputs(), loadFinalizedSnapshots()
+      ]);
       if (current !== readVersion) return;
       moments = stored;
       outputs = storedOutputs;
+      snapshots = storedSnapshots;
       storageReady = true;
       if (!busy) error = '';
     } catch (failure) {
@@ -303,6 +322,7 @@ export function createCareerEvidenceController() {
     const selected = outputs.find(item => item.id === id);
     if (!selected) return;
     selectedOutputId = id;
+    selectedSnapshotId = null;
     outputBase = selected;
     outputDraft = structuredClone(selected);
     outputQuery = '';
@@ -327,6 +347,7 @@ export function createCareerEvidenceController() {
     pendingOutputReload = false;
     if (next) {
       selectedOutputId = null;
+      selectedSnapshotId = null;
       outputBase = null;
       outputDraft = null;
       view = next;
@@ -343,6 +364,7 @@ export function createCareerEvidenceController() {
       return;
     }
     selectedOutputId = null;
+    selectedSnapshotId = null;
     outputBase = null;
     outputDraft = null;
     outputError = '';
@@ -374,6 +396,7 @@ export function createCareerEvidenceController() {
       await addOutput(draft);
       outputs = [draft, ...outputs];
       selectedOutputId = draft.id;
+      selectedSnapshotId = null;
       outputBase = draft;
       outputDraft = structuredClone(draft);
       outputQuery = '';
@@ -470,6 +493,58 @@ export function createCareerEvidenceController() {
     } finally { busy = false; }
   }
 
+  /** A reviewed source revision is saved as a normal document change first. */
+  function acknowledgeChangedEvidence(momentId: string): void {
+    if (!outputDraft || busy || isOutputStale) return;
+    const source = moments.find(moment => moment.id === momentId);
+    if (!source) return;
+    outputDraft = acknowledgeSourceRevision(outputDraft, source);
+    outputError = '';
+  }
+
+  function openSnapshot(id: string): void {
+    if (!snapshots.some(snapshot => snapshot.id === id && snapshot.outputId === selectedOutputId))
+      return;
+    selectedSnapshotId = id;
+    outputError = '';
+  }
+
+  function closeSnapshot(): void {
+    selectedSnapshotId = null;
+  }
+
+  async function finalizeDocument(): Promise<boolean> {
+    if (!storageReady || busy || !outputBase || !outputDraft) return false;
+    if (isOutputDirty || isOutputStale) {
+      outputError = 'Save your document changes before finalizing.';
+      return false;
+    }
+    if (!outputDraft.items.length) {
+      outputError = 'Select at least one experience before finalizing.';
+      return false;
+    }
+    if (outputPreview.some(item => item.missing || item.sourceChanged)) {
+      outputError = 'Review changed or unavailable source experiences before finalizing.';
+      return false;
+    }
+    busy = true;
+    outputError = '';
+    notice = '';
+    try {
+      const snapshot = await finalizeSavedOutput(
+        outputBase.id, outputBase.revision, crypto.randomUUID(), new Date()
+      );
+      snapshots = [...snapshots, snapshot];
+      selectedSnapshotId = snapshot.id;
+      notice = 'Version ' + snapshot.version + ' finalized. This copy will not change.';
+      return true;
+    } catch (failure) {
+      await reload();
+      outputError = 'Finalization failed. ' + explainError(failure);
+      return false;
+    } finally { busy = false; }
+  }
+
   async function exportBackup(): Promise<void> {
     if (busy || !storageReady) return;
     busy = true;
@@ -487,6 +562,9 @@ export function createCareerEvidenceController() {
     set view(next: CareerView) { navigate(next); },
     get moments() { return moments; },
     get outputs() { return outputs; },
+    get outputSnapshots() { return outputSnapshots; },
+    get selectedSnapshot() { return selectedSnapshot; },
+    get canFinalize() { return canFinalize; },
     get selectedOutputId() { return selectedOutputId; },
     get selectedOutput() { return selectedOutput; },
     get outputDraft() { return outputDraft; },
@@ -537,7 +615,8 @@ export function createCareerEvidenceController() {
     setArchived, openOutput, closeOutput, cancelOutputDiscard,
     discardOutput, reloadOutputLatest, createDocument,
     setOutputGoal, toggleEvidence, reorderEvidence, changeNarrative,
-    saveOutput, exportBackup
+    saveOutput, acknowledgeChangedEvidence, openSnapshot, closeSnapshot,
+    finalizeDocument, exportBackup
   };
 }
 export type CareerEvidenceController = ReturnType<typeof createCareerEvidenceController>;
