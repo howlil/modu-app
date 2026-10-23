@@ -40,7 +40,7 @@ export function decodeCareerBackup(raw: unknown): CareerBackup {
       throw new CareerValidationError('Backup contains duplicate career record IDs.');
   }
   const sourceById = new Map(moments.map(item => [item.id, item]));
-  const docIds = new Set(outputs.map(item => item.id));
+  const docById = new Map(outputs.map(item => [item.id, item]));
   const versions = new Set<string>();
   for (const output of outputs) {
     for (const item of output.items) {
@@ -51,8 +51,9 @@ export function decodeCareerBackup(raw: unknown): CareerBackup {
     }
   }
   for (const snapshot of snapshots) {
-    if (!docIds.has(snapshot.outputId)) {
-      throw new CareerValidationError('Finalized version references a missing document.');
+    const parent = docById.get(snapshot.outputId);
+    if (!parent || snapshot.outputRevision > parent.revision) {
+      throw new CareerValidationError('Finalized version references an unavailable document revision.');
     }
     const key = snapshot.outputId + ':' + snapshot.version;
     if (versions.has(key)) throw new CareerValidationError('Duplicate finalized document version.');
