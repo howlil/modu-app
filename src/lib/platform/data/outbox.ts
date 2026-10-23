@@ -56,6 +56,25 @@ export function ensureOutboxStores(db: IDBDatabase): void {
   }
 }
 
+/** Preflight the exact signed-push envelope with maximum supported identity length.
+ * Feature adapters call this BEFORE their domain write so an unsendable row
+ * never becomes an unacknowledgeable head-of-line outbox item. */
+export function assertQueueableSyncOperation(
+  moduleId: ModuleDataId, entityId: string,
+  kind: Exclude<SyncOperationKind, "baseline">,
+  payload: unknown, baseRevision: string | null = null
+): void {
+  const example = {
+    operationId: "00000000-0000-4000-8000-000000000000",
+    moduleId, deviceId: "x".repeat(128), entityId, kind, baseRevision,
+    payload, createdAt: Number.MAX_SAFE_INTEGER
+  };
+  const bytes = new TextEncoder().encode(JSON.stringify({ operations: [example] })).byteLength;
+  if (bytes > 256 * 1024) {
+    throw new Error("This record exceeds the sync payload limit. Split the document before saving.");
+  }
+}
+
 function newOperation(
   moduleId: ModuleDataId, deviceId: string, entityId: string,
   kind: SyncOperationKind, payload: unknown, baseRevision: string | null
