@@ -33,18 +33,21 @@
       {/if}
     </div>
 
-    {#if creating || controller.outputs.length === 0}
+    {#if creating}
       <div class="mb-6 rounded-[20px] border border-border bg-card p-4 sm:p-5">
         <h3 class="mb-4 text-title font-medium">Create for a goal</h3>
         <GoalEditor busy={controller.busy} error={controller.outputError}
           onSave={submitNew} onCancel={() => creating = false} />
-        {#if controller.outputs.length === 0 && !creating}
-          <p class="mt-3 text-meta text-muted-foreground">Start with an interview, application, or review. You can select evidence after creating it.</p>
-        {/if}
       </div>
     {/if}
 
-    {#if controller.outputs.length}
+    {#if controller.outputs.length === 0 && !creating}
+      <div class="rounded-xl border border-dashed border-border p-6 text-center">
+        <p class="text-ui font-medium">No documents yet.</p>
+        <p class="mt-1 text-meta text-muted-foreground">Start with an interview, application, or review.</p>
+        <Button size="sm" class="mt-4" onclick={() => creating = true}>Create your first document</Button>
+      </div>
+    {:else if controller.outputs.length}
       <div class="border-t border-border">
         {#each controller.outputs as output (output.id)}
           <button type="button" class="flex w-full items-start gap-3 border-b border-border py-4 text-left hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
