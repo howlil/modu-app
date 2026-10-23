@@ -1,3 +1,4 @@
+// @ts-nocheck — Vitest executes Bun/Node built-ins; app tsconfig intentionally omits Node ambient types.
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
