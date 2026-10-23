@@ -4,7 +4,7 @@ Local-first browser utilities built with SvelteKit, Tailwind CSS, shadcn-svelte,
 
 ## Current scope
 
-- Career Evidence (capture, history, multi-document drafts, immutable finalized versions, and Print/PDF; local export only until global data integration)
+- Career Evidence (capture, history, multi-document drafts, immutable finalized versions, and Print/PDF; Global Data & Sync supported after explicit pairing; local export also available)
 - Language Learning
 - Habit Tracker
 - Pomodoro
