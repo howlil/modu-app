@@ -5,12 +5,14 @@
   let preview = $derived(module.status === 'coming-soon');
 
   let tileStyle = $derived({
+    'brag-document': 'background: linear-gradient(145deg, #D7EEE6 0%, #BCE1D4 54%, #A2D4C4 100%);',
     pomodoro: 'background: linear-gradient(145deg, #9BC2F7 0%, #80AEEF 54%, #709DE5 100%);',
     'habit-tracker': 'background: linear-gradient(145deg, #D4E3FF 0%, #BED4FD 55%, #9CBCFA 100%);',
     'language-learning': 'background: linear-gradient(145deg, #D9D4FD 0%, #C7BEF8 55%, #B5A9F0 100%);',
   }[module.id]);
 
   let tileClass = $derived({
+    'brag-document': 'text-[#23584C] border-[#8FC7B6]',
     pomodoro: 'text-[#163A6B] border-[#6F9FE8]',
     'habit-tracker': 'text-[#17437A] border-[#86A9EA]',
     'language-learning': 'text-[#423176] border-[#A494DF]',
@@ -79,6 +81,21 @@
         </g>
       </svg>
     </div>
+  {:else if module.id === 'brag-document'}
+    <div class="tool-art tool-art--career" aria-hidden="true">
+      <svg class="size-full" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <g transform="rotate(-8 120 120)">
+          <rect x="55" y="35" width="145" height="176" rx="19" fill="#F2FCF8" stroke="#78AFA0" stroke-width="4"/>
+          <rect x="43" y="48" width="143" height="172" rx="18" fill="#FFFFFF" stroke="#77B4A0" stroke-width="4"/>
+          <rect x="65" y="72" width="82" height="14" rx="7" fill="#5EAD92"/>
+          <rect x="65" y="104" width="97" height="9" rx="4.5" fill="#C3DFD5"/>
+          <rect x="65" y="124" width="85" height="9" rx="4.5" fill="#C3DFD5"/>
+          <rect x="65" y="144" width="71" height="9" rx="4.5" fill="#C3DFD5"/>
+          <circle cx="168" cy="171" r="32" fill="#247A54"/>
+          <path d="m153 170 10 10 21-22" stroke="white" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+        </g>
+      </svg>
+    </div>
   {:else if module.id === 'pomodoro'}
     <div class="tool-art tool-art--pomodoro" aria-hidden="true">
       <svg class="size-full" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -112,6 +129,7 @@
 
 
 
+  .tool-art--career { --art-rotation: -5deg; --art-duration: 8s; --art-delay: -1.2s; }
   .tool-art--language { --art-rotation: 5deg; --art-duration: 7.4s; --art-delay: -1s; }
   .tool-art--habit { --art-rotation: -8deg; --art-duration: 8s; --art-delay: -1.5s; }
 
