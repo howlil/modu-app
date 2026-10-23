@@ -3,7 +3,7 @@ import { decodeOutput } from '../core/outputs.ts';
 import { buildFinalizedSnapshot, decodeFinalizedSnapshot } from '../core/snapshots.ts';
 import type { CareerMoment, CareerOutput, FinalizedSnapshot } from '../core/types.ts';
 import { OUTBOX_STORE, SYNC_META_STORE, ensureOutboxStores, queueLocalMutation } from '#lib/platform/data/outbox.ts';
-import { ensureInboxStores, INBOX_STORE, TOMBSTONE_STORE } from '#lib/platform/data/inbox.ts';
+import { ensureInboxStores } from '#lib/platform/data/inbox.ts';
 
 const DATABASE = 'modu-career-evidence';
 const VERSION = 4;
@@ -144,7 +144,7 @@ export async function replaceMoment(next: CareerMoment, expectedRevision: number
       }
     };
   }));
-  notifyCommittedChange();
+  notifyCareerChange();
 }
 
 /** Output records share the existing IndexedDB database, never a second isolated storage. */
@@ -165,7 +165,7 @@ export async function addOutput(output: CareerOutput): Promise<void> {
     store => store.add(valid), OUTPUTS,
     tx => queueLocalMutation(tx, 'brag-document', 'output:' + valid.id, 'upsert',
       { output: valid })));
-  notifyCommittedChange();
+  notifyCareerChange();
 }
 
 /** Atomic compare-and-swap inside a single readwrite transaction prevents lost updates. */
@@ -195,7 +195,7 @@ export async function replaceOutput(next: CareerOutput, expectedRevision: number
       }
     };
   }));
-  notifyCommittedChange();
+  notifyCareerChange();
 }
 
 export async function loadFinalizedSnapshots(): Promise<FinalizedSnapshot[]> {
@@ -251,7 +251,7 @@ export async function finalizeSavedOutput(
     momentRequest.onsuccess = maybeBuild;
     previousRequest.onsuccess = maybeBuild;
   }));
-  notifyCommittedChange();
+  notifyCareerChange();
   return result;
 }
 
