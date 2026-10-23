@@ -17,7 +17,9 @@ The current modules are:
 ```text
 Module
 ├── Pomodoro
-└── Habit Tracker
+├── Habit Tracker
+├── Language Learning
+└── Career Evidence (capture/history local-first slice)
 ```
 
 Do not add JSON, UUID, image tools, category pages, PWA layers, storage abstractions, OPFS wrappers, or generic worker frameworks until a current module actually needs them.
