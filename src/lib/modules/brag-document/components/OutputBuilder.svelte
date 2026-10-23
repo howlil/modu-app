@@ -1,5 +1,6 @@
 <script lang="ts">
   import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, RefreshCw, Save, Search, X } from 'lucide-svelte';
+  import { onMount } from 'svelte';
   import { Button } from '#lib/components/ui/button/index.js';
   import { Input } from '#lib/components/ui/input/index.js';
   import { Textarea } from '#lib/components/ui/textarea/index.js';
@@ -8,6 +9,8 @@
 
   let { controller }: { controller: CareerEvidenceController } = $props();
   let editGoal = $state(false);
+  let heading: HTMLHeadingElement;
+  onMount(() => heading?.focus());
 
   const kindLabel = { interview: 'Interview', application: 'Application', review: 'Review' } as const;
 </script>
@@ -48,7 +51,7 @@
     <div class="mb-5 flex flex-wrap items-start justify-between gap-3">
       <div class="min-w-0">
         <p class="text-meta text-muted-foreground">{kindLabel[controller.outputDraft.kind]} · Draft</p>
-        <h2 class="mt-1 break-words text-title-lg font-medium">{controller.outputDraft.title}</h2>
+        <h2 bind:this={heading} tabindex="-1" class="mt-1 break-words text-title-lg font-medium focus:outline-none">{controller.outputDraft.title}</h2>
         <p class="mt-1 text-meta text-muted-foreground">
           {controller.outputDraft.targetRole || 'Any role'}
           {#if controller.outputDraft.organization} · {controller.outputDraft.organization}{/if}
