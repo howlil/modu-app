@@ -78,7 +78,7 @@ async function run() {
   const json = await executeAsync('const done=arguments[arguments.length-1];window.__moduBlob.text().then(done).catch(e=>done("ERROR:"+e.message));');
   const parsed = JSON.parse(json);
   assert.equal(parsed.format, "modu-global-backup");
-  assert.deepEqual(Object.keys(parsed.modules).sort(), ["habit-tracker", "language-learning", "pomodoro"]);
+  assert.deepEqual(Object.keys(parsed.modules).sort(), ["brag-document", "habit-tracker", "language-learning", "pomodoro"]);
 
   await navigate(SITE + "/habit");
   await waitFor("habit page ready", 'document.body.textContent.includes("New habit") && !document.body.textContent.includes("Loading habits")');
@@ -108,9 +108,9 @@ async function run() {
   await navigate(SITE + "/settings/data");
   await waitFor("module data ready", 'document.body.textContent.includes("Module data") && !document.body.textContent.includes("Reading local module data")');
   const migratedStores = await executeAsync(
-    'const done=arguments[arguments.length-1];const names=[["modu-habit-tracker",4],["modu-language-learning",6],["module-pomodoro-activity",3]];let count=0;const results=[];for(const [name,version] of names){const req=indexedDB.open(name);req.onsuccess=()=>{const db=req.result;results.push({name,version:db.version,stores:[...db.objectStoreNames]});db.close();if(++count===names.length)done(results)};req.onerror=()=>done("ERROR: "+name+" database unavailable");}',
+    'const done=arguments[arguments.length-1];const names=[["modu-habit-tracker",4],["modu-language-learning",6],["module-pomodoro-activity",3],["modu-career-evidence",4]];let count=0;const results=[];for(const [name,version] of names){const req=indexedDB.open(name);req.onsuccess=()=>{const db=req.result;results.push({name,version:db.version,stores:[...db.objectStoreNames]});db.close();if(++count===names.length)done(results)};req.onerror=()=>done("ERROR: "+name+" database unavailable");}',
   );
-  assert.ok(Array.isArray(migratedStores), "All three feature databases must be available in Chrome");
+  assert.ok(Array.isArray(migratedStores), "All four feature databases must be available in Chrome");
   for (const entry of migratedStores) {
     assert.ok(entry.stores.includes("sync_outbox"), entry.name + " outbox missing");
     assert.ok(entry.stores.includes("sync_metadata"), entry.name + " capture metadata missing");
@@ -118,9 +118,9 @@ async function run() {
     assert.ok(entry.stores.includes("sync_tombstones"), entry.name + " tombstone store missing");
     assert.equal(entry.version,
       entry.name === "modu-habit-tracker" ? 4 :
-      entry.name === "modu-language-learning" ? 6 : 3);
+      entry.name === "modu-language-learning" ? 6 : entry.name === "modu-career-evidence" ? 4 : 3);
   }
-  process.stdout.write("Global Data & Sync Chrome smoke passed: export → mutate → restore → reload → M3 schema upgrade.\\n");
+  process.stdout.write("Global Data & Sync Chrome smoke passed: export → mutate → restore → reload → four-module schema check.\\n");
 }
 
 let failure = null;
