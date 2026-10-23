@@ -1,7 +1,7 @@
 import type { CareerMoment } from '../core/types.ts';
-import { CareerValidationError, createMoment, filterMoments } from '../core/moments.ts';
+import { createMoment, filterMoments } from '../core/moments.ts';
 import {
-  addMoment, downloadLocalBackup, loadMoments, type CareerStorageError
+  addMoment, downloadLocalBackup, loadMoments
 } from '../adapters/persistence.ts';
 
 export type CareerView = 'capture' | 'history';
