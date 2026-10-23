@@ -3,7 +3,7 @@ import { assertOutputReferences, decodeOutput } from '../core/outputs.ts';
 import { buildFinalizedSnapshot, decodeFinalizedSnapshot } from '../core/snapshots.ts';
 import { verifyCareerState } from '../core/backup.ts';
 import type { CareerMoment, CareerOutput, FinalizedSnapshot } from '../core/types.ts';
-import { OUTBOX_STORE, SYNC_META_STORE, ensureOutboxStores, queueLocalMutation } from '#lib/platform/data/outbox.ts';
+import { OUTBOX_STORE, SYNC_META_STORE, ensureOutboxStores, queueLocalMutation, assertQueueableSyncOperation } from '#lib/platform/data/outbox.ts';
 import { ensureInboxStores } from '#lib/platform/data/inbox.ts';
 
 const DATABASE = 'modu-career-evidence';
@@ -16,21 +16,6 @@ export const CAREER_SNAPSHOTS_STORE = 'snapshots';
 const SNAPSHOTS = CAREER_SNAPSHOTS_STORE;
 const EVENT = 'modu:career-evidence-changed';
 const CHANNEL = 'modu-career-evidence-changes';
-/** Reserve >=2KiB for operation metadata, signature envelope and device ID.
- * The transport's absolute JSON cap is 256KiB. Reject unsendable records
- * before their IndexedDB commit; local-only mode remains exportable. */
-const MAX_QUEUED_PAYLOAD_BYTES = 254 * 1024;
-function assertSyncPayloadCapacity(value: unknown): void {
-  const serialized = JSON.stringify(value);
-  if (serialized === undefined || new TextEncoder().encode(serialized).byteLength >
-    MAX_QUEUED_PAYLOAD_BYTES) {
-    throw new CareerStorageError(
-      'This record is too large to sync. Split the document into smaller experiences.'
-    );
-  }
-}
-
-
 export class CareerStorageError extends Error {
   constructor(message: string) { super(message); this.name = 'CareerStorageError'; }
 }
@@ -126,7 +111,8 @@ export function notifyCareerChange(): void {
 
 export async function addMoment(moment: CareerMoment): Promise<void> {
   const valid = decodeMoment(moment);
-  assertSyncPayloadCapacity({ moment: valid });
+  assertQueueableSyncOperation('brag-document', 'moment:' + valid.id,
+    'upsert', { moment: valid }, null);
   await withDatabase(db => committedRequest(db, 'readwrite', store => store.add(valid),
     STORE, tx => queueLocalMutation(tx, 'brag-document', 'moment:' + valid.id,
       'upsert', { moment: valid })));
@@ -136,7 +122,8 @@ export async function addMoment(moment: CareerMoment): Promise<void> {
 /** Optimistic revision enforcement stays inside one IDB transaction. */
 export async function replaceMoment(next: CareerMoment, expectedRevision: number): Promise<void> {
   const valid = decodeMoment(next);
-  assertSyncPayloadCapacity({ moment: valid });
+  assertQueueableSyncOperation('brag-document', 'moment:' + valid.id,
+    'upsert', { moment: valid }, String(expectedRevision));
   await withDatabase(db => new Promise<void>((resolve, reject) => {
     const tx = db.transaction([STORE, OUTBOX_STORE, SYNC_META_STORE], 'readwrite');
     const store = tx.objectStore(STORE);
@@ -178,7 +165,8 @@ export async function loadOutputs(): Promise<CareerOutput[]> {
 
 export async function addOutput(output: CareerOutput): Promise<void> {
   const valid = decodeOutput(output);
-  assertSyncPayloadCapacity({ output: valid });
+  assertQueueableSyncOperation('brag-document', 'output:' + valid.id,
+    'upsert', { output: valid }, null);
   await withDatabase(db => new Promise<void>((resolve, reject) => {
     const tx = db.transaction([STORE, OUTPUTS, OUTBOX_STORE, SYNC_META_STORE], 'readwrite');
     let failure: Error | null = null;
@@ -202,7 +190,8 @@ export async function addOutput(output: CareerOutput): Promise<void> {
 /** Atomic compare-and-swap inside a single readwrite transaction prevents lost updates. */
 export async function replaceOutput(next: CareerOutput, expectedRevision: number): Promise<void> {
   const valid = decodeOutput(next);
-  assertSyncPayloadCapacity({ output: valid });
+  assertQueueableSyncOperation('brag-document', 'output:' + valid.id,
+    'upsert', { output: valid }, String(expectedRevision));
   await withDatabase(db => new Promise<void>((resolve, reject) => {
     const tx = db.transaction([STORE, OUTPUTS, OUTBOX_STORE, SYNC_META_STORE], 'readwrite');
     const store = tx.objectStore(OUTPUTS);
@@ -281,7 +270,8 @@ export async function finalizeSavedOutput(
         const versions = (previousRequest.result as unknown[]).map(decodeFinalizedSnapshot);
         const version = Math.max(0, ...versions.map(v => v.version)) + 1;
         created = buildFinalizedSnapshot(output, moments, snapshotId, version, now);
-        assertSyncPayloadCapacity({ snapshot: created });
+        assertQueueableSyncOperation('brag-document', 'snapshot:' + created.id,
+          'upsert', { snapshot: created }, null);
         tx.objectStore(SNAPSHOTS).add(created);
         queueLocalMutation(tx, 'brag-document', 'snapshot:' + created.id,
           'upsert', { snapshot: created });
