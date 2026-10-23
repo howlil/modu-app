@@ -1,17 +1,17 @@
-import type { CareerMoment } from '../core/types.ts';
+import type { CareerMoment, MomentEditInput } from '../core/types.ts';
 import { createMoment, filterMoments } from '../core/moments.ts';
+import { applyMomentEdit, setMomentArchived, toMomentEditInput } from '../core/enrichment.ts';
 import {
-  addMoment, downloadLocalBackup, loadMoments
+  addMoment, downloadLocalBackup, loadMoments, replaceMoment
 } from '../adapters/persistence.ts';
 
 export type CareerView = 'capture' | 'history';
 
 function explainError(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  return 'The operation failed. Your input has not been removed.';
+  return error instanceof Error ? error.message : 'The operation failed. Your changes remain here.';
 }
 
-/** This factory is called once for each mounted workspace. Never export shared state. */
+/** Per-workspace Svelte 5 controller; source edits never depend on component lifetime. */
 export function createCareerEvidenceController() {
   let view = $state<CareerView>('capture');
   let moments = $state<CareerMoment[]>([]);
@@ -21,12 +21,59 @@ export function createCareerEvidenceController() {
   let noteDraft = $state('');
   let evidenceDraft = $state('');
   let query = $state('');
+  let showArchived = $state(false);
   let error = $state('');
   let notice = $state('');
+  let selectedMomentId = $state<string | null>(null);
+  let editBase = $state<CareerMoment | null>(null);
+  let editDraft = $state<MomentEditInput | null>(null);
+  let editError = $state('');
+  let confirmDiscard = $state(false);
+  let pendingView = $state<CareerView | null>(null);
+  let pendingReload = $state(false);
   let readVersion = 0;
 
-  const visibleMoments = $derived(filterMoments(moments, query));
   const recentMoments = $derived(filterMoments(moments, '').slice(0, 3));
+  const activeCount = $derived(moments.filter(moment => !moment.archivedAt).length);
+  const archivedCount = $derived(moments.filter(moment => moment.archivedAt).length);
+  const visibleMoments = $derived(
+    filterMoments(moments, query, { includeArchived: true })
+      .filter(moment => Boolean(moment.archivedAt) === showArchived)
+  );
+  const selectedMoment = $derived(
+    moments.find(moment => moment.id === selectedMomentId) ?? null
+  );
+  const isDirty = $derived(
+    !!editBase && !!editDraft &&
+    JSON.stringify(editDraft) !== JSON.stringify(toMomentEditInput(editBase))
+  );
+  const isStale = $derived(
+    !!editBase && (!selectedMoment || selectedMoment.revision !== editBase.revision)
+  );
+
+  function clearEditor(): void {
+    selectedMomentId = null;
+    editBase = null;
+    editDraft = null;
+    editError = '';
+    confirmDiscard = false;
+    pendingView = null;
+    pendingReload = false;
+  }
+
+  function navigate(next: CareerView): void {
+    if (next === view) return;
+    if (selectedMomentId && isDirty) {
+      pendingView = next;
+      pendingReload = false;
+      confirmDiscard = true;
+      return;
+    }
+    clearEditor();
+    view = next;
+    notice = '';
+    error = '';
+  }
 
   async function reload(): Promise<void> {
     const current = ++readVersion;
@@ -47,7 +94,6 @@ export function createCareerEvidenceController() {
 
   async function capture(): Promise<boolean> {
     if (busy || !storageReady) return false;
-    // Validate before entering the asynchronous transaction.
     let moment: CareerMoment;
     try {
       const now = new Date();
@@ -75,6 +121,137 @@ export function createCareerEvidenceController() {
     } finally { busy = false; }
   }
 
+  function openMoment(id: string): void {
+    const moment = moments.find(item => item.id === id);
+    if (!moment) return;
+    // A second selection never replaces an unsaved edit without confirmation.
+    if (selectedMomentId && selectedMomentId !== id && isDirty) {
+      editError = 'Save or discard your changes before opening another moment.';
+      return;
+    }
+    selectedMomentId = id;
+    editBase = moment;
+    editDraft = toMomentEditInput(moment);
+    editError = '';
+    confirmDiscard = false;
+    pendingView = null;
+    pendingReload = false;
+    view = 'history';
+  }
+
+  function changeEditField<K extends keyof MomentEditInput>(
+    field: K, value: MomentEditInput[K]
+  ): void {
+    if (!editDraft) return;
+    editDraft = { ...editDraft, [field]: value };
+    editError = '';
+    confirmDiscard = false;
+  }
+
+  function requestCloseMoment(): void {
+    if (busy) return;
+    if (isDirty) {
+      confirmDiscard = true;
+      pendingView = null;
+      pendingReload = false;
+    } else clearEditor();
+  }
+
+  function requestReloadLatest(): void {
+    if (!selectedMoment || busy) return;
+    if (isDirty) {
+      confirmDiscard = true;
+      pendingReload = true;
+      pendingView = null;
+    } else {
+      editBase = selectedMoment;
+      editDraft = toMomentEditInput(selectedMoment);
+      editError = '';
+    }
+  }
+
+  function cancelDiscard(): void {
+    confirmDiscard = false;
+    pendingView = null;
+    pendingReload = false;
+  }
+
+  function confirmDiscardChanges(): void {
+    if (pendingReload && selectedMoment) {
+      editBase = selectedMoment;
+      editDraft = toMomentEditInput(selectedMoment);
+      editError = '';
+      confirmDiscard = false;
+      pendingReload = false;
+      pendingView = null;
+      return;
+    }
+    const next = pendingView;
+    clearEditor();
+    if (next) {
+      view = next;
+      notice = '';
+      error = '';
+    }
+  }
+
+  async function saveEdit(): Promise<boolean> {
+    if (!storageReady || busy || !editBase || !editDraft) return false;
+    if (isStale) {
+      editError = 'This moment changed in another tab. Review the latest saved version before editing.';
+      return false;
+    }
+    let updated: CareerMoment;
+    try {
+      updated = applyMomentEdit(editBase, editDraft, new Date(), () => crypto.randomUUID());
+    } catch (failure) {
+      editError = explainError(failure);
+      return false;
+    }
+    busy = true;
+    editError = '';
+    notice = '';
+    try {
+      await replaceMoment(updated, editBase.revision);
+      moments = moments.map(item => item.id === updated.id ? updated : item);
+      editBase = updated;
+      editDraft = toMomentEditInput(updated);
+      notice = 'Changes saved.';
+      return true;
+    } catch (failure) {
+      await reload();
+      editError = 'Changes not saved. ' + explainError(failure);
+      return false;
+    } finally { busy = false; }
+  }
+
+  async function setArchived(id: string, archived: boolean): Promise<boolean> {
+    if (!storageReady || busy) return false;
+    if (selectedMomentId === id && isDirty) {
+      editError = 'Save or discard changes before archiving this moment.';
+      return false;
+    }
+    const current = moments.find(moment => moment.id === id);
+    if (!current) return false;
+    let updated: CareerMoment;
+    try { updated = setMomentArchived(current, archived, new Date()); }
+    catch (failure) { editError = explainError(failure); return false; }
+    if (updated === current) return true;
+    busy = true;
+    editError = '';
+    try {
+      await replaceMoment(updated, current.revision);
+      moments = moments.map(moment => moment.id === id ? updated : moment);
+      if (selectedMomentId === id) clearEditor();
+      notice = archived ? 'Moment archived. Find it under Archived.' : 'Moment restored.';
+      return true;
+    } catch (failure) {
+      await reload();
+      error = 'Could not change archive state. ' + explainError(failure);
+      return false;
+    } finally { busy = false; }
+  }
+
   async function exportBackup(): Promise<void> {
     if (busy || !storageReady) return;
     busy = true;
@@ -89,10 +266,21 @@ export function createCareerEvidenceController() {
 
   return {
     get view() { return view; },
-    set view(next: CareerView) { view = next; notice = ''; error = ''; },
+    set view(next: CareerView) { navigate(next); },
     get moments() { return moments; },
     get visibleMoments() { return visibleMoments; },
     get recentMoments() { return recentMoments; },
+    get activeCount() { return activeCount; },
+    get archivedCount() { return archivedCount; },
+    get showArchived() { return showArchived; },
+    set showArchived(next: boolean) { if (!selectedMomentId) showArchived = next; },
+    get selectedMoment() { return selectedMoment; },
+    get selectedMomentId() { return selectedMomentId; },
+    get editDraft() { return editDraft; },
+    get isDirty() { return isDirty; },
+    get isStale() { return isStale; },
+    get editError() { return editError; },
+    get confirmDiscard() { return confirmDiscard; },
     get loading() { return loading; },
     get storageReady() { return storageReady; },
     get busy() { return busy; },
@@ -104,7 +292,9 @@ export function createCareerEvidenceController() {
     set query(next: string) { query = next; },
     get error() { return error; },
     get notice() { return notice; },
-    reload, capture, exportBackup
+    reload, capture, openMoment, changeEditField, requestCloseMoment,
+    requestReloadLatest, cancelDiscard, confirmDiscardChanges, saveEdit,
+    setArchived, exportBackup
   };
 }
 export type CareerEvidenceController = ReturnType<typeof createCareerEvidenceController>;
