@@ -187,7 +187,7 @@ async function run() {
   const links = await execute(
     'return [...document.querySelectorAll("#tools a[href]")].map(a => a.getAttribute("href"));'
   );
-  assert.deepEqual(links, ['/language', '/habit', '/pomodoro', '/brag-document']);
+  assert.deepEqual(links, ['/language', '/habit', '/brag-document', '/pomodoro']);
   await navigate(SITE + '/language');
   await waitUntil('Language Learning workspace renders',
     'Boolean(document.body.textContent.includes("Language library") && !document.body.textContent.includes("Loading learning history"))');
