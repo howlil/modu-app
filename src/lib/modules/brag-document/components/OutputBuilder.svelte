@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ArrowDown, ArrowLeft, ArrowUp, Check, ChevronDown, Plus, RefreshCw, Save, Search, X } from 'lucide-svelte';
+  import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, RefreshCw, Save, Search, X } from 'lucide-svelte';
   import { Button } from '#lib/components/ui/button/index.js';
   import { Input } from '#lib/components/ui/input/index.js';
   import { Textarea } from '#lib/components/ui/textarea/index.js';
@@ -8,7 +8,6 @@
 
   let { controller }: { controller: CareerEvidenceController } = $props();
   let editGoal = $state(false);
-  let selectionSection: HTMLElement;
 
   const kindLabel = { interview: 'Interview', application: 'Application', review: 'Review' } as const;
 </script>
@@ -77,8 +76,7 @@
     {/if}
 
     <div class="grid min-w-0 gap-5 md:grid-cols-2">
-      <section aria-label="Choose career evidence" bind:this={selectionSection}
-        class="min-w-0 rounded-[20px] border border-border bg-card p-4">
+      <section aria-label="Choose career evidence" class="min-w-0 rounded-[20px] border border-border bg-card p-4">
         <div class="flex items-center justify-between gap-2">
           <h3 class="text-title font-medium">Choose evidence</h3>
           <span class="text-meta text-muted-foreground">{controller.outputDraft.items.length} selected</span>
