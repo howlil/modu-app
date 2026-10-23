@@ -139,7 +139,7 @@ function isOperation(value: unknown): value is PendingSyncOperation {
   return typeof x.operationId === "string" && typeof x.deviceId === "string" &&
     typeof x.entityId === "string" && typeof x.createdAt === "number" &&
     (x.kind === "upsert" || x.kind === "delete" || x.kind === "command" || x.kind === "baseline") &&
-    (x.moduleId === "pomodoro" || x.moduleId === "habit-tracker" || x.moduleId === "language-learning") &&
+    (x.moduleId === "pomodoro" || x.moduleId === "habit-tracker" || x.moduleId === "language-learning" || x.moduleId === "brag-document") &&
     (x.baseRevision === null || typeof x.baseRevision === "string") &&
     Number.isSafeInteger(x.sequence) && (x.sequence as number) > 0 && "payload" in x;
 }
