@@ -143,7 +143,7 @@ async function run() {
   await until("Persisted document", 'document.body.textContent.includes("M7 Backend Interview")');
   await clickSelector('[id^="output-open-"]');
   await until("Finalized history", 'document.body.textContent.includes("Version 1")');
-  await clickButton("Version 1");
+  await clickSelector('[id^="career-snapshot-"]');
   await until("Immutable preview survives reload", 'Boolean(document.querySelector("#career-print-sheet"))');
   assert.equal(await js(
     "return document.querySelector('#career-print-sheet').textContent.includes(" +
