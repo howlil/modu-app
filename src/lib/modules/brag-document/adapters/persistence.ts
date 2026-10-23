@@ -1,11 +1,13 @@
 import { decodeMoment } from '../core/moments.ts';
 import { decodeOutput } from '../core/outputs.ts';
-import type { CareerMoment, CareerOutput } from '../core/types.ts';
+import { buildFinalizedSnapshot, decodeFinalizedSnapshot } from '../core/snapshots.ts';
+import type { CareerMoment, CareerOutput, FinalizedSnapshot } from '../core/types.ts';
 
 const DATABASE = 'modu-career-evidence';
-const VERSION = 2;
+const VERSION = 3;
 const STORE = 'moments';
 const OUTPUTS = 'outputs';
+const SNAPSHOTS = 'snapshots';
 const EVENT = 'modu:career-evidence-changed';
 const CHANNEL = 'modu-career-evidence-changes';
 
@@ -29,6 +31,10 @@ function openDatabase(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(OUTPUTS)) {
         const store = db.createObjectStore(OUTPUTS, { keyPath: 'id' });
         store.createIndex('updatedAt', 'updatedAt');
+      }
+      if (!db.objectStoreNames.contains(SNAPSHOTS)) {
+        const store = db.createObjectStore(SNAPSHOTS, { keyPath: 'id' });
+        store.createIndex('outputId', 'outputId', { unique: false });
       }
     };
     request.onsuccess = () => {
@@ -54,7 +60,7 @@ function committedRequest<T>(
   db: IDBDatabase,
   mode: IDBTransactionMode,
   request: (store: IDBObjectStore) => IDBRequest<T>,
-  storeName: typeof STORE | typeof OUTPUTS = STORE
+  storeName: typeof STORE | typeof OUTPUTS | typeof SNAPSHOTS = STORE
 ): Promise<T> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(storeName, mode);
@@ -174,17 +180,73 @@ export async function replaceOutput(next: CareerOutput, expectedRevision: number
   notifyCommittedChange();
 }
 
-/** Backup both stores from the same readonly IDB transaction to avoid split snapshots. */
+export async function loadFinalizedSnapshots(): Promise<FinalizedSnapshot[]> {
+  return withDatabase(async db => {
+    const raw = await committedRequest<unknown[]>(db, 'readonly',
+      store => store.getAll(), SNAPSHOTS);
+    return raw.map(decodeFinalizedSnapshot).sort((a, b) =>
+      a.outputId.localeCompare(b.outputId) || b.version - a.version);
+  });
+}
+
+/** Immutable insert, with a live output revision and all source records checked
+ * in the same transaction. No already-finalized snapshot can be overwritten. */
+export async function finalizeSavedOutput(
+  outputId: string, expectedRevision: number, snapshotId: string, now: Date
+): Promise<FinalizedSnapshot> {
+  const result = await withDatabase(db => new Promise<FinalizedSnapshot>((resolve, reject) => {
+    const tx = db.transaction([STORE, OUTPUTS, SNAPSHOTS], 'readwrite');
+    let failure: Error | null = null;
+    let created: FinalizedSnapshot | null = null;
+    tx.oncomplete = () => {
+      if (created) resolve(created);
+      else reject(new CareerStorageError('Snapshot was not created.'));
+    };
+    tx.onabort = () => reject(failure ?? new CareerStorageError(
+      tx.error?.message || 'Document finalization failed.'
+    ));
+    const outputRequest = tx.objectStore(OUTPUTS).get(outputId);
+    const momentRequest = tx.objectStore(STORE).getAll();
+    const previousRequest = tx.objectStore(SNAPSHOTS).index('outputId').getAll(outputId);
+    let ready = 0;
+    const maybeBuild = () => {
+      if (++ready !== 3) return;
+      try {
+        if (!outputRequest.result) throw new CareerStorageError('Saved document no longer exists.');
+        const output = decodeOutput(outputRequest.result);
+        if (output.revision !== expectedRevision) {
+          throw new CareerStorageError('Document changed in another tab. Reload before finalizing.');
+        }
+        const moments = (momentRequest.result as unknown[]).map(decodeMoment);
+        const versions = (previousRequest.result as unknown[]).map(decodeFinalizedSnapshot);
+        const version = Math.max(0, ...versions.map(v => v.version)) + 1;
+        created = buildFinalizedSnapshot(output, moments, snapshotId, version, now);
+        tx.objectStore(SNAPSHOTS).add(created);
+      } catch (error) {
+        failure = error instanceof Error ? error : new CareerStorageError('Invalid document snapshot.');
+        try { tx.abort(); } catch { reject(failure); }
+      }
+    };
+    outputRequest.onsuccess = maybeBuild;
+    momentRequest.onsuccess = maybeBuild;
+    previousRequest.onsuccess = maybeBuild;
+  }));
+  notifyCommittedChange();
+  return result;
+}
+
+/** Backup all feature stores from one readonly transaction. */
 export async function exportMomentsBackup(): Promise<string> {
   const snapshot = await withDatabase(db => new Promise<{
-    moments: CareerMoment[]; outputs: CareerOutput[];
+    moments: CareerMoment[]; outputs: CareerOutput[]; snapshots: FinalizedSnapshot[];
   }>((resolve, reject) => {
-    const tx = db.transaction([STORE, OUTPUTS], 'readonly');
-    let moments: unknown[] = [], outputs: unknown[] = [];
+    const tx = db.transaction([STORE, OUTPUTS, SNAPSHOTS], 'readonly');
+    let moments: unknown[] = [], outputs: unknown[] = [], snapshots: unknown[] = [];
     tx.onabort = () => reject(new CareerStorageError('Unable to read backup data.'));
     tx.oncomplete = () => {
       try {
-        resolve({ moments: moments.map(decodeMoment), outputs: outputs.map(decodeOutput) });
+        resolve({ moments: moments.map(decodeMoment), outputs: outputs.map(decodeOutput),
+          snapshots: snapshots.map(decodeFinalizedSnapshot) });
       } catch (error) { reject(error); }
     };
     tx.objectStore(STORE).getAll().onsuccess = event => {
@@ -193,9 +255,12 @@ export async function exportMomentsBackup(): Promise<string> {
     tx.objectStore(OUTPUTS).getAll().onsuccess = event => {
       outputs = (event.target as IDBRequest<unknown[]>).result;
     };
+    tx.objectStore(SNAPSHOTS).getAll().onsuccess = event => {
+      snapshots = (event.target as IDBRequest<unknown[]>).result;
+    };
   }));
   return JSON.stringify({
-    format: 'modu-career-evidence-local', version: 2,
+    format: 'modu-career-evidence-local', version: 3,
     exportedAt: new Date().toISOString(), ...snapshot
   }, null, 2);
 }
