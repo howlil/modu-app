@@ -6,6 +6,7 @@
   import { Textarea } from '#lib/components/ui/textarea/index.js';
   import type { CareerEvidenceController } from '../controller/career-evidence.svelte.ts';
   import GoalEditor from './GoalEditor.svelte';
+  import DocumentPreview from './DocumentPreview.svelte';
 
   let { controller }: { controller: CareerEvidenceController } = $props();
   let editGoal = $state(false);
@@ -15,7 +16,9 @@
   const kindLabel = { interview: 'Interview', application: 'Application', review: 'Review' } as const;
 </script>
 
-{#if controller.outputDraft}
+{#if controller.selectedSnapshot}
+  <DocumentPreview snapshot={controller.selectedSnapshot} onBack={controller.closeSnapshot}/>
+{:else if controller.outputDraft}
   <section aria-label="Career document builder">
     <div class="mb-5 flex flex-wrap items-center justify-between gap-2">
       <Button variant="ghost" size="sm" class="-ml-2" onclick={controller.closeOutput}>
@@ -154,12 +157,21 @@
                   </div>
                 </div>
                 {#if item.sourceChanged || item.outOfPeriod || item.archived || item.missing}
-                  <p class="mb-2 text-meta text-muted-foreground">
-                    {item.missing ? 'Source unavailable · ' : ''}
-                    {item.sourceChanged ? 'Source changed since selection · ' : ''}
-                    {item.outOfPeriod ? 'Outside selected period · ' : ''}
-                    {item.archived ? 'Archived source' : ''}
-                  </p>
+                  <div class="mb-3">
+                    <p class="text-meta text-muted-foreground">
+                      {item.missing ? 'Source unavailable · ' : ''}
+                      {item.sourceChanged ? 'Source changed since selection · ' : ''}
+                      {item.outOfPeriod ? 'Outside selected period · ' : ''}
+                      {item.archived ? 'Archived source' : ''}
+                    </p>
+                    {#if item.sourceChanged && !item.missing}
+                      <Button type="button" variant="outline" size="xs" class="mt-2"
+                        disabled={controller.busy || controller.isOutputStale}
+                        onclick={() => controller.acknowledgeChangedEvidence(item.momentId)}>
+                        I reviewed this source
+                      </Button>
+                    {/if}
+                  </div>
                 {/if}
                 <label class="mb-2 block text-meta text-muted-foreground" for={'output-story-' + item.momentId}>
                   Your narrative for this document
@@ -188,5 +200,48 @@
         <Save class="size-4"/> Save draft
       </Button>
     </div>
+
+    <section class="mt-6 rounded-[20px] border border-border bg-card p-4 sm:p-5" aria-label="Document finalization">
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 class="text-title font-medium">Finalized versions</h3>
+          <p class="mt-1 max-w-[480px] text-meta text-muted-foreground">
+            Finalizing saves a permanent copy. Editing this draft or its source moments will not change previous versions.
+          </p>
+        </div>
+        <Button type="button" disabled={!controller.canFinalize}
+          onclick={() => void controller.finalizeDocument()}>
+          Finalize version
+        </Button>
+      </div>
+      {#if !controller.canFinalize}
+        <p class="mt-3 text-meta text-muted-foreground">
+          {controller.isOutputDirty ? 'Save your draft first.' :
+          controller.outputDraft.items.length === 0 ? 'Select at least one experience.' :
+          controller.isOutputStale ? 'Load the updated document before finalizing.' :
+          controller.outputPreview.some(item => item.missing || item.sourceChanged)
+            ? 'Review changed or unavailable sources in the draft.' : ''}
+        </p>
+      {/if}
+      {#if controller.outputSnapshots.length}
+        <div class="mt-4 divide-y divide-border border-t border-border">
+          {#each controller.outputSnapshots as snapshot (snapshot.id)}
+            <button type="button"
+              class="flex w-full items-center justify-between gap-3 py-3 text-left text-ui hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              onclick={() => controller.openSnapshot(snapshot.id)}>
+              <span>
+                <span class="block font-medium">Version {snapshot.version}</span>
+                <span class="block text-meta text-muted-foreground">
+                  {new Date(snapshot.finalizedAt).toLocaleDateString()} · {snapshot.sections.length} stories
+                </span>
+              </span>
+              <span class="text-meta text-primary">View / Print</span>
+            </button>
+          {/each}
+        </div>
+      {:else}
+        <p class="mt-4 text-meta text-muted-foreground">No finalized versions yet.</p>
+      {/if}
+    </section>
   </section>
 {/if}
