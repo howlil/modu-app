@@ -44,7 +44,7 @@ describe('Career Evidence global data port', () => {
     const draft = toggleOutputMoment(createOutput(goal, 'd1', at), first);
     await addOutput(draft);
     const finalized = await finalizeSavedOutput('d1', 1, 's1', at);
-    const snapshot = await careerDataPort.exportBackup();
+    const snapshot = decodeCareerBackup(await careerDataPort.exportBackup());
     expect((await careerDataPort.inspect()).recordCount).toBe(3);
     await expect(careerDataPort.validateBackup({ ...snapshot,
       outputs: [{ ...draft, items: [{ ...draft.items[0], momentId: 'missing' }] }]
