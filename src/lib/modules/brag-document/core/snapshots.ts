@@ -53,8 +53,8 @@ export function decodeFinalizedSnapshot(value: unknown): FinalizedSnapshot {
     typeof value.id !== 'string' || !value.id ||
     typeof value.outputId !== 'string' || !value.outputId ||
     typeof value.title !== 'string' || !value.title.trim() || value.title.length > 160 ||
-    !Number.isSafeInteger(value.version) || Number(value.version) < 1 ||
-    !Number.isSafeInteger(value.outputRevision) || Number(value.outputRevision) < 1 ||
+    (typeof value.version !== 'number' || !Number.isSafeInteger(value.version)) || Number(value.version) < 1 ||
+    (typeof value.outputRevision !== 'number' || !Number.isSafeInteger(value.outputRevision)) || Number(value.outputRevision) < 1 ||
     !timestamp(value.finalizedAt) ||
     !['interview','application','review'].includes(String(value.kind)) ||
     !validPeriod(value.period) || !Array.isArray(value.sections) || value.sections.length === 0 ||
