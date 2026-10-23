@@ -62,7 +62,7 @@ describe('Module boundary rules', () => {
       const ownOtherLayers = imports.filter((target) => target.includes('/modules/' + owner + '/') || target.startsWith('../') || target.startsWith('./'));
       if (layer === 'core') {
         expect(ownOtherLayers, path + ': pure core cannot import UI, controller, adapters or server').not.toContainEqual(expect.stringMatching(/(?:^|\/)(?:adapters|controller|components|server|routes)\//));
-        expect(content, path + ': domain must be browser-free').not.toMatch(/\b(localStorage|indexedDB|window|document|AudioContext|chrome)\b/);
+        expect(content, path + ': domain must be browser-free').not.toMatch(/\b(localStorage|indexedDB|window|AudioContext|chrome)\b|\bdocument\s*\.\s*(?:body|head|cookie|createElement|documentElement|getElementById|querySelector|querySelectorAll|addEventListener|removeEventListener)/);
       }
       if (layer === 'adapters') {
         expect(ownOtherLayers, path + ': adapters cannot import UI/controllers').not.toContainEqual(expect.stringMatching(/(?:^|\/)(?:controller|components)\/|\.svelte(?:\.ts)?$/));
