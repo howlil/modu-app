@@ -249,6 +249,11 @@ function applyCareerOperation(
         if (!outputReq.result) {
           fail(new RemoteApplyConflict('Finalized document references missing output.')); return;
         }
+        const parent = decodeOutput(outputReq.result);
+        if (row.outputRevision > parent.revision) {
+          fail(new RemoteApplyConflict('Finalized version references a future document revision.'));
+          return;
+        }
         const sources = tx.objectStore(MOMENTS).getAllKeys();
         sources.onsuccess = () => {
           const ids = new Set(sources.result.map(String));
