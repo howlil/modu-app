@@ -116,7 +116,7 @@ async function startCareerCapture(deviceId: string, explicitNewPairing: boolean)
       pendingRecovery.onsuccess = () => {
         if (pendingRecovery.result && !explicitNewPairing) {
           fail(new Error(
-            'Career Evidence restore requires a new pairing or recovery space. Export local data before reconnecting.'
+            'Career Evidence restore conflict: manual resolution requires a new pairing or recovery space. Export local data before reconnecting.'
           ));
           return;
         }
@@ -165,7 +165,7 @@ export async function beginCareerRemoteCapture(deviceId: string): Promise<void> 
       const blocked = meta.get(RECONCILIATION_KEY);
       blocked.onsuccess = () => {
         if (blocked.result) {
-          fail(new Error('Career Evidence restore requires explicit re-pairing before remote sync.'));
+          fail(new Error('Career Evidence restore conflict: manual resolution requires explicit re-pairing before remote sync.'));
           return;
         }
         activateCaptureFromRemote(tx, deviceId, moduleId);
