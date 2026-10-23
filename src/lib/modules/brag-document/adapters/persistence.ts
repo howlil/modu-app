@@ -1,5 +1,5 @@
 import { decodeMoment } from '../core/moments.ts';
-import { decodeOutput } from '../core/outputs.ts';
+import { assertOutputReferences, decodeOutput } from '../core/outputs.ts';
 import { buildFinalizedSnapshot, decodeFinalizedSnapshot } from '../core/snapshots.ts';
 import { verifyCareerState } from '../core/backup.ts';
 import type { CareerMoment, CareerOutput, FinalizedSnapshot } from '../core/types.ts';
@@ -16,6 +16,20 @@ export const CAREER_SNAPSHOTS_STORE = 'snapshots';
 const SNAPSHOTS = CAREER_SNAPSHOTS_STORE;
 const EVENT = 'modu:career-evidence-changed';
 const CHANNEL = 'modu-career-evidence-changes';
+/** Reserve >=2KiB for operation metadata, signature envelope and device ID.
+ * The transport's absolute JSON cap is 256KiB. Reject unsendable records
+ * before their IndexedDB commit; local-only mode remains exportable. */
+const MAX_QUEUED_PAYLOAD_BYTES = 254 * 1024;
+function assertSyncPayloadCapacity(value: unknown): void {
+  const serialized = JSON.stringify(value);
+  if (serialized === undefined || new TextEncoder().encode(serialized).byteLength >
+    MAX_QUEUED_PAYLOAD_BYTES) {
+    throw new CareerStorageError(
+      'This record is too large to sync. Split the document into smaller experiences.'
+    );
+  }
+}
+
 
 export class CareerStorageError extends Error {
   constructor(message: string) { super(message); this.name = 'CareerStorageError'; }
@@ -112,6 +126,7 @@ export function notifyCareerChange(): void {
 
 export async function addMoment(moment: CareerMoment): Promise<void> {
   const valid = decodeMoment(moment);
+  assertSyncPayloadCapacity({ moment: valid });
   await withDatabase(db => committedRequest(db, 'readwrite', store => store.add(valid),
     STORE, tx => queueLocalMutation(tx, 'brag-document', 'moment:' + valid.id,
       'upsert', { moment: valid })));
@@ -121,6 +136,7 @@ export async function addMoment(moment: CareerMoment): Promise<void> {
 /** Optimistic revision enforcement stays inside one IDB transaction. */
 export async function replaceMoment(next: CareerMoment, expectedRevision: number): Promise<void> {
   const valid = decodeMoment(next);
+  assertSyncPayloadCapacity({ moment: valid });
   await withDatabase(db => new Promise<void>((resolve, reject) => {
     const tx = db.transaction([STORE, OUTBOX_STORE, SYNC_META_STORE], 'readwrite');
     const store = tx.objectStore(STORE);
@@ -162,18 +178,33 @@ export async function loadOutputs(): Promise<CareerOutput[]> {
 
 export async function addOutput(output: CareerOutput): Promise<void> {
   const valid = decodeOutput(output);
-  await withDatabase(db => committedRequest(db, 'readwrite',
-    store => store.add(valid), OUTPUTS,
-    tx => queueLocalMutation(tx, 'brag-document', 'output:' + valid.id, 'upsert',
-      { output: valid })));
+  assertSyncPayloadCapacity({ output: valid });
+  await withDatabase(db => new Promise<void>((resolve, reject) => {
+    const tx = db.transaction([STORE, OUTPUTS, OUTBOX_STORE, SYNC_META_STORE], 'readwrite');
+    let failure: Error | null = null;
+    tx.oncomplete = () => resolve();
+    tx.onabort = () => reject(failure ?? tx.error ?? new CareerStorageError('Unable to add document.'));
+    const sources = tx.objectStore(STORE).getAll();
+    sources.onsuccess = () => {
+      try {
+        assertOutputReferences(valid, (sources.result as unknown[]).map(decodeMoment));
+        tx.objectStore(OUTPUTS).add(valid);
+        queueLocalMutation(tx, 'brag-document', 'output:' + valid.id, 'upsert', { output: valid });
+      } catch (error) {
+        failure = error instanceof Error ? error : new CareerStorageError('Invalid output references.');
+        tx.abort();
+      }
+    };
+  }));
   notifyCareerChange();
 }
 
 /** Atomic compare-and-swap inside a single readwrite transaction prevents lost updates. */
 export async function replaceOutput(next: CareerOutput, expectedRevision: number): Promise<void> {
   const valid = decodeOutput(next);
+  assertSyncPayloadCapacity({ output: valid });
   await withDatabase(db => new Promise<void>((resolve, reject) => {
-    const tx = db.transaction([OUTPUTS, OUTBOX_STORE, SYNC_META_STORE], 'readwrite');
+    const tx = db.transaction([STORE, OUTPUTS, OUTBOX_STORE, SYNC_META_STORE], 'readwrite');
     const store = tx.objectStore(OUTPUTS);
     let failure: Error | null = null;
     tx.oncomplete = () => resolve();
@@ -187,9 +218,18 @@ export async function replaceOutput(next: CareerOutput, expectedRevision: number
           valid.revision !== expectedRevision + 1) {
           throw new CareerStorageError('Document changed in another tab. Reload before editing.');
         }
-        store.put(valid);
-        queueLocalMutation(tx, 'brag-document', 'output:' + valid.id,
-          'upsert', { output: valid }, String(current.revision));
+        const sources = tx.objectStore(STORE).getAll();
+        sources.onsuccess = () => {
+          try {
+            assertOutputReferences(valid, (sources.result as unknown[]).map(decodeMoment));
+            store.put(valid);
+            queueLocalMutation(tx, 'brag-document', 'output:' + valid.id,
+              'upsert', { output: valid }, String(current.revision));
+          } catch (error) {
+            failure = error instanceof Error ? error : new CareerStorageError('Invalid output references.');
+            tx.abort();
+          }
+        };
       } catch (error) {
         failure = error instanceof Error ? error : new CareerStorageError('Unable to save document.');
         tx.abort();
@@ -240,6 +280,7 @@ export async function finalizeSavedOutput(
         const versions = (previousRequest.result as unknown[]).map(decodeFinalizedSnapshot);
         const version = Math.max(0, ...versions.map(v => v.version)) + 1;
         created = buildFinalizedSnapshot(output, moments, snapshotId, version, now);
+        assertSyncPayloadCapacity({ snapshot: created });
         tx.objectStore(SNAPSHOTS).add(created);
         queueLocalMutation(tx, 'brag-document', 'snapshot:' + created.id,
           'upsert', { snapshot: created });
