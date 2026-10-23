@@ -19,7 +19,7 @@ Module
 ├── Pomodoro
 ├── Habit Tracker
 ├── Language Learning
-└── Career Evidence (capture/history/document drafts/finalized snapshots; local-first slice)
+└── Career Evidence (capture/history/document drafts/finalized snapshots; integrated Global Data & Sync)
 ```
 
 Do not add JSON, UUID, image tools, category pages, PWA layers, storage abstractions, OPFS wrappers, or generic worker frameworks until a current module actually needs them.
