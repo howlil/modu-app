@@ -182,19 +182,19 @@ async function run() {
   process.stdout.write('Habit Tracker Chrome smoke passed: create → increment → reload → correction → insights → cross-tab visibility.\n');
 
   await navigate(SITE + '/');
-  await waitUntil('Landing exposes all three active modules',
-    'document.querySelectorAll("#tools a[href]").length === 3');
+  await waitUntil('Landing exposes all four active modules',
+    'document.querySelectorAll("#tools a[href]").length === 4');
   const links = await execute(
     'return [...document.querySelectorAll("#tools a[href]")].map(a => a.getAttribute("href"));'
   );
-  assert.deepEqual(links, ['/language', '/habit', '/pomodoro']);
+  assert.deepEqual(links, ['/language', '/habit', '/pomodoro', '/brag-document']);
   await navigate(SITE + '/language');
   await waitUntil('Language Learning workspace renders',
     'Boolean(document.body.textContent.includes("Language library") && !document.body.textContent.includes("Loading learning history"))');
   assert.equal(await execute(
     'return !document.body.textContent.includes("Retry connection") && document.title.includes("Language Learning");'
   ), true, 'Language Learning route is functional');
-  process.stdout.write('Landing Chrome smoke passed: 3 cards and Language Learning route.\n');
+  process.stdout.write('Landing Chrome smoke passed: 4 cards and Language Learning route.\n');
 }
 
 let failure = null;
