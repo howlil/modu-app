@@ -208,35 +208,6 @@
       notice = "Recovery complete. Older devices were revoked. Save your new recovery code.";
     });
   }
-  async function disconnectLocalSync() {
-    const previous = identity;
-    if (!previous || previous.status !== "paired") return;
-    if (!window.confirm(
-      "Disconnect this browser from its sync space? Local data stays here, but the old cloud space and other devices are NOT deleted. Export a global backup first. You can create a NEW sync space afterward."
-    )) return;
-    await action(async () => {
-      if (!navigator.locks?.request) throw new Error("Web Locks are required for safe disconnection.");
-      await navigator.locks.request("modu-global-restore", { mode: "exclusive" }, async () => {
-        const persisted = await readDeviceIdentity();
-        if (!persisted || persisted.deviceId !== previous.deviceId ||
-            persisted.spaceId !== previous.spaceId) {
-          throw new Error("Sync identity changed; reload settings before disconnecting.");
-        }
-        await clearDeviceIdentity();
-        await clearPendingPairing();
-        await clearOwnerInvitation();
-      });
-      identity = null;
-      inviteCode = "";
-      invitationId = "";
-      devices = [];
-      mode = "overview";
-      consent = false;
-      notifyDeviceIdentityChanged();
-      notice = "Local sync disconnected. Your data is still in this browser. Create a new space to re-enable synchronization.";
-    });
-  }
-
   async function refreshDevices() {
     await action(async () => {
       if (!identity || identity.status !== "paired") return;
@@ -472,16 +443,6 @@
               {:else if device.revoked}<span class="text-meta text-muted-foreground">Revoked</span>{/if}
             </div>
           {/each}
-          <div class="border-t border-border pt-3">
-            <p class="mb-2 text-meta text-muted-foreground">
-              Restored local data causing a sync conflict? Disconnect this browser before creating a new sync space.
-              Local data is preserved; the previous cloud space is not deleted.
-            </p>
-            <Button variant="outline" size="sm" class="rounded-full shadow-none"
-              disabled={busy} onclick={() => void disconnectLocalSync()}>
-              Disconnect this browser
-            </Button>
-          </div>
         {:else if !identity}
           <button class="text-meta text-muted-foreground underline underline-offset-4" onclick={() => mode="recover"}>Recover a lost device</button>
         {/if}
