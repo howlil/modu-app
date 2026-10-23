@@ -244,7 +244,7 @@
               class="flex w-full items-center justify-between gap-3 py-3 text-left text-ui hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               onclick={() => openVersion(snapshot.id)}>
               <span>
-                <span class="block font-medium">Version {snapshot.version}</span>
+                <span class="block font-medium">Version {snapshot.version} · {snapshot.id.slice(0, 8)}</span>
                 <span class="block text-meta text-muted-foreground">
                   {new Date(snapshot.finalizedAt).toLocaleDateString()} · {snapshot.sections.length} stories
                 </span>
