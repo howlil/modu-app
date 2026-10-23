@@ -1,6 +1,6 @@
 import type { CareerMoment, CareerOutput, FinalizedSnapshot } from './types.ts';
 import { CareerValidationError, decodeMoment } from './moments.ts';
-import { decodeOutput } from './outputs.ts';
+import { assertOutputReferences, decodeOutput } from './outputs.ts';
 import { decodeFinalizedSnapshot } from './snapshots.ts';
 
 export type CareerBackup = {
@@ -40,16 +40,9 @@ export function decodeCareerBackup(raw: unknown): CareerBackup {
       throw new CareerValidationError('Backup contains duplicate career record IDs.');
   }
   const sourceById = new Map(moments.map(item => [item.id, item]));
+  for (const output of outputs) assertOutputReferences(output, moments);
   const docById = new Map(outputs.map(item => [item.id, item]));
   const versions = new Set<string>();
-  for (const output of outputs) {
-    for (const item of output.items) {
-      const source = sourceById.get(item.momentId);
-      if (!source || item.sourceRevision > source.revision) {
-        throw new CareerValidationError('Career document references unavailable or future source revision.');
-      }
-    }
-  }
   for (const snapshot of snapshots) {
     const parent = docById.get(snapshot.outputId);
     if (!parent || snapshot.outputRevision > parent.revision) {
