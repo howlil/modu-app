@@ -3,7 +3,7 @@ import { decodeCareerBackup, emptyCareerBackup } from '../core/backup.ts';
 import { exportMomentsBackup } from './persistence.ts';
 import {
   acknowledgeCareerSyncOperations, applyCareerRemoteChanges,
-  beginCareerRemoteCapture, beginCareerSyncCapture,
+  beginCareerRemoteCapture, beginCareerSyncCapture, resumeCareerSyncCapture,
   readCareerPendingSyncOperations, readCareerRemoteCursor,
   replaceCareerBackupForRestore
 } from './sync.ts';
@@ -33,7 +33,7 @@ export const careerDataPort: SyncOutboxPort = {
   },
   restoreBackup: replaceCareerBackupForRestore,
   beginSyncCapture: beginCareerSyncCapture,
-  resumeSyncCapture: beginCareerSyncCapture,
+  resumeSyncCapture: resumeCareerSyncCapture,
   beginRemoteSyncCapture: beginCareerRemoteCapture,
   readRemoteCursor: readCareerRemoteCursor,
   applyRemoteChanges: applyCareerRemoteChanges,

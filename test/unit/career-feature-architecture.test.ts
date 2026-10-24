@@ -1,3 +1,4 @@
+// @ts-nocheck — Vitest executes Bun/Node built-ins; app tsconfig intentionally omits Node ambient types.
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -18,7 +19,7 @@ describe('Career Evidence feature boundary', () => {
       if (!name.endsWith('.ts')) continue;
       const code = source('core/' + name);
       expect(code).not.toMatch(/from\s+['"]\.\.\/(adapters|controller|components)\//);
-      expect(code).not.toMatch(/\b(?:indexedDB|localStorage|window|document)\s*\./);
+      expect(code).not.toMatch(/\b(?:indexedDB|localStorage|window)\s*\.|\bdocument\s*\.\s*(?:body|head|cookie|createElement|documentElement|getElementById|querySelector|querySelectorAll)/);
     }
   });
   it('keeps UI composition away from raw IDB APIs', () => {

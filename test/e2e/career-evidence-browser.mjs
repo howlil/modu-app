@@ -51,7 +51,13 @@ async function until(label, expression, timeout = 16000) {
     } catch { /* still loading */ }
     await sleep(150);
   }
-  throw new Error("Timed out: " + label);
+  const debug = await js(`return JSON.stringify({
+    headings:[...document.querySelectorAll("h1,h2,h3")].map(e=>e.textContent.trim()).slice(-12),
+    content:document.body.innerText.slice(-3200),
+    checkboxes:document.querySelectorAll('input[type="checkbox"]').length,
+    sections:[...document.querySelectorAll("section[aria-label]")].map(e=>e.getAttribute("aria-label"))
+  });`).catch(cause => String(cause));
+  throw new Error("Timed out: " + label + " | " + debug);
 }
 
 async function clickButton(name) {
@@ -119,7 +125,7 @@ async function run() {
   await fill("#career-goal-title", "M7 Backend Interview");
   await fill("#career-goal-role", "Backend Engineer");
   await clickButton("Create document");
-  await until("Output builder", 'Boolean(document.querySelector("section[aria-label=\"Choose career evidence\"] input[type=checkbox]"))');
+  await until("Output builder", 'Boolean(document.querySelector("section[aria-label*=evidence] input[type=checkbox]"))');
   await clickSelector('section[aria-label="Choose career evidence"] input[type=checkbox]');
   await until("Evidence selected", 'document.body.textContent.includes("1 selected")');
   await fill('textarea[id^="output-story-"]',

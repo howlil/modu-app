@@ -59,6 +59,31 @@ export async function readBoundedSyncJson(response: Response): Promise<unknown> 
   }
 }
 
+/** Size-aware stable prefix. Preserve outbox order and let the caller retry the tail.
+ * This budgets the exact unsigned JSON envelope sent by push(), not just payloads. */
+export function takeSizeBoundedSyncBatch(
+  pending: readonly PendingSyncOperation[], maxBytes = SYNC_MAX_BODY_BYTES
+): PendingSyncOperation[] {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) throw new Error("Invalid sync byte budget.");
+  const result: PendingSyncOperation[] = [];
+  const encoder = new TextEncoder();
+  let size = encoder.encode('{"operations":[]}').byteLength;
+  for (const entry of pending.slice(0, SYNC_MAX_BATCH)) {
+    const { sequence: _sequence, ...wire } = entry;
+    const bytes = encoder.encode(JSON.stringify(wire)).byteLength;
+    const next = size + bytes + (result.length ? 1 : 0);
+    if (next > maxBytes) {
+      if (result.length === 0) {
+        throw new Error("Single sync operation exceeds the payload size limit. Resolve or export data before retrying.");
+      }
+      break;
+    }
+    result.push(entry);
+    size = next;
+  }
+  return result;
+}
+
 export class SyncTransport {
   constructor(
     private readonly device: AuthorizedDevice,

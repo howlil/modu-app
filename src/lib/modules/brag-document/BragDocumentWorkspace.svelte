@@ -72,6 +72,8 @@
       <p class="mt-8 border-t border-border pt-4 text-meta text-muted-foreground">
         Career Evidence stays on this browser until you enable Data & Sync pairing.
         Use History → Export backup to keep a separate copy of moments, documents, and finalized versions.
+        Paired sync sends signed, readable JSON to the Modu sync service; do not include confidential work details
+        unless you are authorized to store and synchronize them.
       </p>
     {/if}
   </div>

@@ -69,6 +69,16 @@ describe('Career Output domain', () => {
     expect(removeOutputMoment(selected, source.id).items).toEqual([]);
   });
 
+  it('detaches reactive proxy period data before IndexedDB serialization', () => {
+    const output = createOutput(goal, 'proxy-proof', at);
+    const proxied = { ...output, period: new Proxy(output.period, {}) };
+    expect(() => structuredClone(proxied)).toThrow();
+    const plain = decodeOutput(proxied);
+    expect(plain).toEqual(output);
+    expect(plain.period).not.toBe(proxied.period);
+    expect(() => structuredClone(plain)).not.toThrow();
+  });
+
   it('validates revision increments and rejects duplicate or corrupted items', () => {
     const source = moment('a');
     const output = toggleOutputMoment(createOutput(goal, 'doc', at), source);

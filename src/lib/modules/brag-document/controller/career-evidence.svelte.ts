@@ -1,5 +1,6 @@
 import type { CareerMoment, CareerOutput, FinalizedSnapshot, MomentEditInput, NewOutputInput, Period } from '../core/types.ts';
 import { createMoment, filterMoments } from '../core/moments.ts';
+import { decodeOutput } from '../core/outputs.ts';
 import {
   committedOutputDraft, createOutput, outputCandidates, projectOutputItems,
   toggleOutputMoment, removeOutputMoment, moveOutputMoment, updateOutputGoal, updateOutputNarrative
@@ -59,12 +60,7 @@ export function createCareerEvidenceController() {
   );
   const outputSnapshots = $derived(
     snapshots.filter(snapshot => snapshot.outputId === selectedOutputId)
-      .sort((a, b) => b.version - a.version)
-  );
-  const canFinalize = $derived(
-    !!outputDraft && !isOutputDirty && !isOutputStale && !busy &&
-    outputDraft.items.length > 0 && outputPreview.every(item =>
-      !item.missing && !item.sourceChanged)
+      .sort((a, b) => b.finalizedAt.localeCompare(a.finalizedAt) || a.id.localeCompare(b.id))
   );
   const selectedOutput = $derived(outputs.find(item => item.id === selectedOutputId) ?? null);
   const isOutputDirty = $derived(!!outputBase && !!outputDraft &&
@@ -74,6 +70,11 @@ export function createCareerEvidenceController() {
   const availableEvidence = $derived(outputDraft
     ? outputCandidates(moments, outputDraft, outputQuery) : []);
   const outputPreview = $derived(outputDraft ? projectOutputItems(outputDraft, moments) : []);
+  const canFinalize = $derived(
+    !!outputDraft && !isOutputDirty && !isOutputStale && !busy &&
+    outputDraft.items.length > 0 && outputPreview.every(item =>
+      !item.missing && !item.sourceChanged)
+  );
   const recentMoments = $derived(filterMoments(moments, '').slice(0, 3));
   const activeCount = $derived(moments.filter(moment => !moment.archivedAt).length);
   const archivedCount = $derived(moments.filter(moment => moment.archivedAt).length);
@@ -325,7 +326,7 @@ export function createCareerEvidenceController() {
     selectedOutputId = id;
     selectedSnapshotId = null;
     outputBase = selected;
-    outputDraft = structuredClone(selected);
+    outputDraft = decodeOutput(selected);
     outputQuery = '';
     outputError = '';
     confirmOutputDiscard = false;
@@ -338,9 +339,9 @@ export function createCareerEvidenceController() {
     const next = pendingOutputView;
     if (pendingOutputReload && selectedOutput) {
       outputBase = selectedOutput;
-      outputDraft = structuredClone(selectedOutput);
+      outputDraft = decodeOutput(selectedOutput);
     } else if (outputBase) {
-      outputDraft = structuredClone(outputBase);
+      outputDraft = decodeOutput(outputBase);
     }
     outputError = '';
     confirmOutputDiscard = false;
@@ -399,7 +400,7 @@ export function createCareerEvidenceController() {
       selectedOutputId = draft.id;
       selectedSnapshotId = null;
       outputBase = draft;
-      outputDraft = structuredClone(draft);
+      outputDraft = decodeOutput(draft);
       outputQuery = '';
       confirmOutputDiscard = false;
       notice = 'Document created. Select the evidence you want to use.';
@@ -457,7 +458,7 @@ export function createCareerEvidenceController() {
       return;
     }
     outputBase = selectedOutput;
-    outputDraft = structuredClone(selectedOutput);
+    outputDraft = decodeOutput(selectedOutput);
     outputError = '';
     pendingOutputReload = false;
   }
@@ -482,7 +483,7 @@ export function createCareerEvidenceController() {
       await replaceOutput(committed, outputBase.revision);
       outputs = outputs.map(item => item.id === committed.id ? committed : item);
       outputBase = committed;
-      outputDraft = structuredClone(committed);
+      outputDraft = decodeOutput(committed);
       confirmOutputDiscard = false;
       notice = 'Document saved.';
       return true;

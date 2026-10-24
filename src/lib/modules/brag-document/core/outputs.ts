@@ -54,7 +54,16 @@ export function decodeOutput(value: unknown): CareerOutput {
   });
   return {
     id: value.id, kind: value.kind as CareerOutput['kind'], title,
-    targetRole, organization, period: value.period as Period,
+    targetRole, organization,
+    // A Svelte $state draft is a Proxy. Never return nested ingress objects:
+    // IndexedDB structured cloning rejects Proxy instances even when valid.
+    period: (value.period as Period).kind === 'all-time'
+      ? { kind: 'all-time' }
+      : (value.period as Period).kind === 'year'
+        ? { kind: 'year', year: (value.period as Extract<Period, { kind: 'year' }>).year }
+        : { kind: 'month',
+          year: (value.period as Extract<Period, { kind: 'month' }>).year,
+          month: (value.period as Extract<Period, { kind: 'month' }>).month },
     items, revision: value.revision as number,
     createdAt: value.createdAt, updatedAt: value.updatedAt
   };
@@ -74,6 +83,23 @@ export function createOutput(input: NewOutputInput, id: string, now: Date): Care
     updatedAt: now.toISOString()
   };
   return decodeOutput(result);
+}
+
+/** Enforce source existence/revision at each domain write boundary.
+ * Selection may reference an older version (stale = review before finalization),
+ * but never a missing source or a future version. */
+export function assertOutputReferences(
+  output: CareerOutput, moments: readonly CareerMoment[]
+): void {
+  const sources = new Map(moments.map(moment => [moment.id, moment]));
+  for (const item of output.items) {
+    const source = sources.get(item.momentId);
+    if (!source || source.revision < item.sourceRevision) {
+      throw new CareerValidationError(
+        'Career document references missing or future source experience.'
+      );
+    }
+  }
 }
 
 /** Period narrows discovery, not selected evidence: changing a date never deletes a reference. */

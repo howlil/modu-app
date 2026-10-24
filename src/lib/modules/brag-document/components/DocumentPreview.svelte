@@ -35,7 +35,7 @@
     </Button>
   </div>
   <p class="career-print-controls mb-4 flex items-center gap-2 text-meta text-muted-foreground">
-    <LockKeyhole class="size-4"/> Version {snapshot.version} · Finalized {new Date(snapshot.finalizedAt).toLocaleDateString()} · Immutable copy
+    <LockKeyhole class="size-4"/> Version {snapshot.version} · {snapshot.id.slice(0, 8)} · Finalized {new Date(snapshot.finalizedAt).toLocaleDateString()} · Immutable copy
   </p>
 
   <article id="career-print-sheet" aria-label="Printable career document"
@@ -74,7 +74,7 @@
       {/each}
     </div>
     <footer class="mt-8 border-t border-border pt-3 text-meta text-muted-foreground">
-      Finalized {new Date(snapshot.finalizedAt).toLocaleDateString()} · Version {snapshot.version}
+      Finalized {new Date(snapshot.finalizedAt).toLocaleDateString()} · Version {snapshot.version} · {snapshot.id.slice(0, 8)}
     </footer>
   </article>
 </section>

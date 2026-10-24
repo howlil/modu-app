@@ -18,6 +18,7 @@ import {
 import type { CareerMoment, CareerOutput, FinalizedSnapshot } from '../core/types.ts';
 
 const moduleId = 'brag-document' as const;
+const RECONCILIATION_KEY = 'post-restore-reconciliation';
 const localStores = [MOMENTS, OUTPUTS, SNAPSHOTS] as const;
 const syncStores = [MOMENTS, OUTPUTS, SNAPSHOTS, OUTBOX_STORE, SYNC_META_STORE] as const;
 const incomingStores = [...syncStores, INBOX_STORE, TOMBSTONE_STORE] as const;
@@ -80,55 +81,96 @@ export async function replaceCareerBackupForRestore(raw: unknown): Promise<void>
   const db = await openCareerDatabase();
   try {
     await transaction(db, incomingStores, 'readwrite', (tx, finish) => {
-      for (const name of localStores) tx.objectStore(name).clear();
-      for (const moment of backup.moments) tx.objectStore(MOMENTS).add(moment);
-      for (const output of backup.outputs) tx.objectStore(OUTPUTS).add(output);
-      for (const snapshot of backup.snapshots) tx.objectStore(SNAPSHOTS).add(snapshot);
-      resetCaptureAfterRestore(tx);
-      resetInboxAfterRestore(tx);
-      finish(undefined);
+      const metadata = tx.objectStore(SYNC_META_STORE);
+      const capture = metadata.get('capture');
+      const cursor = metadata.get('remote-cursor');
+      let readCount = 0;
+      const replace = () => {
+        if (++readCount !== 2) return;
+        const wasPaired = capture.result !== undefined || cursor.result !== undefined;
+        for (const name of localStores) tx.objectStore(name).clear();
+        for (const moment of backup.moments) tx.objectStore(MOMENTS).add(moment);
+        for (const output of backup.outputs) tx.objectStore(OUTPUTS).add(output);
+        for (const snapshot of backup.snapshots) tx.objectStore(SNAPSHOTS).add(snapshot);
+        resetCaptureAfterRestore(tx);
+        resetInboxAfterRestore(tx);
+        if (wasPaired) metadata.put({ key: RECONCILIATION_KEY, required: true });
+        finish(undefined);
+      };
+      capture.onsuccess = replace;
+      cursor.onsuccess = replace;
     });
     notifyCareerChange();
   } finally { db.close(); }
 }
 
-export async function beginCareerSyncCapture(deviceId: string): Promise<void> {
+/** Explicit new owner pairing can establish a new sync generation.
+ * Automatic resume must never publish a restored database as a fresh baseline
+ * into a previously paired cloud space. */
+async function startCareerCapture(deviceId: string, explicitNewPairing: boolean): Promise<void> {
   const db = await openCareerDatabase();
   try {
     await transaction(db, syncStores, 'readwrite', (tx, finish, fail) => {
-      const request = tx.objectStore(SYNC_META_STORE).get('capture');
-      request.onsuccess = () => {
-        const current: unknown = request.result;
-        if (current !== undefined) {
-          if (current && typeof current === 'object' &&
-              (current as { enabled?: unknown }).enabled === true &&
-              (current as { deviceId?: unknown }).deviceId === deviceId) {
-            finish(undefined); // already enrolled, no duplicate baseline
-            return;
-          }
-          fail(new Error('Career Evidence sync capture belongs to another device or is corrupt.'));
+      const meta = tx.objectStore(SYNC_META_STORE);
+      const pendingRecovery = meta.get(RECONCILIATION_KEY);
+      pendingRecovery.onsuccess = () => {
+        if (pendingRecovery.result && !explicitNewPairing) {
+          fail(new Error(
+            'Career Evidence restore conflict: manual resolution requires a new pairing or recovery space. Export local data before reconnecting.'
+          ));
           return;
         }
-        allRecords(tx, (moments, outputs, snapshots) => {
-          const baseline = verifyCareerState(moments, outputs, snapshots);
-          if (new TextEncoder().encode(JSON.stringify(baseline)).byteLength > 185_000) {
-            fail(new Error('Career Evidence history exceeds the initial sync baseline limit. Export a backup first.'));
+        const request = meta.get('capture');
+        request.onsuccess = () => {
+          const current: unknown = request.result;
+          if (current !== undefined) {
+            if (current && typeof current === 'object' &&
+                (current as { enabled?: unknown }).enabled === true &&
+                (current as { deviceId?: unknown }).deviceId === deviceId) {
+              finish(undefined); // already enrolled, no duplicate baseline
+              return;
+            }
+            fail(new Error('Career Evidence sync capture belongs to another device or is corrupt.'));
             return;
           }
-          initializeCaptureWithBaseline(tx, moduleId, deviceId, baseline);
-          finish(undefined);
-        }, fail);
+          allRecords(tx, (moments, outputs, snapshots) => {
+            const baseline = verifyCareerState(moments, outputs, snapshots);
+            if (new TextEncoder().encode(JSON.stringify(baseline)).byteLength > 185_000) {
+              fail(new Error('Career Evidence history exceeds the initial sync baseline limit. Export a backup first.'));
+              return;
+            }
+            initializeCaptureWithBaseline(tx, moduleId, deviceId, baseline);
+            if (explicitNewPairing) meta.delete(RECONCILIATION_KEY);
+            finish(undefined);
+          }, fail);
+        };
       };
     });
   } finally { db.close(); }
 }
 
+export async function beginCareerSyncCapture(deviceId: string): Promise<void> {
+  return startCareerCapture(deviceId, true);
+}
+
+export async function resumeCareerSyncCapture(deviceId: string): Promise<void> {
+  return startCareerCapture(deviceId, false);
+}
+
 export async function beginCareerRemoteCapture(deviceId: string): Promise<void> {
   const db = await openCareerDatabase();
   try {
-    await transaction(db, incomingStores, 'readwrite', (tx, finish) => {
-      activateCaptureFromRemote(tx, deviceId, moduleId);
-      finish(undefined);
+    await transaction(db, incomingStores, 'readwrite', (tx, finish, fail) => {
+      const meta = tx.objectStore(SYNC_META_STORE);
+      const blocked = meta.get(RECONCILIATION_KEY);
+      blocked.onsuccess = () => {
+        if (blocked.result) {
+          fail(new Error('Career Evidence restore conflict: manual resolution requires explicit re-pairing before remote sync.'));
+          return;
+        }
+        activateCaptureFromRemote(tx, deviceId, moduleId);
+        finish(undefined);
+      };
     });
   } finally { db.close(); }
 }
@@ -240,9 +282,9 @@ function applyCareerOperation(
     req.onsuccess = () => {
       if (req.result.some((value: unknown) => {
         const other = decodeFinalizedSnapshot(value);
-        return other.id === row.id || other.version === row.version;
+        return other.id === row.id;
       })) {
-        fail(new RemoteApplyConflict('Finalized document version collision.')); return;
+        fail(new RemoteApplyConflict('Finalized document snapshot identity collision.')); return;
       }
       const outputReq = tx.objectStore(OUTPUTS).get(row.outputId);
       outputReq.onsuccess = () => {
@@ -277,16 +319,25 @@ export async function applyCareerRemoteChanges(
   const db = await openCareerDatabase();
   try {
     await transaction(db, incomingStores, 'readwrite', (tx, finish, fail) => {
-      applyIncomingInTransaction(
-        tx, moduleId, events,
-        (event, next, stop) => {
-          try { applyCareerOperation(tx, event, next, stop); }
-          catch (cause) {
-            stop(cause instanceof Error ? cause : new RemoteApplyConflict('Invalid remote career operation.'));
-          }
-        },
-        () => finish(undefined), fail
-      );
+      const pendingReconciliation = tx.objectStore(SYNC_META_STORE).get(RECONCILIATION_KEY);
+      pendingReconciliation.onsuccess = () => {
+        if (pendingReconciliation.result) {
+          fail(new RemoteApplyConflict(
+            'Career Evidence restore conflict: manual resolution required before remote replay.'
+          ));
+          return;
+        }
+        applyIncomingInTransaction(
+          tx, moduleId, events,
+          (event, next, stop) => {
+            try { applyCareerOperation(tx, event, next, stop); }
+            catch (cause) {
+              stop(cause instanceof Error ? cause : new RemoteApplyConflict('Invalid remote career operation.'));
+            }
+          },
+          () => finish(undefined), fail
+        );
+      };
     });
     notifyCareerChange();
   } finally { db.close(); }
